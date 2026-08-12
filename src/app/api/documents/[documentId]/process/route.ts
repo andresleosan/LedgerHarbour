@@ -1,0 +1,42 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+
+import { getCurrentIdentity } from "../../../../../modules/auth/session";
+import { JobError, JOB_ERROR_CODES, queueOcr } from "../../../../../modules/jobs/job-service";
+import type { DocumentId } from "../../../../../modules/invoices/ocr-provider";
+
+type RouteContext = { params: Promise<{ documentId: string }> };
+const requestSchema = z.object({}).strict();
+
+function errorResponse(error: unknown): NextResponse {
+  if (error instanceof JobError) {
+    const status = error.code === JOB_ERROR_CODES.DOCUMENT_NOT_FOUND || error.code === JOB_ERROR_CODES.JOB_NOT_FOUND ? 404 :
+      error.code === JOB_ERROR_CODES.BUSINESS_ACCESS_DENIED || error.code === JOB_ERROR_CODES.INACTIVE_BUSINESS ? 403 :
+      error.code === JOB_ERROR_CODES.OCR_JOB_CONFLICT ? 409 : 400;
+    return NextResponse.json({ error: { code: error.code, message: error.message } }, { status });
+  }
+  return NextResponse.json({ error: { code: "OCR_PROCESSING_FAILED", message: "The OCR request could not be processed." } }, { status: 500 });
+}
+
+export async function POST(request: Request, context: RouteContext) {
+  const identity = getCurrentIdentity();
+  if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: { code: JOB_ERROR_CODES.INVALID_JOB_REQUEST, message: "The OCR job request is invalid." } }, { status: 400 });
+  }
+  if (!requestSchema.safeParse(body).success) {
+    return NextResponse.json({ error: { code: JOB_ERROR_CODES.INVALID_JOB_REQUEST, message: "The OCR job request is invalid." } }, { status: 400 });
+  }
+
+  try {
+    const { documentId } = await context.params;
+     const job = await queueOcr(documentId as DocumentId, identity);
+    return NextResponse.json({ job }, { status: 202 });
+  } catch (error) {
+    return errorResponse(error);
+  }
+}

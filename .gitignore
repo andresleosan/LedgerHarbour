@@ -1,0 +1,14 @@
+node_modules/
+.next/
+out/
+dist/
+.env
+.env.*
+!.env.example
+storage/
+private-storage/
+test-results/
+playwright-report/
+coverage/
+*.tsbuildinfo
+.superpowers/

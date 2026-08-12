@@ -1,0 +1,37 @@
+{
+  "name": "ledgerharbour",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint src tests --no-config-lookup --parser @typescript-eslint/parser --plugin @typescript-eslint --ext .ts,.tsx --rule @typescript-eslint/no-unused-vars:error",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test"
+  },
+  "dependencies": {
+    "drizzle-orm": "0.45.2",
+    "next": "15.5.23",
+    "next-intl": "4.13.6",
+    "pg": "8.23.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1",
+    "@electric-sql/pglite": "0.5.4",
+    "@typescript-eslint/eslint-plugin": "8.67.0",
+    "@types/pg": "8.21.0",
+    "@types/node": "26.2.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.4",
+    "eslint": "9.39.1",
+    "@typescript-eslint/parser": "8.67.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}
