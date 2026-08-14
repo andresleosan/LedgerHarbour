@@ -43,10 +43,11 @@ export default function CategoriesPage({ params }: { params: Promise<{ businessI
 
   const create = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const submittedName = String(new FormData(event.currentTarget).get("categoryName") ?? "").trim();
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch(`/api/businesses/${businessId}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name }) });
+      const response = await fetch(`/api/businesses/${businessId}/categories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: submittedName }) });
       const payload = await response.json() as Category & ErrorPayload;
       if (!response.ok) throw new Error(payload.error?.code);
       setName("");

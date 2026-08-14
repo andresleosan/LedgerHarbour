@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "LedgerHarbour",
-  description: "LedgerHarbour finance workspace.",
+  title: "LedgerHarbour | Control financiero por negocio",
+  description: "Revisa facturas, automatiza OCR y controla varios negocios desde un mismo workspace.",
 };
 
 export default function RootLayout({
@@ -12,7 +12,7 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="es">
       <body>{children}</body>
     </html>
   );

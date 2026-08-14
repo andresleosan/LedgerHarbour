@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useState } from "react";
+import { use, useRef, useState } from "react";
 
 import { messages } from "@/i18n/config";
 import { useUrlLocale } from "@/ui/useUrlLocale";
@@ -35,6 +35,7 @@ function messageForError(code: string | undefined, copy: typeof messages.en.docu
 export default function UploadPage({ params }: { params: Promise<{ businessId: string }> }) {
   const { businessId } = use(params);
   const { locale, setLocale, hrefFor } = useUrlLocale();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [file, setFile] = useState<File | null>(null);
   const [document, setDocument] = useState<SafeDocument | null>(null);
   const [errorCode, setErrorCode] = useState<string | null>(null);
@@ -42,11 +43,12 @@ export default function UploadPage({ params }: { params: Promise<{ businessId: s
   const copy = messages[locale].documents;
 
   const upload = async () => {
-    if (!file) { setErrorCode("UNSUPPORTED_DOCUMENT_FORMAT"); return; }
+    const selectedFile = file ?? fileInputRef.current?.files?.[0] ?? null;
+    if (!selectedFile) { setErrorCode("UNSUPPORTED_DOCUMENT_FORMAT"); return; }
     setErrorCode(null); setDocument(null); setUploading(true);
     try {
       const form = new FormData();
-      form.set("file", file);
+      form.set("file", selectedFile);
       const response = await fetch(`/api/businesses/${businessId}/documents`, { method: "POST", body: form });
       const payload = await response.json() as SafeDocument & { error?: { code?: string } };
       if (!response.ok) { setErrorCode(payload.error?.code ?? "UPLOAD_FAILED"); return; }
@@ -66,7 +68,7 @@ export default function UploadPage({ params }: { params: Promise<{ businessId: s
         <div className="toolbar" aria-label={copy.languageLabel}><span>{copy.languageLabel}</span>{(["en", "es"] as const).map((candidate) => <button className="locale-button" key={candidate} type="button" aria-pressed={locale === candidate} onClick={() => setLocale(candidate)}>{candidate === "en" ? copy.localeEnglish : copy.localeSpanish}</button>)}</div>
          <Link className="back" href={hrefFor(`/business/${businessId}/members`)}>{copy.brand} / {copy.back}</Link>
         <section className="upload-card" aria-labelledby="upload-title"><p className="eyebrow">{copy.eyebrow}</p><h1 id="upload-title">{copy.title}</h1><p className="description">{copy.description}</p>
-          <div className="drop-area"><label htmlFor="invoice-file">{copy.fileLabel}</label><input id="invoice-file" aria-label={copy.fileLabel} type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.tif,.tiff,application/pdf,image/jpeg,image/png,image/heic,image/tiff" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><p className="hint">{copy.limit}</p><button type="button" onClick={() => void upload()} disabled={uploading}>{uploading ? copy.uploading : copy.uploadAction}</button></div>
+           <div className="drop-area"><label htmlFor="invoice-file">{copy.fileLabel}</label><input ref={fileInputRef} id="invoice-file" aria-label={copy.fileLabel} type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.tif,.tiff,application/pdf,image/jpeg,image/png,image/heic,image/tiff" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><p className="hint">{copy.limit}</p><button type="button" onClick={() => void upload()} disabled={uploading}>{uploading ? copy.uploading : copy.uploadAction}</button></div>
           {errorCode && <p className="error" role="alert">{messageForError(errorCode, copy)}</p>}
           {document && <p className="success" role="status" aria-live="polite">{copy.uploaded.replace("{status}", document.status)} <Link href={`/api/documents/${document.id}/download`}>{copy.download.replace("{name}", document.originalFileName)}</Link></p>}
         </section>

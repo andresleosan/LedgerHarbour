@@ -42,10 +42,17 @@ export default function CurrenciesPage({ params }: { params: Promise<{ businessI
 
   const create = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    const submitted = new FormData(event.currentTarget);
+    const submittedForm = {
+      name: String(submitted.get("currencyName") ?? "").trim(),
+      symbol: String(submitted.get("currencySymbol") ?? "").trim(),
+      decimalCount: String(submitted.get("currencyDecimals") ?? "2"),
+      isoCode: String(submitted.get("currencyIso") ?? "").trim(),
+    };
     setBusy(true);
     setError(null);
     try {
-      const response = await fetch(`/api/businesses/${businessId}/currencies`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: form.name, symbol: form.symbol, decimalCount: Number(form.decimalCount), isoCode: form.isoCode || null }) });
+      const response = await fetch(`/api/businesses/${businessId}/currencies`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: submittedForm.name, symbol: submittedForm.symbol, decimalCount: Number(submittedForm.decimalCount), isoCode: submittedForm.isoCode || null }) });
       const payload = await response.json() as Currency & ErrorPayload;
       if (!response.ok) throw new Error(payload.error?.code);
       setForm({ name: "", symbol: "", decimalCount: "2", isoCode: "" });
