@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { getCurrentIdentity } from "../../../../../modules/auth/session";
 import { DocumentError, DOCUMENT_ERROR_CODES, getDocumentForDownload } from "../../../../../modules/documents/document-service";
+import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 
 type RouteContext = { params: Promise<{ documentId: string }> };
 
@@ -19,7 +20,12 @@ export async function GET(_request: Request, context: RouteContext) {
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   const { documentId } = await context.params;
   try {
-     const { document, stream } = await getDocumentForDownload(documentId, identity);
+     const persistence = getPersistenceContext();
+     const { document, stream } = await getDocumentForDownload(documentId, identity, {
+       tenancyRepository: persistence.tenancyRepository,
+       documentRepository: persistence.documentRepository,
+       storage: persistence.storage,
+     });
     const safeName = document.originalFileName.replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 180) || "document";
     return new Response(stream, {
       status: 200,

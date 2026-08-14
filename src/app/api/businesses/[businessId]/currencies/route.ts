@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentIdentity } from "../../../../../modules/auth/session";
 import { CurrencyError, CURRENCY_ERROR_CODES, deactivateCurrency, listCurrencies, setCurrency } from "../../../../../modules/accounting/currency-service";
 import type { BusinessId } from "../../../../../modules/tenancy/types";
+import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 
 type RouteContext = { params: Promise<{ businessId: string }> };
 
@@ -28,7 +29,14 @@ function identity() {
 export async function GET(_request: Request, context: RouteContext) {
   const actor = identity();
   if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
-  try { return NextResponse.json(await listCurrencies((await context.params).businessId as BusinessId, actor)); } catch (error) { return responseFor(error); }
+  try {
+    const persistence = getPersistenceContext();
+    return NextResponse.json(await listCurrencies((await context.params).businessId as BusinessId, actor, {
+      tenancyRepository: persistence.tenancyRepository,
+      currencies: persistence.currencyRepository,
+      invoices: persistence.invoiceRepository,
+    }));
+  } catch (error) { return responseFor(error); }
 }
 
 export async function POST(request: Request, context: RouteContext) {
@@ -38,7 +46,14 @@ export async function POST(request: Request, context: RouteContext) {
   try { body = await request.json(); } catch { return NextResponse.json({ error: { code: "INVALID_CURRENCY_REQUEST", message: "The currency request is invalid." } }, { status: 400 }); }
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: { code: "INVALID_CURRENCY_REQUEST", message: "The currency request is invalid." } }, { status: 400 });
-  try { return NextResponse.json(await setCurrency({ ...parsed.data, businessId: (await context.params).businessId as BusinessId }, actor), { status: 201 }); } catch (error) { return responseFor(error); }
+  try {
+    const persistence = getPersistenceContext();
+    return NextResponse.json(await setCurrency({ ...parsed.data, businessId: (await context.params).businessId as BusinessId }, actor, {
+      tenancyRepository: persistence.tenancyRepository,
+      currencies: persistence.currencyRepository,
+      invoices: persistence.invoiceRepository,
+    }), { status: 201 });
+  } catch (error) { return responseFor(error); }
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -48,5 +63,11 @@ export async function PATCH(request: Request, context: RouteContext) {
   try { body = await request.json(); } catch { return NextResponse.json({ error: { code: "INVALID_CURRENCY_REQUEST", message: "The currency request is invalid." } }, { status: 400 }); }
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: { code: "INVALID_CURRENCY_REQUEST", message: "The currency request is invalid." } }, { status: 400 });
-  try { return NextResponse.json(await deactivateCurrency((await context.params).businessId as BusinessId, parsed.data.currencyId, actor)); } catch (error) { return responseFor(error); }
+  try {
+    const persistence = getPersistenceContext();
+    return NextResponse.json(await deactivateCurrency((await context.params).businessId as BusinessId, parsed.data.currencyId, actor, {
+      tenancyRepository: persistence.tenancyRepository,
+      currencies: persistence.currencyRepository,
+    }));
+  } catch (error) { return responseFor(error); }
 }

@@ -89,6 +89,7 @@
     "failed": "Failed",
     "allInvoices": "All invoices",
     "empty": "No invoices match this filter.",
+    "loadError": "This business could not be loaded right now.",
     "openReview": "Open review",
     "documentPreview": "Original document",
     "downloadDocument": "Download original document",

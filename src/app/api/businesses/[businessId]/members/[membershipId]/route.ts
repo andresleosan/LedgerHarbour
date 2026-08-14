@@ -8,6 +8,7 @@ import {
   MEMBERSHIP_ERROR_CODES,
 } from "../../../../../../modules/tenancy/membership-service";
 import type { BusinessId } from "../../../../../../modules/tenancy/types";
+import { getPersistenceContext } from "../../../../../../modules/persistence/repository-factory";
 
 const actionSchema = z.object({
   action: z.union([
@@ -36,9 +37,10 @@ function identityOr401() {
 export async function GET(_request: Request, context: RouteContext) {
    const actor = identityOr401();
    if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
-  const { businessId } = await context.params;
+   const { businessId } = await context.params;
   try {
-     const members = await createMembershipService().listMemberships(businessId as BusinessId, actor);
+     const persistence = getPersistenceContext();
+     const members = await createMembershipService(persistence.tenancyRepository).listMemberships(businessId as BusinessId, actor);
     return NextResponse.json(members);
   } catch (error) {
     return errorResponse(error);
@@ -57,7 +59,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const service = createMembershipService();
+    const persistence = getPersistenceContext();
+    const service = createMembershipService(persistence.tenancyRepository);
     if (input.action === "set_general_admin") {
        const membership = await service.setGeneralAdmin({ businessId: businessId as BusinessId, membershipId }, actor);
       return NextResponse.json(membership);

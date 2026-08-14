@@ -87,7 +87,7 @@ test("searches, requests access, approves, rejects, and reapplies", async ({ bro
 
   await signIn(owner, "owner-workflow@example.com");
   await owner.goto(`/business/${businessId}/members`);
-  await expect(owner.getByText(/Request from dev-/)).toBeVisible();
+  await expect(owner.getByText(/Request from user-/)).toBeVisible();
   await owner.getByRole("button", { name: "Reject request" }).click();
   await expect(owner.getByRole("status")).toContainText("Request rejected");
 

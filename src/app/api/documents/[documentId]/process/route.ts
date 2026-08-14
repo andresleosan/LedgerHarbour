@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentIdentity } from "../../../../../modules/auth/session";
 import { JobError, JOB_ERROR_CODES, queueOcr } from "../../../../../modules/jobs/job-service";
 import type { DocumentId } from "../../../../../modules/invoices/ocr-provider";
+import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 
 type RouteContext = { params: Promise<{ documentId: string }> };
 const requestSchema = z.object({}).strict();
@@ -34,7 +35,13 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const { documentId } = await context.params;
-     const job = await queueOcr(documentId as DocumentId, identity);
+     const persistence = getPersistenceContext();
+     const job = await queueOcr(documentId as DocumentId, identity, {
+       tenancyRepository: persistence.tenancyRepository,
+       documentRepository: persistence.documentRepository,
+       jobs: persistence.jobRepository,
+       invoices: persistence.invoiceRepository,
+     });
     return NextResponse.json({ job }, { status: 202 });
   } catch (error) {
     return errorResponse(error);

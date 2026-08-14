@@ -8,6 +8,7 @@ import {
   ONBOARDING_ERROR_CODES,
   type CreateBusinessInput,
 } from "../../../modules/tenancy/business-service";
+import { getPersistenceContext } from "../../../modules/persistence/repository-factory";
 
 const createBusinessSchema = z.object({ name: z.string() });
 
@@ -41,7 +42,8 @@ export async function POST(request: Request) {
   }
 
   try {
-    const business = await createBusiness(input, identity);
+    const persistence = getPersistenceContext();
+    const business = await createBusiness(input, identity, persistence.tenancyRepository);
     return NextResponse.json(business, { status: 201 });
   } catch (error) {
     return errorResponse(error);

@@ -8,6 +8,7 @@ import {
   MEMBERSHIP_ERROR_CODES,
 } from "../../../../../../modules/tenancy/membership-service";
 import type { BusinessId } from "../../../../../../modules/tenancy/types";
+import { getPersistenceContext } from "../../../../../../modules/persistence/repository-factory";
 
 const transferSchema = z.object({
   targetMembershipId: z.string().trim().min(1),
@@ -38,7 +39,8 @@ export async function POST(request: Request, context: RouteContext) {
     return responseForError(new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.CONFIRMATION_REQUIRED));
   }
   try {
-    await createMembershipService().transferOwnership(
+    const persistence = getPersistenceContext();
+    await createMembershipService(persistence.tenancyRepository).transferOwnership(
       { ...input, businessId: businessId as BusinessId },
        identity,
     );

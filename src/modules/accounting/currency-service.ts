@@ -64,10 +64,10 @@ export interface SetCurrencyInput {
 export interface CurrencyRepository {
   transaction<T>(operation: () => Promise<T>): Promise<T>;
   create(currency: BusinessCurrency): Promise<BusinessCurrency>;
-  update(currency: BusinessCurrency): Promise<BusinessCurrency>;
-  findById(id: string): Promise<BusinessCurrency | null>;
+  update(currency: BusinessCurrency, businessId: BusinessId): Promise<BusinessCurrency>;
+  findById(id: string, businessId: BusinessId): Promise<BusinessCurrency | null>;
   listByBusinessId(businessId: BusinessId): Promise<BusinessCurrency[]>;
-  delete(id: string): Promise<void>;
+  delete(id: string, businessId: BusinessId): Promise<void>;
 }
 
 export interface InMemoryCurrencyRepository extends CurrencyRepository {
@@ -101,23 +101,23 @@ class MemoryCurrencyRepository implements InMemoryCurrencyRepository {
     return { ...currency };
   }
 
-  async update(currency: BusinessCurrency): Promise<BusinessCurrency> {
-    if (!this.currencies.has(currency.id)) throw new CurrencyError(CURRENCY_ERROR_CODES.CURRENCY_NOT_FOUND);
+  async update(currency: BusinessCurrency, businessId: BusinessId): Promise<BusinessCurrency> {
+    if (currency.businessId !== businessId || this.currencies.get(currency.id)?.businessId !== businessId) throw new CurrencyError(CURRENCY_ERROR_CODES.CURRENCY_NOT_FOUND);
     this.currencies.set(currency.id, { ...currency });
     return { ...currency };
   }
 
-  async findById(id: string): Promise<BusinessCurrency | null> {
+  async findById(id: string, businessId: BusinessId): Promise<BusinessCurrency | null> {
     const currency = this.currencies.get(id);
-    return currency ? { ...currency } : null;
+    return currency?.businessId === businessId ? { ...currency } : null;
   }
 
   async listByBusinessId(businessId: BusinessId): Promise<BusinessCurrency[]> {
     return [...this.currencies.values()].filter((currency) => currency.businessId === businessId).map((currency) => ({ ...currency }));
   }
 
-  async delete(id: string): Promise<void> {
-    this.currencies.delete(id);
+  async delete(id: string, businessId: BusinessId): Promise<void> {
+    if (this.currencies.get(id)?.businessId === businessId) this.currencies.delete(id);
   }
 }
 
@@ -128,7 +128,7 @@ export function createCurrencyRepository(): InMemoryCurrencyRepository {
 const CURRENCY_REPOSITORY_KEY = Symbol.for("ledgerharbour.task9.currencyRepository");
 type GlobalState = typeof globalThis & { [key: symbol]: unknown };
 
-function defaultCurrencyRepository(): CurrencyRepository {
+export function resolveDefaultCurrencyRepository(): CurrencyRepository {
   const state = globalThis as GlobalState;
   const existing = state[CURRENCY_REPOSITORY_KEY] as CurrencyRepository | undefined;
   if (existing && typeof existing.findById === "function" && typeof existing.listByBusinessId === "function" && typeof existing.delete === "function") return existing;
@@ -183,7 +183,7 @@ async function conflict(repository: CurrencyRepository, businessId: BusinessId, 
 
 export async function setCurrency(input: SetCurrencyInput, actor: OnboardingActor, dependencies: CurrencyDependencies = {}): Promise<BusinessCurrency> {
   const tenancy = dependencies.tenancyRepository ?? defaultOnboardingRepository;
-  const repository = dependencies.currencies ?? defaultCurrencyRepository();
+   const repository = dependencies.currencies ?? resolveDefaultCurrencyRepository();
   const actorId = await resolveOnboardingActor(tenancy, actor);
   const businessId = validateBusinessId(input?.businessId);
   const value = normalizeCurrency(input);
@@ -201,7 +201,7 @@ export async function setCurrency(input: SetCurrencyInput, actor: OnboardingActo
 
 export async function listCurrencies(businessId: BusinessId, actor: OnboardingActor, dependencies: CurrencyDependencies = {}): Promise<BusinessCurrency[]> {
   const tenancy = dependencies.tenancyRepository ?? defaultOnboardingRepository;
-  const repository = dependencies.currencies ?? defaultCurrencyRepository();
+   const repository = dependencies.currencies ?? resolveDefaultCurrencyRepository();
   const actorId = await resolveOnboardingActor(tenancy, actor);
   try {
     await requireBusinessOperational(tenancy, businessId);
@@ -223,13 +223,13 @@ export async function listCurrencies(businessId: BusinessId, actor: OnboardingAc
 
 export async function deactivateCurrency(businessId: BusinessId, currencyId: string, actor: OnboardingActor, dependencies: CurrencyDependencies = {}): Promise<BusinessCurrency> {
   const tenancy = dependencies.tenancyRepository ?? defaultOnboardingRepository;
-  const repository = dependencies.currencies ?? defaultCurrencyRepository();
+   const repository = dependencies.currencies ?? resolveDefaultCurrencyRepository();
   const actorId = await resolveOnboardingActor(tenancy, actor);
   await requireCurrencyAdmin(businessId, actorId, tenancy);
-  const currency = await repository.findById(currencyId);
+  const currency = await repository.findById(currencyId, businessId);
   if (!currency || currency.businessId !== businessId) throw new CurrencyError(CURRENCY_ERROR_CODES.CURRENCY_NOT_FOUND);
   try {
-    return await repository.update({ ...currency, isActive: false, updatedAt: new Date().toISOString() });
+    return await repository.update({ ...currency, isActive: false, updatedAt: new Date().toISOString() }, businessId);
   } catch (error) {
     throw mapBoundaryError(error);
   }
@@ -245,11 +245,11 @@ async function isCurrencyReferenced(currency: BusinessCurrency, invoices: Invoic
 
 export async function removeCurrency(businessId: BusinessId, currencyId: string, actorId: UserId, dependencies: CurrencyDependencies = {}): Promise<void> {
   const tenancy = dependencies.tenancyRepository ?? defaultOnboardingRepository;
-  const repository = dependencies.currencies ?? defaultCurrencyRepository();
+   const repository = dependencies.currencies ?? resolveDefaultCurrencyRepository();
   await requireCurrencyAdmin(businessId, actorId, tenancy);
-  const currency = await repository.findById(currencyId);
+  const currency = await repository.findById(currencyId, businessId);
   if (!currency || currency.businessId !== businessId) throw new CurrencyError(CURRENCY_ERROR_CODES.CURRENCY_NOT_FOUND);
    if (await isCurrencyReferenced(currency, dependencies.invoices)) throw new CurrencyError(CURRENCY_ERROR_CODES.CURRENCY_REFERENCED);
-   await repository.delete(currencyId);
+    await repository.delete(currencyId, businessId);
 }
 import { randomUUID } from "node:crypto";

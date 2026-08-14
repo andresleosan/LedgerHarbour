@@ -20,6 +20,8 @@ import {
 import type { Job } from "../../../src/modules/jobs/job-service";
 import { createPostgresOnboardingRepository } from "../../../src/modules/tenancy/postgres-tenancy-repository";
 import { createOnboardingServices } from "../../../src/modules/tenancy/business-service";
+import { approveInvoice } from "../../../src/modules/invoices/invoice-service";
+import { createPersistenceContext } from "../../../src/modules/persistence/repository-factory";
 import type { BusinessId, UserId } from "../../../src/modules/tenancy/types";
 import type { DocumentId, InvoiceId } from "../../../src/modules/invoices/ocr-provider";
 
@@ -223,6 +225,58 @@ describe("PostgreSQL finance repositories", () => {
         throw new Error("invoice rollback sentinel");
       })).rejects.toMatchObject({ code: INVOICE_ERROR_CODES.REPOSITORY_CONFLICT });
       await expect(state.invoiceRepository.findById(invoice.id)).resolves.toBeNull();
+    } finally {
+      await state.close();
+    }
+  }, 30_000);
+
+  it("rolls back invoice, document, and audit together when approval fails after audit commit", async () => {
+    const state = await fixture();
+    try {
+      const context = createPersistenceContext({ mode: "postgres", database: state.db });
+      const document = makeDocument({ id: "approval-document", businessId: state.businessId, uploaderId: state.ownerId, status: "needs_review" });
+      await context.documentRepository.create(document);
+      const invoice = await context.invoiceRepository.create(makeInvoice({ id: invoiceId("approval-invoice"), businessId: state.businessId, documentId: documentId(document.id) }));
+      const transaction = async (operation: Parameters<NonNullable<typeof context.transaction>>[0]) => {
+        return context.tenancyRepository.transaction(async (transactionTenancy) => {
+          await operation(transactionTenancy);
+          throw new Error("cross-repository rollback sentinel");
+        });
+      };
+
+      await expect(approveInvoice(invoice.id, state.ownerId, {
+        tenancyRepository: context.tenancyRepository,
+        documentRepository: context.documentRepository,
+        invoices: context.invoiceRepository,
+        transaction,
+      })).rejects.toThrow("cross-repository rollback sentinel");
+
+      await expect(context.invoiceRepository.findById(invoice.id)).resolves.toMatchObject({ reviewState: "needs_review" });
+      await expect(context.documentRepository.getStatus(document.id)).resolves.toBe("needs_review");
+      await expect(context.tenancyRepository.listAuditEvents(state.businessId)).resolves.not.toContainEqual(expect.objectContaining({ entityId: invoice.id }));
+    } finally {
+      await state.close();
+    }
+  }, 30_000);
+
+  it("commits invoice, document, and audit together on approval", async () => {
+    const state = await fixture();
+    try {
+      const context = createPersistenceContext({ mode: "postgres", database: state.db });
+      const document = makeDocument({ id: "approval-commit-document", businessId: state.businessId, uploaderId: state.ownerId, status: "needs_review" });
+      await context.documentRepository.create(document);
+      const invoice = await context.invoiceRepository.create(makeInvoice({ id: invoiceId("approval-commit-invoice"), businessId: state.businessId, documentId: documentId(document.id) }));
+
+      await expect(approveInvoice(invoice.id, state.ownerId, {
+        tenancyRepository: context.tenancyRepository,
+        documentRepository: context.documentRepository,
+        invoices: context.invoiceRepository,
+        transaction: context.transaction,
+      })).resolves.toMatchObject({ reviewState: "approved" });
+
+      await expect(context.invoiceRepository.findById(invoice.id)).resolves.toMatchObject({ reviewState: "approved" });
+      await expect(context.documentRepository.getStatus(document.id)).resolves.toBe("approved");
+      await expect(context.tenancyRepository.listAuditEvents(state.businessId)).resolves.toContainEqual(expect.objectContaining({ entityId: invoice.id, type: "invoice_approved" }));
     } finally {
       await state.close();
     }

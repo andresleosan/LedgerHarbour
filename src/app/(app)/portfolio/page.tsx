@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { getCurrentIdentity } from "@/modules/auth/session";
 import { listUserBusinesses } from "@/modules/tenancy/portfolio-service";
+import { getPersistenceContext } from "@/modules/persistence/repository-factory";
 import StatusBadge from "@/ui/StatusBadge";
 
 export default async function PortfolioPage({ searchParams }: { searchParams?: Promise<{ locale?: string }> }) {
@@ -9,7 +10,12 @@ export default async function PortfolioPage({ searchParams }: { searchParams?: P
   if (!identity) return null;
   const locale = (await searchParams)?.locale === "es" ? "es" : "en";
   const localeQuery = `?locale=${locale}`;
-  const businesses = await listUserBusinesses(identity);
+  const persistence = getPersistenceContext();
+  const businesses = await listUserBusinesses(identity, {
+    tenancyRepository: persistence.tenancyRepository,
+    documentRepository: persistence.documentRepository,
+    invoiceRepository: persistence.invoiceRepository,
+  });
   const copy = locale === "es"
     ? { eyebrow: "Espacio multiempresa", title: "Portfolio", description: "Elige un negocio autorizado para continuar.", empty: "Aún no tienes negocios autorizados.", active: "Activo", inactive: "Inactivo", open: "Abrir negocio", role: "Rol" }
     : { eyebrow: "Multi-business workspace", title: "Portfolio", description: "Choose an authorized business to continue.", empty: "You do not have any authorized businesses yet.", active: "Active", inactive: "Inactive", open: "Open business", role: "Role" };

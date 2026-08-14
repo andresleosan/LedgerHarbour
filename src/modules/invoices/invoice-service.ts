@@ -130,13 +130,12 @@ class MemoryInvoiceRepository implements InMemoryInvoiceRepository {
   }
 
   async updateIfUnchanged(invoice: Invoice, expectedReviewState: InvoiceDraft["reviewState"], expectedUpdatedAt: string): Promise<Invoice> {
-    return this.transaction(async () => {
-      const current = this.invoices.get(invoice.id);
-      if (!current || current.reviewState !== expectedReviewState || current.updatedAt !== expectedUpdatedAt) {
-        throw new InvoiceError(INVOICE_ERROR_CODES.REPOSITORY_CONFLICT);
-      }
-      return this.update(invoice);
-    });
+    const current = this.invoices.get(invoice.id);
+    if (!current || current.reviewState !== expectedReviewState || current.updatedAt !== expectedUpdatedAt) {
+      throw new InvoiceError(INVOICE_ERROR_CODES.REPOSITORY_CONFLICT);
+    }
+    this.invoices.set(invoice.id, { ...invoice, confidenceData: { ...invoice.confidenceData } });
+    return { ...invoice, confidenceData: { ...invoice.confidenceData } };
   }
 
   async listByBusinessId(businessId: BusinessId): Promise<Invoice[]> {
@@ -194,6 +193,7 @@ export interface InvoiceDependencies {
   tenancyRepository?: OnboardingRepository;
   documentRepository?: DocumentRepository;
   invoices?: InvoiceRepository;
+  transaction?: <T>(operation: (tenancyRepository: OnboardingRepository) => Promise<T>) => Promise<T>;
 }
 
 function dependencies(input: InvoiceDependencies = {}) {
@@ -201,6 +201,7 @@ function dependencies(input: InvoiceDependencies = {}) {
     tenancyRepository: input.tenancyRepository ?? defaultOnboardingRepository,
     documentRepository: input.documentRepository ?? resolveDefaultDocumentRepository(),
     invoices: input.invoices ?? resolveDefaultInvoiceRepository(),
+    transaction: input.transaction,
   };
 }
 
@@ -239,6 +240,8 @@ const minimumApprovalConfidence = 0.8;
 function validForApproval(invoice: Invoice): boolean {
   return requiredFields.every((field) => invoice[field] !== null && (invoice.confidenceData[field] ?? 0) >= minimumApprovalConfidence);
 }
+
+type ApprovalTransaction = (tenancyRepository: OnboardingRepository) => Promise<Invoice>;
 
 export async function createInvoiceFromOcr(
   businessId: BusinessId,
@@ -321,32 +324,35 @@ export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActo
   if (current.reviewState === "approved") throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_STATE);
   if (!validForApproval(current)) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_FOR_APPROVAL);
 
-  return resolved.invoices.transaction(async () => {
-    const latest = await resolved.invoices.findById(invoiceId);
-    if (!latest || latest.reviewState === "approved") throw new InvoiceError(INVOICE_ERROR_CODES.REPOSITORY_CONFLICT);
-    if (!validForApproval(latest)) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_FOR_APPROVAL);
-    const document = await resolved.documentRepository.findById(latest.documentId);
-    if (!document || document.businessId !== latest.businessId) throw new InvoiceError(INVOICE_ERROR_CODES.DOCUMENT_NOT_FOUND);
-    const previousDocumentStatus = await resolved.documentRepository.getStatus(latest.documentId);
-    const approved = { ...latest, reviewState: "approved" as const, updatedAt: new Date().toISOString() };
-    try {
-      const saved = await resolved.invoices.update(approved);
+  const approveInTransaction: ApprovalTransaction = async (transactionTenancy) => {
+      const latest = await resolved.invoices.findById(invoiceId);
+      if (!latest || latest.reviewState === "approved") throw new InvoiceError(INVOICE_ERROR_CODES.REPOSITORY_CONFLICT);
+      if (!validForApproval(latest)) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_FOR_APPROVAL);
+      const document = await resolved.documentRepository.findById(current.documentId);
+      if (!document || document.businessId !== current.businessId) throw new InvoiceError(INVOICE_ERROR_CODES.DOCUMENT_NOT_FOUND);
+      const previousDocumentStatus = await resolved.documentRepository.getStatus(current.documentId);
+      const approved = { ...current, reviewState: "approved" as const, updatedAt: new Date().toISOString() };
+      try {
+        const saved = await resolved.invoices.updateIfUnchanged(approved, current.reviewState, current.updatedAt);
       if (!await setDocumentState(resolved.documentRepository, saved.documentId, "approved")) {
         throw new InvoiceError(INVOICE_ERROR_CODES.DOCUMENT_NOT_FOUND);
       }
-      await resolved.tenancyRepository.transaction(async (transaction) => {
-        await transaction.appendAuditEvent({
-          businessId: saved.businessId,
-          actorId,
-          type: "invoice_approved",
-          entityId: saved.id,
-        });
+      await transactionTenancy.appendAuditEvent({
+        businessId: saved.businessId,
+        actorId,
+        type: "invoice_approved",
+        entityId: saved.id,
       });
       return saved;
     } catch (error) {
       if (previousDocumentStatus) await setDocumentState(resolved.documentRepository, latest.documentId, previousDocumentStatus);
       throw error;
     }
+  };
+
+  if (resolved.transaction) return resolved.transaction(approveInTransaction);
+  return resolved.invoices.transaction(async () => {
+    return resolved.tenancyRepository.transaction((transaction) => approveInTransaction(transaction));
   });
 }
 

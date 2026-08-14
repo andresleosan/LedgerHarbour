@@ -2,12 +2,19 @@ import { AsyncLocalStorage } from "node:async_hooks";
 
 import type { Database } from "./client";
 
-const databaseScope = new AsyncLocalStorage<Database>();
+type DatabaseScope = {
+  database: Database;
+  transaction: Database;
+};
+
+const databaseScope = new AsyncLocalStorage<DatabaseScope>();
 
 export function databaseForOperation(database: Database): Database {
-  return databaseScope.getStore() ?? database;
+  const scope = databaseScope.getStore();
+  return scope?.database === database ? scope.transaction : database;
 }
 
 export function transactionWithDatabase<T>(database: Database, operation: () => Promise<T>): Promise<T> {
-  return database.transaction((transaction) => databaseScope.run(transaction, operation));
+  if (databaseScope.getStore()?.database === database) return operation();
+  return database.transaction((transaction) => databaseScope.run({ database, transaction }, operation));
 }

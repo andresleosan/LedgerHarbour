@@ -18,7 +18,7 @@ Prototipo local/no comercial. El objetivo de la siguiente fase es una prueba des
 ## Arquitectura de prototipo desplegable
 
 - Hosting: Vercel Hobby.
-- PostgreSQL: Neon Free.
+- PostgreSQL objetivo: Neon Free; no conectado ni verificado remotamente en esta fase.
 - Auth: Firebase Authentication Spark.
 - Storage privado: Cloudflare R2 Standard.
 - OCR: Fake OCR local; proveedor externo pendiente de aprobacion.
@@ -39,7 +39,11 @@ Las cuotas y precios cambian. Antes de crear cuentas o activar billing se debe v
 
 ## Datos y persistencia
 
-La aplicacion migra los repositorios in-memory a PostgreSQL mediante adaptadores Drizzle. El esquema relacional existente en `src/db/schema` y `src/db/migrations/0001_initial.sql` es la fuente inicial, sujeto a validacion contra PostgreSQL real.
+La aplicacion dispone del selector reversible `PERSISTENCE_MODE=memory|postgres`, con `memory` como valor por defecto. `memory` conserva los repositorios in-memory y es el rollback operativo inmediato. `postgres` requiere `DATABASE_URL` en runtime, falla cerrado si falta y usa adaptadores Drizzle; en pruebas puede recibir una base PGlite inyectada.
+
+El estado local verificado cubre selección de modo, fail-closed sin fallback, cache del contexto runtime, aislamiento tenant-aware y wiring explícito de las rutas API. La evidencia usa PGlite y la migración SQL versionada; no se usó Neon, PostgreSQL remoto ni se aplicaron migraciones productivas.
+
+El esquema relacional existente en `src/db/schema` y `src/db/migrations/0001_initial.sql` es la fuente inicial, sujeto a validacion contra PostgreSQL real.
 
 El storage de documentos se migra por separado a R2; las claves de objetos permanecen privadas y nunca forman parte de DTOs publicos.
 
@@ -48,6 +52,7 @@ El storage de documentos se migra por separado a R2; las claves de objetos perma
 - Firebase reemplaza el provider de desarrollo solo despues de probar el boundary de identidad.
 - Rate limiting sigue siendo obligatorio antes de exposicion publica.
 - Las migraciones productivas requieren backup verificado, rollback probado y confirmacion explicita.
+- La verificacion local del selector no implica que produccion este lista; auth, rate limiting, R2, OCR real, dependencias y operacion siguen pendientes.
 - Este documento no autoriza despliegue ni gasto.
 
 ## Decisiones de arquitectura

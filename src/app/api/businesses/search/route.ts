@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getCurrentIdentity } from "../../../../modules/auth/session";
 import { OnboardingError, searchBusinesses } from "../../../../modules/tenancy/business-service";
+import { getPersistenceContext } from "../../../../modules/persistence/repository-factory";
 
 const querySchema = z.object({ q: z.string() });
 
@@ -25,7 +26,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const results = await searchBusinesses(parsed.data.q, identity);
+    const persistence = getPersistenceContext();
+    const results = await searchBusinesses(parsed.data.q, identity, persistence.tenancyRepository);
     return NextResponse.json(results);
   } catch (error) {
     if (error instanceof OnboardingError) {

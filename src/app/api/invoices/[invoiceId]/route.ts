@@ -10,6 +10,7 @@ import {
   updateInvoice,
 } from "../../../../modules/invoices/invoice-service";
 import type { InvoiceId } from "../../../../modules/invoices/ocr-provider";
+import { getPersistenceContext } from "../../../../modules/persistence/repository-factory";
 
 type RouteContext = { params: Promise<{ invoiceId: string }> };
 
@@ -45,7 +46,12 @@ export async function GET(_request: Request, context: RouteContext) {
   const actor = actorId();
   if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   try {
-    return NextResponse.json(await getInvoice((await context.params).invoiceId as InvoiceId, actor));
+    const persistence = getPersistenceContext();
+    return NextResponse.json(await getInvoice((await context.params).invoiceId as InvoiceId, actor, {
+      tenancyRepository: persistence.tenancyRepository,
+      documentRepository: persistence.documentRepository,
+      invoices: persistence.invoiceRepository,
+    }));
   } catch (error) {
     return errorResponse(error);
   }
@@ -66,10 +72,17 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
   try {
     const { invoiceId } = await context.params;
-    if (parsed.data.action === "approve") return NextResponse.json(await approveInvoice(invoiceId as InvoiceId, actor));
+    const persistence = getPersistenceContext();
+    const dependencies = {
+      tenancyRepository: persistence.tenancyRepository,
+      documentRepository: persistence.documentRepository,
+      invoices: persistence.invoiceRepository,
+      transaction: persistence.transaction,
+    };
+    if (parsed.data.action === "approve") return NextResponse.json(await approveInvoice(invoiceId as InvoiceId, actor, dependencies));
     const fields = { ...parsed.data };
     delete fields.action;
-    return NextResponse.json(await updateInvoice(invoiceId as InvoiceId, actor, fields));
+    return NextResponse.json(await updateInvoice(invoiceId as InvoiceId, actor, fields, dependencies));
   } catch (error) {
     return errorResponse(error);
   }

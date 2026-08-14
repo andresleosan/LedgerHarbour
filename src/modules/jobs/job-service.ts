@@ -137,7 +137,7 @@ export function createJobRepository(): InMemoryJobRepository {
 const JOB_REPOSITORY_KEY = Symbol.for("ledgerharbour.task8.inMemoryJobRepository");
 type GlobalState = typeof globalThis & { [key: symbol]: unknown };
 
-function defaultJobRepository(): JobRepository {
+export function resolveDefaultJobRepository(): JobRepository {
   const state = globalThis as GlobalState;
   const existing = state[JOB_REPOSITORY_KEY] as JobRepository | undefined;
   if (
@@ -166,7 +166,7 @@ function resolved(input: JobServiceDependencies = {}) {
   return {
     tenancyRepository: input.tenancyRepository ?? defaultOnboardingRepository,
     documentRepository: input.documentRepository ?? resolveDefaultDocumentRepository(),
-    jobs: input.jobs ?? defaultJobRepository(),
+    jobs: input.jobs ?? resolveDefaultJobRepository(),
   };
 }
 

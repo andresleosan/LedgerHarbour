@@ -5,6 +5,7 @@ import { getCurrentIdentity } from "../../../../../modules/auth/session";
 import { approveInvoice, getInvoiceReview, updateInvoiceDraft } from "../../../../../modules/invoices/invoice-review-service";
 import { InvoiceError, INVOICE_ERROR_CODES } from "../../../../../modules/invoices/invoice-service";
 import type { InvoiceId } from "../../../../../modules/invoices/ocr-provider";
+import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 
 type RouteContext = { params: Promise<{ invoiceId: string }> };
 
@@ -26,7 +27,14 @@ function actor() { return getCurrentIdentity(); }
 export async function GET(_request: Request, context: RouteContext) {
   const identity = actor();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
-  try { return NextResponse.json(await getInvoiceReview((await context.params).invoiceId as InvoiceId, identity)); } catch (error) { return responseFor(error); }
+  try {
+    const persistence = getPersistenceContext();
+    return NextResponse.json(await getInvoiceReview((await context.params).invoiceId as InvoiceId, identity, {
+      tenancyRepository: persistence.tenancyRepository,
+      documentRepository: persistence.documentRepository,
+      invoices: persistence.invoiceRepository,
+    }));
+  } catch (error) { return responseFor(error); }
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
@@ -38,7 +46,14 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (!parsed.success) return NextResponse.json({ error: { code: "INVALID_INVOICE_REVIEW", message: "The invoice review request is invalid." } }, { status: 400 });
   try {
     const invoiceId = (await context.params).invoiceId as InvoiceId;
-    if ("action" in parsed.data) return NextResponse.json(await approveInvoice(invoiceId, identity));
-    return NextResponse.json(await updateInvoiceDraft({ invoiceId, fields: parsed.data }, identity));
+    const persistence = getPersistenceContext();
+    const dependencies = {
+      tenancyRepository: persistence.tenancyRepository,
+      documentRepository: persistence.documentRepository,
+      invoices: persistence.invoiceRepository,
+      transaction: persistence.transaction,
+    };
+    if ("action" in parsed.data) return NextResponse.json(await approveInvoice(invoiceId, identity, dependencies));
+    return NextResponse.json(await updateInvoiceDraft({ invoiceId, fields: parsed.data }, identity, dependencies));
   } catch (error) { return responseFor(error); }
 }

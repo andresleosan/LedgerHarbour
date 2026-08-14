@@ -125,7 +125,7 @@ describe("currency service", () => {
       findById: base.findById.bind(base),
       listByBusinessId: async (businessId: typeof business.id) => {
         const result: Array<NonNullable<Awaited<ReturnType<typeof base.findById>>>> = [];
-        for (const currency of [await base.findById(`currency-${businessId}-GBP`), await base.findById(`currency-${businessId}-EUR`), await base.findById(`currency-${businessId}-USD`)]) {
+        for (const currency of [await base.findById(`currency-${businessId}-GBP`, businessId), await base.findById(`currency-${businessId}-EUR`, businessId), await base.findById(`currency-${businessId}-USD`, businessId)]) {
           if (currency) result.push(currency);
         }
         return result;

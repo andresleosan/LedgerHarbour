@@ -8,6 +8,7 @@ import {
   ONBOARDING_ERROR_CODES,
 } from "../../../../../modules/tenancy/business-service";
 import type { BusinessId } from "../../../../../modules/tenancy/types";
+import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 
 const requestSchema = z.object({ requestedRole: z.literal("administrator") });
 const reviewSchema = z.object({
@@ -56,7 +57,8 @@ export async function POST(request: Request, context: RouteContext) {
   }
 
   try {
-    const result = await createOnboardingServices().requestMembership(
+    const persistence = getPersistenceContext();
+    const result = await createOnboardingServices(persistence.tenancyRepository).requestMembership(
       { businessId: businessId as BusinessId, requestedRole: input.requestedRole },
       session.identity,
     );
@@ -80,7 +82,8 @@ export async function GET(request: Request, context: RouteContext) {
     return responseForError(new OnboardingError(ONBOARDING_ERROR_CODES.INVALID_TRANSITION));
   }
   try {
-    const services = createOnboardingServices();
+    const persistence = getPersistenceContext();
+    const services = createOnboardingServices(persistence.tenancyRepository);
     const result = query.data.mine
       ? await services.listUserJoinRequests(businessId as BusinessId, session.identity)
       : await services.listJoinRequests(businessId as BusinessId, session.identity);
@@ -107,7 +110,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   }
 
   try {
-    const result = await createOnboardingServices().reviewJoinRequest(
+    const persistence = getPersistenceContext();
+    const result = await createOnboardingServices(persistence.tenancyRepository).reviewJoinRequest(
       { ...input, businessId: businessId as BusinessId },
       session.identity,
     );

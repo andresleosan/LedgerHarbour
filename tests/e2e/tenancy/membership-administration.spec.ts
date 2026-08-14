@@ -9,16 +9,7 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await expect(page.getByRole("status")).toContainText("Signed in for development");
 }
 
-function developmentUserId(email: string): string {
-  let hash = 2166136261;
-  for (const character of email) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 16777619);
-  }
-  return `dev-${(hash >>> 0).toString(16).padStart(8, "0")}`;
-}
-
-type E2EMember = { userId: string; role: string; capabilities: string[] };
+type E2EMember = { membershipId: string; userId: string; role: string; capabilities: string[] };
 
 async function readMembers(page: import("@playwright/test").Page, businessId: string): Promise<E2EMember[]> {
   const response = await page.request.get(`/api/businesses/${businessId}/members/list`);
@@ -70,10 +61,13 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
 
   await owner.goto(`/business/${businessId}/settings/members`);
   await expect(owner.getByRole("heading", { name: "Manage members" })).toBeVisible();
-  const memberUserId = developmentUserId("task6-member@example.com");
-  const secondMemberUserId = developmentUserId("task6-second-member@example.com");
-  const memberCard = owner.locator("article").filter({ hasText: memberUserId });
-  const secondMemberCard = owner.locator("article").filter({ hasText: secondMemberUserId });
+  const membersBeforeRoleChanges = await readMembers(owner, businessId);
+  const administratorIds = membersBeforeRoleChanges
+    .filter((candidate) => candidate.role === "administrator")
+    .map((candidate) => candidate.userId);
+  expect(administratorIds).toHaveLength(3);
+  const memberCard = owner.locator("article").filter({ hasText: administratorIds[0] });
+  const secondMemberCard = owner.locator("article").filter({ hasText: administratorIds[1] });
   await memberCard.getByRole("button", { name: "Make General Admin" }).click();
   await expect(owner.getByText("General Admin", { exact: true })).toBeVisible();
   await memberCard.getByRole("button", { name: "Remove General Admin" }).click();
@@ -92,8 +86,8 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   expect(await owner.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
     await owner.evaluate(() => document.documentElement.clientWidth),
   );
-  const ownerView = await readMembers(owner, businessId);
-  const transferTargetId = ownerView.find((candidate) => candidate.role === "general_admin")?.userId;
+  const ownerViewAfterRoleChanges = await readMembers(owner, businessId);
+  const transferTargetId = ownerViewAfterRoleChanges.find((candidate) => candidate.role === "general_admin")?.userId;
   if (!transferTargetId) throw new Error("General Admin target was not returned by the safe member DTO");
   const staleTransfer = await owner.request.post(`/api/businesses/${businessId}/ownership/transfer`, {
     data: {
@@ -111,15 +105,15 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   await expect(secondMember.getByRole("button", { name: "Remove General Admin" })).toHaveCount(0);
   await expect(secondMember.getByRole("button", { name: "Remove Administrator" })).toHaveCount(1);
   const generalAdminMembers = await readMembers(secondMember, businessId);
-  const ownerId = generalAdminMembers.find((candidate) => candidate.role === "owner_admin")?.userId;
-  const generalAdminId = generalAdminMembers.find((candidate) => candidate.role === "general_admin")?.userId;
-  if (!ownerId || !generalAdminId) throw new Error("Expected Owner and General Admin memberships");
-  const blockedOwnerChange = await secondMember.request.patch(`/api/businesses/${businessId}/members/${ownerId}`, {
+  const ownerMember = generalAdminMembers.find((candidate) => candidate.role === "owner_admin");
+  const generalAdmin = generalAdminMembers.find((candidate) => candidate.role === "general_admin");
+  if (!ownerMember || !generalAdmin) throw new Error("Expected Owner and General Admin memberships");
+  const blockedOwnerChange = await secondMember.request.patch(`/api/businesses/${businessId}/members/${ownerMember.membershipId}`, {
     data: { action: "remove_administrator" },
   });
   expect(blockedOwnerChange.status()).toBe(400);
   await expect(blockedOwnerChange.json()).resolves.toMatchObject({ error: { code: "OWNER_PROTECTED" } });
-  const blockedGeneralAdminChange = await secondMember.request.patch(`/api/businesses/${businessId}/members/${generalAdminId}`, {
+  const blockedGeneralAdminChange = await secondMember.request.patch(`/api/businesses/${businessId}/members/${generalAdmin.membershipId}`, {
     data: { action: "remove_general_admin" },
   });
   expect(blockedGeneralAdminChange.status()).toBe(403);
@@ -144,7 +138,7 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
 
   await signIn(secondMember, "task6-second-member@example.com");
   const transferredMembers = await readMembers(secondMember, businessId);
-  expect(transferredMembers.find((candidate) => candidate.userId === ownerId)?.role).toBe("administrator");
+  expect(transferredMembers.find((candidate) => candidate.userId === ownerMember.userId)?.role).toBe("administrator");
   expect(transferredMembers.find((candidate) => candidate.userId === transferTargetId)?.role).toBe("owner_admin");
 
   await owner.getByRole("button", { name: "Espanol" }).click();

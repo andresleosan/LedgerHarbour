@@ -39,7 +39,7 @@ Task 1 valida localmente la ejecución de `src/db/migrations/0001_initial.sql` e
 
 - Esta tarea no aplica migraciones productivas y no necesita backup productivo.
 - Para eliminar el estado local, se cierra y descarta la instancia PGlite; no se ejecutan `DROP` ni `TRUNCATE` en la migración.
-- El rollback operativo de la aplicación sigue siendo `PERSISTENCE_MODE=memory`, pendiente de Task 5.
+- **Estado histórico al cerrar Task 1:** el rollback operativo de la aplicación se dejaba pendiente de Task 5; el estado actual usa `PERSISTENCE_MODE=memory` como rollback.
 - PGlite valida compatibilidad PostgreSQL local, pero la verificación final contra un servidor PostgreSQL nativo queda pendiente antes de conectar Neon.
 - `pg` queda instalado como dependencia runtime para el cliente PostgreSQL real de las siguientes tareas; todavía no se conecta ninguna base remota.
 
@@ -73,7 +73,7 @@ Task 1 valida localmente la ejecución de `src/db/migrations/0001_initial.sql` e
 
 - El adapter se verificó contra PGlite, no contra un servidor PostgreSQL nativo; `psql`/`pg_isready` no están disponibles en este entorno.
 - La verificación nativa y el migration runner quedan como gate antes de release o conexión a Neon.
-- `PERSISTENCE_MODE=memory|postgres` todavía no está cableado; corresponde a Task 5.
+- **Estado histórico al cerrar Task 2:** `PERSISTENCE_MODE=memory|postgres` todavía no estaba cableado; el selector se implementó posteriormente en Task 5.
 - No se modificó `src/db/migrations/0001_initial.sql`, no se usó Neon y no se aplicaron migraciones productivas.
 
 **Task 2: aprobada para revisión local**, no aprobada para producción.
@@ -102,8 +102,9 @@ ALTER TABLE jobs DROP COLUMN IF EXISTS requested_by;
 ```
 
 El rollback no debe ejecutarse en producción ni sobre una base compartida sin backup y aprobación
-operativa. Para volver la aplicación al prototipo memory, usar `PERSISTENCE_MODE=memory` cuando
-Task 5 cablee el selector; esa configuración todavía no está implementada en Task 3.
+ operativa. **Estado histórico al cerrar Task 3:** para volver la aplicación al prototipo memory se
+ documentaba usar `PERSISTENCE_MODE=memory` cuando Task 5 cableara el selector; en el estado
+ actual Task 5 ya lo implementó y esa configuración es el rollback operativo.
 
 ### Verificación Task 3
 
@@ -132,3 +133,38 @@ remota ni despliegue.
 - Los errores SQL se traducen a errores de dominio públicos; no se exponen SQL, rutas privadas, secretos ni `privateObjectKey` en DTOs.
 
 **Task 3: aprobada para validación local**, no aprobada para release PostgreSQL.
+
+## Task 5: Selector reversible de persistencia
+
+### Implementación verificada
+
+- `PERSISTENCE_MODE=memory|postgres` se resuelve en un factory central y el modo por defecto es `memory`.
+- El modo `memory` reutiliza los repositorios in-memory y `LocalPrivateStorage` actuales, por lo que `PERSISTENCE_MODE=memory` es el rollback operativo inmediato.
+- El modo `postgres` acepta un `Database` inyectado para pruebas, incluido PGlite, o crea el cliente PostgreSQL desde `DATABASE_URL` en runtime.
+- El modo `postgres` sin `DATABASE_URL` ni una base inyectada falla cerrado con `PersistenceConfigurationError`; no hace fallback a memoria y no expone la URL, SQL ni credenciales en el error.
+- El contexto runtime se cachea por modo y URL para no crear un pool por request. El `close()` del factory solo cierra el pool creado por el factory; no cierra una base inyectada.
+- Los handlers API obtienen un único `PersistenceContext` mediante `getPersistenceContext()` y pasan sus repositorios explícitamente a los servicios de tenancy, documentos, facturas, jobs y monedas.
+- PGlite valida localmente la selección, el aislamiento tenant-aware, los adapters PostgreSQL y el wiring de API. No se usó Neon, PostgreSQL remoto ni una migración productiva.
+
+### Verificación ejecutada
+
+| Comando | Resultado |
+|---|---|
+| `npm test` | 28 archivos, 289/289 tests |
+| `npm run lint` | Exit 0, sin errores |
+| `npx tsc --noEmit` | Exit 0, sin salida |
+| `npm run build` | Next build completado, 30 rutas |
+| `$env:AUTH_MODE='development'; $env:PERSISTENCE_MODE='memory'; npm run test:e2e` | 19/19 pasaron |
+| Integración focalizada Task 3 | 3 archivos, 26/26 |
+| Regresiones de esta ronda | 2 archivos, 23/23 tests |
+| `npm audit --audit-level=high` | Exit 1: 3 vulnerabilidades altas en `postcss` y `sharp`; `npm audit fix --force` propone `next@16.3.1`, un cambio mayor, y no se aplicó |
+
+### Límites y rollback
+
+- Esta verificación sigue siendo local y no autoriza producción, despliegue ni migraciones productivas.
+- PGlite no sustituye la verificación contra un servidor PostgreSQL nativo; Neon/PostgreSQL remoto todavía no fue conectado.
+- `LocalPrivateStorage` continúa siendo el storage de ambos modos en esta fase; R2 queda fuera de alcance.
+- Firebase Auth, rate limiting, OCR real, storage R2, gestión operativa y la resolución de vulnerabilidades de dependencias siguen siendo gates independientes antes de producción.
+- Para volver al comportamiento local, configurar `PERSISTENCE_MODE=memory`; no se requiere migración destructiva ni se modifica la migración SQL versionada.
+
+**Task 5: verificada localmente, no aprobada para producción.**

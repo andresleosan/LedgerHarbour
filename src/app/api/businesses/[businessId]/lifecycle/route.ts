@@ -8,6 +8,7 @@ import {
   LIFECYCLE_ERROR_CODES,
 } from "../../../../../modules/tenancy/business-lifecycle-service";
 import type { BusinessId } from "../../../../../modules/tenancy/types";
+import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 
 const actionSchema = z.object({
   action: z.union([z.literal("deactivate"), z.literal("reactivate")]),
@@ -44,7 +45,8 @@ export async function PATCH(request: Request, context: RouteContext) {
     return responseForError(new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.CONFIRMATION_REQUIRED));
   }
   try {
-    const service = createBusinessLifecycleService();
+    const persistence = getPersistenceContext();
+    const service = createBusinessLifecycleService(persistence.tenancyRepository);
     if (action.data.action === "deactivate") {
         await service.deactivateBusiness(businessId as BusinessId, identity, confirmation.data.confirmationName);
     } else {

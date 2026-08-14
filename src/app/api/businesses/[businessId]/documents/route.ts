@@ -9,6 +9,7 @@ import {
 } from "../../../../../modules/documents/document-service";
 import { UploadValidationError, UPLOAD_ERROR_CODES, validateUpload } from "../../../../../modules/documents/file-validation";
 import type { BusinessId } from "../../../../../modules/tenancy/types";
+import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 
 type RouteContext = { params: Promise<{ businessId: string }> };
 
@@ -40,7 +41,12 @@ export async function POST(request: Request, context: RouteContext) {
     }
     const data = new Uint8Array(await value.arrayBuffer());
     const upload = validateUpload({ name: value.name, mimeType: value.type, sizeBytes: value.size, data });
-    const document = await createDocument({ businessId: businessId as BusinessId, upload }, identity);
+    const persistence = getPersistenceContext();
+    const document = await createDocument({ businessId: businessId as BusinessId, upload }, identity, {
+      tenancyRepository: persistence.tenancyRepository,
+      documentRepository: persistence.documentRepository,
+      storage: persistence.storage,
+    });
     return NextResponse.json(toSafeDocument(document), { status: 201 });
   } catch (error) {
     return errorResponse(error);

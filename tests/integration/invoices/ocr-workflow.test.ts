@@ -341,6 +341,36 @@ describe("OCR workflow boundaries", () => {
     expect(tenancy.auditEvents).not.toContainEqual(expect.objectContaining({ invoiceId: invoice.id }));
   });
 
+  it("rejects approval when the invoice changes after the approval read", async () => {
+    const { queue, worker, dependencies } = workflow();
+    const job = await queue.queueOcr(documentId, user("member"));
+    await worker.processOcrJob(job.id);
+    const invoice = (await invoices.listByBusinessId(ownerBusiness.id))[0];
+    await correctLowConfidence(invoice);
+    const originalFind = invoices.findById.bind(invoices);
+    let firstRead = true;
+    invoices.findById = async (invoiceId) => {
+      const found = await originalFind(invoiceId);
+      if (firstRead && found) {
+        firstRead = false;
+        await invoices.update({ ...found, notes: "concurrent change", updatedAt: "2026-08-13T10:00:00.000Z" });
+      }
+      return found;
+    };
+
+    try {
+      await expect(approveInvoice(invoice.id, user("member"), dependencies)).rejects.toMatchObject({
+        code: "INVOICE_REPOSITORY_CONFLICT",
+      });
+    } finally {
+      invoices.findById = originalFind;
+    }
+
+    await expect(invoices.findById(invoice.id)).resolves.toMatchObject({ reviewState: "needs_review", notes: "concurrent change" });
+    await expect(documentRepository.getStatus(documentId)).resolves.toBe("needs_review");
+    expect(tenancy.auditEvents).not.toContainEqual(expect.objectContaining({ entityId: invoice.id, type: "invoice_approved" }));
+  });
+
   it("rolls back invoice, document, and audit state when approval audit fails", async () => {
     const { queue, worker, dependencies } = workflow();
     const job = await queue.queueOcr(documentId, user("member"));
@@ -359,6 +389,18 @@ describe("OCR workflow boundaries", () => {
     await expect(invoices.findById(invoice.id)).resolves.toMatchObject({ reviewState: "needs_review" });
     await expect(documentRepository.getStatus(documentId)).resolves.toBe("needs_review");
     expect(tenancy.auditEvents).not.toContainEqual(expect.objectContaining({ invoiceId: invoice.id }));
+  });
+
+  it("keeps the existing memory transaction contract on successful approval", async () => {
+    const { queue, worker, dependencies } = workflow();
+    const job = await queue.queueOcr(documentId, user("member"));
+    await worker.processOcrJob(job.id);
+    const invoice = (await invoices.listByBusinessId(ownerBusiness.id))[0];
+    await correctLowConfidence(invoice);
+
+    await expect(approveInvoice(invoice.id, user("member"), dependencies)).resolves.toMatchObject({ reviewState: "approved" });
+    expect(documentRepository).toBeDefined();
+    expect(tenancy.auditEvents).toContainEqual(expect.objectContaining({ entityId: invoice.id, type: "invoice_approved" }));
   });
 
   it("rejects invoice reads, edits, and approval when its document belongs to another business", async () => {

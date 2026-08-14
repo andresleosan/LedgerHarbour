@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 import { and, asc, desc, eq, like } from "drizzle-orm";
 
 import type { Database } from "../../db/client";
+import { databaseForOperation, transactionWithDatabase } from "../../db/transaction-scope";
 import { defaultCategorySeeds } from "../../db/seed/default-categories";
 import {
   auditEvents,
@@ -139,7 +140,7 @@ function createRepository(db: Database, transactionCount: { value: number }): On
     async transaction<T>(operation: (repository: OnboardingRepository) => Promise<T>): Promise<T> {
       transactionCount.value += 1;
       try {
-        return await db.transaction((transaction) => operation(createRepository(transaction, transactionCount)));
+        return await transactionWithDatabase(db, () => operation(createRepository(databaseForOperation(db), transactionCount)));
       } catch (error) {
         return preserveOrMap(error);
       }

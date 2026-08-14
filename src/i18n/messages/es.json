@@ -89,6 +89,7 @@
     "failed": "Fallidas",
     "allInvoices": "Todas las facturas",
     "empty": "Ninguna factura coincide con este filtro.",
+    "loadError": "No se pudo cargar este negocio en este momento.",
     "openReview": "Abrir revisión",
     "documentPreview": "Documento original",
     "downloadDocument": "Descargar documento original",

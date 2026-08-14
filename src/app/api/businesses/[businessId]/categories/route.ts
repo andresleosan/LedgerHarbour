@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentIdentity } from "../../../../../modules/auth/session";
 import { CategoryError, CATEGORY_ERROR_CODES, createCategory, listCategories, updateCategory } from "../../../../../modules/accounting/category-service";
 import type { BusinessId } from "../../../../../modules/tenancy/types";
+import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 
 type RouteContext = { params: Promise<{ businessId: string }> };
 
@@ -29,7 +30,8 @@ export async function GET(_request: Request, context: RouteContext) {
    const actor = identity();
   if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   try {
-    return NextResponse.json(await listCategories((await context.params).businessId as BusinessId, actor));
+    const persistence = getPersistenceContext();
+    return NextResponse.json(await listCategories((await context.params).businessId as BusinessId, actor, { tenancyRepository: persistence.tenancyRepository }));
   } catch (error) {
     return responseFor(error);
   }
@@ -43,7 +45,8 @@ export async function POST(request: Request, context: RouteContext) {
   const parsed = createSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: { code: "INVALID_CATEGORY_REQUEST", message: "The category request is invalid." } }, { status: 400 });
   try {
-    return NextResponse.json(await createCategory({ businessId: (await context.params).businessId as BusinessId, name: parsed.data.name }, actor), { status: 201 });
+    const persistence = getPersistenceContext();
+    return NextResponse.json(await createCategory({ businessId: (await context.params).businessId as BusinessId, name: parsed.data.name }, actor, { tenancyRepository: persistence.tenancyRepository }), { status: 201 });
   } catch (error) {
     return responseFor(error);
   }
@@ -57,7 +60,8 @@ export async function PATCH(request: Request, context: RouteContext) {
   const parsed = updateSchema.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: { code: "INVALID_CATEGORY_REQUEST", message: "The category request is invalid." } }, { status: 400 });
   try {
-    return NextResponse.json(await updateCategory({ ...parsed.data, businessId: (await context.params).businessId as BusinessId }, actor));
+    const persistence = getPersistenceContext();
+    return NextResponse.json(await updateCategory({ ...parsed.data, businessId: (await context.params).businessId as BusinessId }, actor, { tenancyRepository: persistence.tenancyRepository }));
   } catch (error) {
     return responseFor(error);
   }

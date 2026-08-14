@@ -3,6 +3,9 @@ import { redirect } from "next/navigation";
 import { getCurrentIdentity } from "@/modules/auth/session";
 import { getBusinessDashboard } from "@/modules/tenancy/portfolio-service";
 import type { BusinessId } from "@/modules/tenancy/types";
+import { BusinessLifecycleError, LIFECYCLE_ERROR_CODES } from "@/modules/tenancy/business-lifecycle-service";
+import { AUTHORIZATION_ERROR_CODES, AuthorizationError } from "@/modules/permissions/authorize";
+import { getPersistenceContext } from "@/modules/persistence/repository-factory";
 import StatusBadge from "@/ui/StatusBadge";
 
 export default async function BusinessDashboardPage({ params, searchParams }: { params: Promise<{ businessId: string }>; searchParams?: Promise<{ locale?: string }> }) {
@@ -10,10 +13,16 @@ export default async function BusinessDashboardPage({ params, searchParams }: { 
   if (!identity) redirect("/login");
   const { businessId } = await params;
   const locale = (await searchParams)?.locale === "es" ? "es" : "en";
+  const persistence = getPersistenceContext();
   let dashboard;
   try {
-    dashboard = await getBusinessDashboard(businessId as BusinessId, identity);
-  } catch {
+    dashboard = await getBusinessDashboard(businessId as BusinessId, identity, {
+      tenancyRepository: persistence.tenancyRepository,
+      documentRepository: persistence.documentRepository,
+      invoiceRepository: persistence.invoiceRepository,
+    });
+  } catch (error) {
+    if (!((error instanceof AuthorizationError && error.code === AUTHORIZATION_ERROR_CODES.BUSINESS_ACCESS_DENIED) || (error instanceof BusinessLifecycleError && (error.code === LIFECYCLE_ERROR_CODES.BUSINESS_NOT_FOUND || error.code === LIFECYCLE_ERROR_CODES.INACTIVE_BUSINESS)))) throw error;
     redirect("/portfolio");
   }
 
