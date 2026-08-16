@@ -7,6 +7,7 @@ import { processOcrJob } from "../../../../../modules/jobs/ocr-worker";
 import type { DocumentId } from "../../../../../modules/invoices/ocr-provider";
 import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 import { enforceAuthenticatedRateLimit } from "../../../../../modules/security/authenticated-rate-limit";
+import { AuthenticatedRateLimitError, AuthenticatedRateLimitUnavailableError } from "../../../../../modules/security/rate-limit-errors";
 
 type RouteContext = { params: Promise<{ documentId: string }> };
 const requestSchema = z.object({}).strict();
@@ -25,9 +26,15 @@ export async function POST(request: Request, context: RouteContext) {
   const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   try {
-    await enforceAuthenticatedRateLimit("ocr-process", identity.providerUserId);
-  } catch {
-    return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, { status: 429 });
+    await enforceAuthenticatedRateLimit("ocr-process", identity.providerUserId, request.headers);
+  } catch (error) {
+    if (error instanceof AuthenticatedRateLimitError) {
+      return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, { status: 429 });
+    }
+    if (error instanceof AuthenticatedRateLimitUnavailableError) {
+      return NextResponse.json({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "OCR protection is temporarily unavailable." } }, { status: 503 });
+    }
+    return NextResponse.json({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "OCR protection is temporarily unavailable." } }, { status: 503 });
   }
 
   let body: unknown;

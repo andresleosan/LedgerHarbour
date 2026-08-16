@@ -41,6 +41,8 @@ import {
   DEV_SESSION_COOKIE,
   DEV_SESSION_MAX_AGE,
   clearCurrentIdentity,
+  getCurrentIdentity,
+  getCurrentIdentitySync,
   setCurrentIdentity,
 } from "../../../src/modules/auth/session";
 import {
@@ -240,6 +242,22 @@ describe("development authentication provider", () => {
     expect(cookieStore.get).not.toHaveBeenCalled();
     expect(cookieStore.set).not.toHaveBeenCalled();
     expect(cookieStore.delete).not.toHaveBeenCalled();
+  });
+
+  it("rejects a valid development cookie after NODE_ENV changes to production", async () => {
+    const provider = new DevAuthProvider();
+    const identity = await provider.signInWithEmail({ email: "member@example.com" });
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+
+    try {
+      expect(getCurrentIdentitySync()).toBeNull();
+      await expect(getCurrentIdentity()).resolves.toBeNull();
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+      expect(identity.email).toBe("member@example.com");
+    }
   });
 
   it("normalizes unknown provider failures to a generic public error", () => {

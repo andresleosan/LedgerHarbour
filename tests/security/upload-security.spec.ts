@@ -5,10 +5,14 @@ const { getCurrentIdentity, enforceAuthenticatedRateLimit } = vi.hoisted(() => (
   enforceAuthenticatedRateLimit: vi.fn(),
 }));
 vi.mock("../../src/modules/auth/session", () => ({ getCurrentIdentity }));
-vi.mock("../../src/modules/security/authenticated-rate-limit", () => ({ enforceAuthenticatedRateLimit }));
+vi.mock(import("../../src/modules/security/authenticated-rate-limit"), async (importOriginal) => ({
+  ...(await importOriginal()),
+  enforceAuthenticatedRateLimit,
+}));
 
 import { createDocument, createDocumentRepository, getDocumentForDownload } from "../../src/modules/documents/document-service";
-import { MAX_UPLOAD_SIZE_BYTES, UPLOAD_ERROR_CODES, validateUpload } from "../../src/modules/documents/file-validation";
+import { MAX_UPLOAD_REQUEST_BODY_BYTES, MAX_UPLOAD_SIZE_BYTES, UPLOAD_ERROR_CODES, validateUpload } from "../../src/modules/documents/file-validation";
+import { AuthenticatedRateLimitError, AuthenticatedRateLimitUnavailableError } from "../../src/modules/security/rate-limit-errors";
 import { createInMemoryOnboardingRepository, createOnboardingServices, defaultOnboardingRepository, type OnboardingRepository } from "../../src/modules/tenancy/business-service";
 import { POST } from "../../src/app/api/businesses/[businessId]/documents/route";
 import type { StorageAdapter } from "../../src/modules/documents/storage-adapter";
@@ -59,7 +63,7 @@ describe("Task 11 upload security matrix", () => {
 
   it("returns a generic 429 before materializing multipart data when upload is limited", async () => {
     getCurrentIdentity.mockReturnValue({ providerUserId: "owner", email: "owner@example.com", displayName: "Owner", emailVerified: true });
-    enforceAuthenticatedRateLimit.mockRejectedValue(new Error("private limiter input@example.com"));
+    enforceAuthenticatedRateLimit.mockRejectedValue(new AuthenticatedRateLimitError());
     const formData = vi.fn();
 
     const response = await POST({ headers: new Headers(), formData } as unknown as Request, { params: Promise.resolve({ businessId: "business" }) });
@@ -71,17 +75,43 @@ describe("Task 11 upload security matrix", () => {
     expect(formData).not.toHaveBeenCalled();
   });
 
-  it("rejects an oversized Content-Length before materializing multipart data", async () => {
+  it("returns a generic 503 when the upload limiter is unavailable", async () => {
+    getCurrentIdentity.mockReturnValue({ providerUserId: "owner", email: "owner@example.com", displayName: "Owner", emailVerified: true });
+    enforceAuthenticatedRateLimit.mockRejectedValue(new AuthenticatedRateLimitUnavailableError());
+    const formData = vi.fn();
+
+    const response = await POST({ headers: new Headers(), formData } as unknown as Request, { params: Promise.resolve({ businessId: "business" }) });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "Upload protection is temporarily unavailable." } });
+    expect(formData).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["missing", new Headers()],
+    ["invalid", new Headers({ "content-length": "not-a-length" })],
+  ])("rejects %s Content-Length before materializing multipart data", async (_name, headers) => {
+    getCurrentIdentity.mockReturnValue({ providerUserId: "owner", email: "owner@example.com", displayName: "Owner", emailVerified: true });
+    const formData = vi.fn();
+
+    const response = await POST({ headers, formData } as unknown as Request, { params: Promise.resolve({ businessId: "business" }) });
+
+    expect(response.status).toBe(411);
+    await expect(response.json()).resolves.toEqual({ error: { code: "UPLOAD_LENGTH_REQUIRED", message: "The upload request is invalid." } });
+    expect(formData).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized request body before materializing multipart data", async () => {
     getCurrentIdentity.mockReturnValue({ providerUserId: "owner", email: "owner@example.com", displayName: "Owner", emailVerified: true });
     const formData = vi.fn();
 
     const response = await POST({
-      headers: new Headers({ "content-length": String(MAX_UPLOAD_SIZE_BYTES + 1) }),
+      headers: new Headers({ "content-length": String(MAX_UPLOAD_REQUEST_BODY_BYTES + 1) }),
       formData,
     } as unknown as Request, { params: Promise.resolve({ businessId: "business" }) });
 
     expect(response.status).toBe(413);
-    await expect(response.json()).resolves.toMatchObject({ error: { code: UPLOAD_ERROR_CODES.FILE_TOO_LARGE } });
+    await expect(response.json()).resolves.toEqual({ error: { code: "UPLOAD_REQUEST_TOO_LARGE", message: "The upload request is invalid." } });
     expect(formData).not.toHaveBeenCalled();
   });
 
@@ -89,7 +119,7 @@ describe("Task 11 upload security matrix", () => {
     getCurrentIdentity.mockReturnValue({ providerUserId: "owner", email: "owner@example.com", displayName: "Owner", emailVerified: true });
     const form = new FormData();
     form.set("notFile", "unexpected");
-    const response = await POST(new Request("http://localhost/api/businesses/business/documents", { method: "POST", body: form }), { params: Promise.resolve({ businessId: "business" }) });
+    const response = await POST(new Request("http://localhost/api/businesses/business/documents", { method: "POST", body: form, headers: { "content-length": "1024" } }), { params: Promise.resolve({ businessId: "business" }) });
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ error: { code: "INVALID_UPLOAD" } });
   });
@@ -101,7 +131,7 @@ describe("Task 11 upload security matrix", () => {
     const form = new FormData();
     form.set("file", new File([pdfBytes], "route-invoice.pdf", { type: "application/pdf" }));
 
-    const response = await POST(new Request("http://localhost/api/businesses/business/documents", { method: "POST", body: form }), { params: Promise.resolve({ businessId: business.id }) });
+    const response = await POST(new Request("http://localhost/api/businesses/business/documents", { method: "POST", body: form, headers: { "content-length": "1024" } }), { params: Promise.resolve({ businessId: business.id }) });
     expect(response.status).toBe(201);
     const body = await response.json();
     expect(body).toMatchObject({ businessId: business.id, originalFileName: "route-invoice.pdf", status: "uploaded" });

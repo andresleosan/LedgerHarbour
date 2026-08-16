@@ -13,7 +13,7 @@ interface StoredSession {
   readonly expiresAt: number;
 }
 
-const isDevelopmentMode = () => process.env.AUTH_MODE === "development";
+const isDevelopmentMode = () => process.env.AUTH_MODE === "development" && process.env.NODE_ENV !== "production";
 const sessionSecret = () => process.env.DEV_SESSION_SECRET;
 
 function getRequestCookies(): UnsafeUnwrappedCookies | null {
@@ -142,6 +142,7 @@ export async function getCurrentIdentity(): Promise<AuthIdentity | null> {
       return null;
     }
   }
+  if (!isDevelopmentMode()) return null;
   return getCurrentIdentitySync();
 }
 

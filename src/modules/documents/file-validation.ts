@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 export const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
+export const MAX_UPLOAD_REQUEST_BODY_BYTES = MAX_UPLOAD_SIZE_BYTES + 64 * 1024;
 export const MAX_FILE_NAME_LENGTH = 255;
 
 export const UPLOAD_ERROR_CODES = {

@@ -12,7 +12,8 @@ import { POST as uploadRoute } from "../../../src/app/api/businesses/[businessId
 import { GET as downloadRoute } from "../../../src/app/api/documents/[documentId]/download/route";
 import { clearCurrentIdentity, setCurrentIdentity } from "../../../src/modules/auth/session";
 import { LocalPrivateStorage } from "../../../src/modules/documents/local-private-storage";
-import { validateUpload } from "../../../src/modules/documents/file-validation";
+import { MAX_UPLOAD_REQUEST_BODY_BYTES, validateUpload } from "../../../src/modules/documents/file-validation";
+import { resetRateLimitersForTests } from "../../../src/modules/security/rate-limit";
 import {
   createOnboardingServices,
   createInMemoryOnboardingRepository,
@@ -40,6 +41,7 @@ describe("private document storage and service boundaries", () => {
     defaultOnboardingRepository.joinRequests.splice(0);
     defaultOnboardingRepository.auditEvents.splice(0);
     process.env.AUTH_MODE = "development";
+    resetRateLimitersForTests();
   });
 
   afterEach(async () => {
@@ -209,7 +211,7 @@ describe("private document storage and service boundaries", () => {
     const formFor = (file: File) => {
       const form = new FormData();
       form.set("file", file);
-      return new Request("http://localhost", { method: "POST", body: form });
+      return new Request("http://localhost", { method: "POST", body: form, headers: { "content-length": String(MAX_UPLOAD_REQUEST_BODY_BYTES) } });
     };
     const contextFor = (businessId: string) => ({ params: Promise.resolve({ businessId }) });
     const documentContextFor = (documentId: string) => ({ params: Promise.resolve({ documentId }) });
@@ -225,7 +227,7 @@ describe("private document storage and service boundaries", () => {
     const created = await onboarding.createBusiness({ name: "Route Documents" }, routeOwner);
     await setCurrentIdentity(routeOwner);
 
-    const invalidMultipart = await uploadRoute(new Request("http://localhost", { method: "POST", body: "not multipart" }), contextFor(created.id));
+    const invalidMultipart = await uploadRoute(new Request("http://localhost", { method: "POST", body: "not multipart", headers: { "content-length": "15" } }), contextFor(created.id));
     expect(invalidMultipart.status).toBe(400);
     await expect(invalidMultipart.json()).resolves.toEqual({ error: { code: "INVALID_UPLOAD", message: "The document could not be uploaded." } });
 

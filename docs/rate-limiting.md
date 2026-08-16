@@ -10,10 +10,11 @@ Las acciones de login y registro usan `enforceAuthRateLimit` con una ventana fij
 
 ## Endpoints autenticados
 
-- Upload usa un bucket separado de `10` solicitudes por `5 minutos`, con clave `AuthIdentity.providerUserId`.
-- OCR process usa un bucket separado de `5` solicitudes por `5 minutos`, con la misma clave de identidad y sin incluir IDs de ruta ni body.
+- Upload usa un bucket separado de `10` solicitudes por `5 minutos`, con clave `AuthIdentity.providerUserId` más la dirección del edge.
+- OCR process usa un bucket separado de `5` solicitudes por `5 minutos`, con la misma clave de identidad y dirección, sin incluir IDs de ruta ni body.
+- Los endpoints agregan la primera dirección disponible en `x-vercel-forwarded-for`, luego `x-forwarded-for` y finalmente `x-real-ip`; el edge debe sobrescribir esos headers antes de entregar la request a la aplicación. La aplicación no debe confiar en valores enviados directamente por clientes fuera de ese boundary.
 - En `NODE_ENV=production`, cualquier modo distinto de `RATE_LIMIT_MODE=upstash` falla cerrado. `memory` queda limitado a test/desarrollo.
-- Cuando se excede el límite, las rutas devuelven `429` con un mensaje genérico antes de leer multipart o JSON.
+- Cuando se excede el límite, las rutas devuelven `429` con un mensaje genérico antes de leer multipart o JSON. Si la configuración o Redis no está disponible, devuelven `503` genérico y también fallan cerrado.
 
 ## Operacion y costo
 

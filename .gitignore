@@ -22,3 +22,6 @@ credentials*.json
 service-account*.json
 firebase-adminsdk*.json
 google-credentials*.json
+*-credentials.json
+*-service-account.json
+client_secret*.json

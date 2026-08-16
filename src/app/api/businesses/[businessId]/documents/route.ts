@@ -7,10 +7,11 @@ import {
   DOCUMENT_ERROR_CODES,
   toSafeDocument,
 } from "../../../../../modules/documents/document-service";
-import { MAX_UPLOAD_SIZE_BYTES, UploadValidationError, UPLOAD_ERROR_CODES, validateUpload } from "../../../../../modules/documents/file-validation";
+import { MAX_UPLOAD_REQUEST_BODY_BYTES, MAX_UPLOAD_SIZE_BYTES, UploadValidationError, UPLOAD_ERROR_CODES, validateUpload } from "../../../../../modules/documents/file-validation";
 import type { BusinessId } from "../../../../../modules/tenancy/types";
 import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 import { enforceAuthenticatedRateLimit } from "../../../../../modules/security/authenticated-rate-limit";
+import { AuthenticatedRateLimitError, AuthenticatedRateLimitUnavailableError } from "../../../../../modules/security/rate-limit-errors";
 
 type RouteContext = { params: Promise<{ businessId: string }> };
 
@@ -29,24 +30,40 @@ function errorResponse(error: unknown): NextResponse {
   return NextResponse.json({ error: { code: "INVALID_UPLOAD", message: "The document could not be uploaded." } }, { status: 400 });
 }
 
+function requestLengthError(status: 411 | 413): NextResponse {
+  return NextResponse.json({
+    error: {
+      code: status === 413 ? "UPLOAD_REQUEST_TOO_LARGE" : "UPLOAD_LENGTH_REQUIRED",
+      message: "The upload request is invalid.",
+    },
+  }, { status });
+}
+
 export async function POST(request: Request, context: RouteContext) {
   const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   try {
-    await enforceAuthenticatedRateLimit("upload", identity.providerUserId);
-  } catch {
-    return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, { status: 429 });
+    await enforceAuthenticatedRateLimit("upload", identity.providerUserId, request.headers);
+  } catch (error) {
+    if (error instanceof AuthenticatedRateLimitError || (error as { code?: unknown })?.code === "AUTHENTICATED_RATE_LIMITED") {
+      return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, { status: 429 });
+    }
+    if (error instanceof AuthenticatedRateLimitUnavailableError || (error as { code?: unknown })?.code === "AUTHENTICATED_RATE_LIMIT_UNAVAILABLE") {
+      return NextResponse.json({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "Upload protection is temporarily unavailable." } }, { status: 503 });
+    }
+    return NextResponse.json({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "Upload protection is temporarily unavailable." } }, { status: 503 });
   }
   const contentLength = request.headers.get("content-length");
-  if (contentLength && Number.isFinite(Number(contentLength)) && Number(contentLength) > MAX_UPLOAD_SIZE_BYTES) {
-    return errorResponse(new UploadValidationError(UPLOAD_ERROR_CODES.FILE_TOO_LARGE));
-  }
+  if (!contentLength || !/^\d+$/.test(contentLength.trim())) return requestLengthError(411);
+  const requestBodyBytes = Number(contentLength);
+  if (!Number.isSafeInteger(requestBodyBytes)) return requestLengthError(411);
+  if (requestBodyBytes > MAX_UPLOAD_REQUEST_BODY_BYTES) return requestLengthError(413);
   const { businessId } = await context.params;
   try {
     const form = await request.formData();
     const value = form.get("file");
     if (typeof File === "undefined" || !(value instanceof File)) throw new Error("missing file");
-    if (value.size > 10 * 1024 * 1024) {
+    if (value.size > MAX_UPLOAD_SIZE_BYTES) {
       throw new UploadValidationError(UPLOAD_ERROR_CODES.FILE_TOO_LARGE);
     }
     const data = new Uint8Array(await value.arrayBuffer());
