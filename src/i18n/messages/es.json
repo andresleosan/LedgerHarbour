@@ -1,4 +1,56 @@
 {
+  "landing": {
+    "languageLabel": "Idioma",
+    "localeEnglish": "English",
+    "localeSpanish": "Espanol",
+    "nav": {
+      "howItWorks": "Como funciona",
+      "capabilities": "Capacidades",
+      "enter": "Entrar"
+    },
+    "eyebrow": "Control financiero por negocio",
+    "heroTitle": "Menos bandeja de entrada. Mas control.",
+    "heroDescription": "LedgerHarbour convierte facturas dispersas en decisiones claras: revisa documentos, automatiza la captura y trabaja con cada negocio en su propio espacio.",
+    "primaryAction": "Entrar al workspace",
+    "secondaryAction": "Crear cuenta",
+    "localNote": "Demo local con datos sinteticos. Sin credenciales reales.",
+    "flowAriaLabel": "Flujo de control de una factura",
+    "flowTitle": "Flujo de control",
+    "active": "Activo",
+    "received": "Factura recibida",
+    "receivedFile": "proveedor_abril.pdf",
+    "completed": "Completado",
+    "ocrProposes": "OCR propone datos",
+    "ocrDetails": "Importe, moneda y categoria",
+    "readyToReview": "Lista para revisar",
+    "pendingDecision": "1 decision pendiente",
+    "activeBusiness": "Negocio activo",
+    "businessName": "Harbour Studio",
+    "flowEyebrow": "Un flujo, no otra bandeja",
+    "flowHeading": "De documento a decision sin perder el hilo.",
+    "flowDescription": "El equipo ve que llego, que fue detectado y que necesita atencion. Cada paso deja una senal para que el cierre sea rapido y verificable.",
+    "capabilitiesEyebrow": "Hecho para operar",
+    "capabilitiesHeading": "La claridad que tu equipo necesita.",
+    "capabilities": [
+      {
+        "number": "01",
+        "title": "Revisa con contexto",
+        "description": "Cada factura conserva su documento, estado y decision en una vista lista para operar."
+      },
+      {
+        "number": "02",
+        "title": "Automatiza lo repetitivo",
+        "description": "El flujo OCR propone datos para que tu equipo revise excepciones, no transcriba cada campo."
+      },
+      {
+        "number": "03",
+        "title": "Separa cada negocio",
+        "description": "Cambia de negocio sin mezclar documentos, miembros ni permisos entre espacios."
+      }
+    ],
+    "footerDescription": "Workspace local para revisar y ordenar operaciones financieras.",
+    "openDemo": "Abrir demo"
+  },
   "auth": {
     "brand": "LedgerHarbour",
     "brandMark": "LH",

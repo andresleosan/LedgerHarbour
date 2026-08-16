@@ -52,7 +52,8 @@ El storage de documentos se migra por separado a R2; las claves de objetos perma
 - Firebase reemplaza el provider de desarrollo solo despues de probar el boundary de identidad.
 - Rate limiting sigue siendo obligatorio antes de exposicion publica.
 - Las migraciones productivas requieren backup verificado, rollback probado y confirmacion explicita.
-- La verificacion local del selector no implica que produccion este lista; auth, rate limiting, R2, OCR real, dependencias y operacion siguen pendientes.
+- La verificacion local del selector no implica que produccion este lista; auth, rate limiting, R2, OCR real y operacion siguen pendientes.
+- `corepack pnpm audit --json` queda en cero vulnerabilidades conocidas tras fijar `sharp@0.35.0` y `postcss@8.5.23` bajo Next; debe repetirse en cada release.
 - Este documento no autoriza despliegue ni gasto.
 
 ## Decisiones de arquitectura

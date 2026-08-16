@@ -82,6 +82,30 @@
   font-weight: 680;
 }
 
+.localeNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(16, 40, 61, .12);
+  border-radius: 8px;
+  background: rgba(255, 253, 248, .7);
+}
+
+.localeLink {
+  min-width: 30px;
+  padding: 6px 5px;
+  border-radius: 5px;
+  color: var(--muted);
+  font-size: .67rem;
+  text-align: center;
+}
+
+.localeLink[aria-current="page"] {
+  background: #d9eeea;
+  color: var(--teal);
+}
+
 .nav a,
 .footer a {
   color: inherit;

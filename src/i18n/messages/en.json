@@ -1,4 +1,56 @@
 {
+  "landing": {
+    "languageLabel": "Language",
+    "localeEnglish": "English",
+    "localeSpanish": "Espanol",
+    "nav": {
+      "howItWorks": "How it works",
+      "capabilities": "Capabilities",
+      "enter": "Enter"
+    },
+    "eyebrow": "Financial control by business",
+    "heroTitle": "Less inbox. More control.",
+    "heroDescription": "LedgerHarbour turns scattered invoices into clear decisions: review documents, automate capture, and work with each business in its own space.",
+    "primaryAction": "Enter workspace",
+    "secondaryAction": "Create account",
+    "localNote": "Local demo with synthetic data. No real credentials.",
+    "flowAriaLabel": "Invoice control flow",
+    "flowTitle": "Control flow",
+    "active": "Active",
+    "received": "Invoice received",
+    "receivedFile": "vendor_april.pdf",
+    "completed": "Completed",
+    "ocrProposes": "OCR proposes data",
+    "ocrDetails": "Amount, currency and category",
+    "readyToReview": "Ready to review",
+    "pendingDecision": "1 decision pending",
+    "activeBusiness": "Active business",
+    "businessName": "Harbour Studio",
+    "flowEyebrow": "A flow, not another inbox",
+    "flowHeading": "From document to decision without losing the thread.",
+    "flowDescription": "Your team sees what arrived, what was detected, and what needs attention. Each step leaves a signal so closeout is fast and auditable.",
+    "capabilitiesEyebrow": "Built to operate",
+    "capabilitiesHeading": "The clarity your team needs.",
+    "capabilities": [
+      {
+        "number": "01",
+        "title": "Review with context",
+        "description": "Every invoice keeps its document, status and decision in one view ready for action."
+      },
+      {
+        "number": "02",
+        "title": "Automate the repetitive",
+        "description": "OCR proposes data so your team reviews exceptions instead of transcribing every field."
+      },
+      {
+        "number": "03",
+        "title": "Separate each business",
+        "description": "Switch businesses without mixing documents, members or permissions between workspaces."
+      }
+    ],
+    "footerDescription": "A local workspace for reviewing and organizing financial operations.",
+    "openDemo": "Open demo"
+  },
   "auth": {
     "brand": "LedgerHarbour",
     "brandMark": "LH",
