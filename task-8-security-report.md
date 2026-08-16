@@ -64,6 +64,15 @@ Alcance: autenticación, upload, OCR process, review financiero y controles de a
 - Audit: `corepack pnpm audit --json` - 0 info, 0 low, 0 moderate, 0 high, 0 critical; 556 dependencias totales.
 - E2E: `corepack pnpm exec playwright test tests/e2e/critical-path.spec.ts` con fixtures locales - 1/1 pasa en 28.2 s.
 
+## Verificacion final
+
+- `corepack pnpm test` - 39 archivos pasan, 1 skipped; `362` tests pasan, `1` skipped.
+- `corepack pnpm lint` - exit 0.
+- `corepack pnpm build` - exit 0; Next genera `14/14` paginas.
+- `corepack pnpm audit --json` - 0 info, 0 low, 0 moderate, 0 high, 0 critical.
+- `$env:OCR_PROVIDER='fake'; corepack pnpm exec playwright test` - `23/23` E2E pasan.
+- La suite E2E muestra los `AuthError` esperados de los casos negativos; no son fallos de test.
+
 ## Fix Round 3
 
 ### Finding corregido
