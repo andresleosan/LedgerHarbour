@@ -47,6 +47,14 @@ Las referencias se usan para extraer patrones estructurales, no para copiar cont
 - Los labels accesibles del selector se mantienen traducidos sin mostrar una etiqueta `Language/Idioma` repetida en cada pagina.
 - Auth y onboarding conservan sus controles propios hasta una tarea posterior de consolidacion.
 
+## Assets de marca
+
+- La fuente aprobada es `F:\Proyectos\LedgerHarbour\Img\Logo.png`.
+- El logo completo se usara en cabecera y login, conservando el nombre accesible `LedgerHarbour`.
+- El favicon y el `apple-touch-icon` usaran un recorte cuadrado del emblema del faro, no el wordmark completo, para conservar legibilidad en tamanos pequenos.
+- Las copias optimizadas viviran dentro del repositorio en `public/brand/` y los iconos estaticos de Next.js en `src/app/`.
+- No se sobrescribira el archivo fuente externo ni se agregaran servicios de terceros para servir los assets.
+
 ## Criterios de aceptacion
 
 - Existe un unico selector de idioma visible en cualquier ruta autenticada.
@@ -56,6 +64,7 @@ Las referencias se usan para extraer patrones estructurales, no para copiar cont
 - Los estados `hover`, `focus-visible`, `loading`, `error`, `empty` y `disabled` son distinguibles y accesibles.
 - `prefers-reduced-motion` reduce las transiciones sin eliminar feedback funcional.
 - Playwright verifica el cambio de idioma y no registra errores de consola en las rutas principales.
+- El logo completo y el favicon se sirven con formato PNG valido, texto alternativo accesible y sin romper el layout responsive.
 
 ## Fuera de alcance
 

@@ -44,6 +44,9 @@
 - Modify: `src/app/(app)/business/[businessId]/upload/page.tsx`, `src/app/(app)/business/[businessId]/invoices/page.tsx`, `src/app/(app)/business/[businessId]/invoices/[invoiceId]/page.tsx` - Remove duplicate toolbars and align operational surfaces.
 - Modify: `src/app/(app)/business/[businessId]/members/page.tsx`, `src/app/(app)/business/[businessId]/settings/categories/page.tsx`, `src/app/(app)/business/[businessId]/settings/currencies/page.tsx`, `src/app/(app)/business/[businessId]/settings/members/page.tsx`, `src/app/(app)/business/[businessId]/settings/danger-zone/page.tsx` - Remove duplicate language controls and use shared shell styling.
 - Modify: `tests/e2e/navigation/business-switcher.spec.ts` - Verify one authenticated language control, locale preservation, responsive layout, focus, and reduced motion.
+- Create: `public/brand/ledgerharbour-logo.png`, `src/app/icon.png`, `src/app/apple-icon.png` - Optimized logo and emblem icon derived from the approved source image.
+- Modify: `src/ui/AppShell.tsx`, `src/ui/auth/AuthForm.tsx`, `src/app/page.tsx` - Render the approved logo with accessible alternative text.
+- Create: `tests/e2e/branding/logo-assets.spec.ts` - Verify visible branding and served favicon assets.
 - Modify: `package.json`, `pnpm-lock.yaml` - Add the pinned Google Document AI dependency.
 
 ---
@@ -514,7 +517,87 @@ git commit -m "feat: simplify authenticated visual language"
 
 ---
 
-### Task 7: Full Verification and Production Gate
+### Task 7: Add Logo and Favicon Assets
+
+**Files:**
+- Source only: `F:\Proyectos\LedgerHarbour\Img\Logo.png`
+- Create: `public/brand/ledgerharbour-logo.png`
+- Create: `src/app/icon.png`
+- Create: `src/app/apple-icon.png`
+- Modify: `src/ui/AppShell.tsx`
+- Modify: `src/ui/auth/AuthForm.tsx`
+- Modify: `src/app/page.tsx`
+- Create: `tests/e2e/branding/logo-assets.spec.ts`
+- Reference: `docs/superpowers/specs/2026-08-16-authenticated-shell-visual-language-design.md`
+
+**Interfaces:**
+- Consumes: The approved external PNG at `F:\Proyectos\LedgerHarbour\Img\Logo.png` and the existing branding surfaces.
+- Produces: A repository-local full logo, square favicon/apple icon, accessible image labels, and browser verification of the assets.
+
+- [ ] **Step 1: Add failing asset and branding assertions**
+
+Create `tests/e2e/branding/logo-assets.spec.ts` with tests that:
+
+```ts
+const logo = page.getByRole("img", { name: "LedgerHarbour" });
+await expect(logo).toBeVisible();
+await expect(logo).toHaveAttribute("src", /ledgerharbour-logo/);
+
+const favicon = await page.request.get("/icon.png");
+expect(favicon.ok()).toBe(true);
+expect(favicon.headers()["content-type"]).toContain("image/png");
+```
+
+Also assert `/apple-icon.png` returns `200` and a PNG content type, and that the authenticated shell contains one branded image rather than the placeholder `LH` text mark.
+
+- [ ] **Step 2: Run the focused branding tests and verify RED**
+
+Run:
+
+```bash
+corepack pnpm exec playwright test tests/e2e/branding/logo-assets.spec.ts
+```
+
+Expected: FAIL because the repository has no optimized logo/icon assets and the current shell/auth branding still renders text placeholders.
+
+- [ ] **Step 3: Generate repository-local image assets from the approved source**
+
+Inspect the source PNG dimensions and alpha channel before processing. Use the already-installed `sharp` dependency in a one-off local command to:
+
+- copy the complete source artwork to `public/brand/ledgerharbour-logo.png` in a web-sized PNG that preserves transparency;
+- extract the lighthouse emblem into a centered square PNG for `src/app/icon.png` at `32x32` or the Next.js static icon size;
+- generate `src/app/apple-icon.png` as a `180x180` square from the same emblem crop;
+- avoid including the tiny wordmark/tagline in favicon files;
+- never modify the external source file.
+
+Do not add a runtime image-processing dependency or a remote asset URL.
+
+- [ ] **Step 4: Replace placeholder branding accessibly**
+
+Use the repository-local full logo in `AppShell`, `AuthForm`, and the landing page. Keep a textual `LedgerHarbour` label or accessible name for screen readers, set explicit dimensions to prevent layout shift, use `object-fit: contain`, and keep the header/login responsive. Remove only the visual `LH` placeholder where the logo is rendered; do not remove the product name from accessible navigation.
+
+- [ ] **Step 5: Run branding tests and static checks**
+
+Run:
+
+```bash
+corepack pnpm exec playwright test tests/e2e/branding/logo-assets.spec.ts
+corepack pnpm lint
+corepack pnpm build
+```
+
+Expected: both PNG routes return `200`, branding is visible with accessible text, no layout shift/overflow is introduced, and lint/build exit successfully.
+
+- [ ] **Step 6: Commit the brand assets**
+
+```bash
+git add public/brand/ledgerharbour-logo.png src/app/icon.png src/app/apple-icon.png src/ui/AppShell.tsx src/ui/auth/AuthForm.tsx src/app/page.tsx tests/e2e/branding/logo-assets.spec.ts
+git commit -m "feat: add LedgerHarbour brand assets"
+```
+
+---
+
+### Task 8: Full Verification and Production Gate
 
 **Files:**
 - Modify: `tasks.md` if present, otherwise record status in the final handoff only.
