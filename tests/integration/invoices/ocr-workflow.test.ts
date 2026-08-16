@@ -216,6 +216,52 @@ describe("OCR workflow boundaries", () => {
     expect(providerCalls).toBe(1);
   });
 
+  it("preserves business lifecycle handling before claiming the job", async () => {
+    const { queue, worker } = workflow();
+    const job = await queue.queueOcr(documentId, user("member"));
+    tenancy.businesses.get(ownerBusiness.id)!.isActive = false;
+
+    await worker.processOcrJob(job.id);
+
+    expect(jobs.jobs.get(job.id)).toMatchObject({ status: "failed", retryCount: 1 });
+    await expect(documentRepository.getStatus(documentId)).resolves.toBe("failed");
+  });
+
+  it("terminally fails when the default provider configuration is invalid", async () => {
+    const environment = {
+      OCR_PROVIDER: process.env.OCR_PROVIDER,
+      NODE_ENV: process.env.NODE_ENV,
+      GOOGLE_CLOUD_PROJECT_ID: process.env.GOOGLE_CLOUD_PROJECT_ID,
+      GOOGLE_CLOUD_LOCATION: process.env.GOOGLE_CLOUD_LOCATION,
+      GOOGLE_DOCUMENT_AI_PROCESSOR_ID: process.env.GOOGLE_DOCUMENT_AI_PROCESSOR_ID,
+      GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON,
+    };
+    process.env.OCR_PROVIDER = "invalid-provider";
+
+    try {
+      const dependencies = { tenancyRepository: tenancy, documentRepository, jobs, invoices, storage };
+      const queue = createJobService(dependencies);
+      const worker = createOcrWorker(dependencies);
+      const job = await queue.queueOcr(documentId, user("member"));
+
+      await worker.processOcrJob(job.id);
+
+      expect(jobs.jobs.get(job.id)).toMatchObject({
+        status: "failed",
+        retryCount: 3,
+        errorSummary: "OCR processing failed.",
+      });
+      await expect(documentRepository.getStatus(documentId)).resolves.toBe("failed");
+      await worker.processOcrJob(job.id);
+      expect(jobs.jobs.get(job.id)?.retryCount).toBe(3);
+    } finally {
+      for (const [name, value] of Object.entries(environment)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  });
+
   it("claims a queued job once when two workers process it concurrently", async () => {
     let providerCalls = 0;
     let enteredProvider!: () => void;

@@ -11,7 +11,7 @@ import {
 import type { DocumentRepository } from "../documents/document-service";
 import type { StorageAdapter } from "../documents/storage-adapter";
 import { defaultOnboardingRepository, type OnboardingRepository } from "../tenancy/business-service";
-import { requireBusinessOperational } from "../tenancy/business-lifecycle-service";
+import { BusinessLifecycleError, requireBusinessOperational } from "../tenancy/business-lifecycle-service";
 import { createTenantContext } from "../tenancy/tenant-context";
 import {
   getJobDependencies,
@@ -92,6 +92,10 @@ export function createOcrWorker(input: OcrWorkerDependencies = {}): OcrWorker {
         await jobs.update({ ...processing, status: "completed", errorSummary: null, updatedAt: new Date().toISOString() });
       } catch (error) {
         await setDocumentState(deps.documentRepository, document.id as import("../invoices/ocr-provider").DocumentId, "failed");
+        if (error instanceof BusinessLifecycleError) {
+          await failJob(processing ?? job, jobs);
+          return;
+        }
         if (error instanceof OcrConfigurationError || (error instanceof OcrProviderError && !error.retryable)) {
           await failJobTerminal(processing ?? job, jobs);
         } else {
