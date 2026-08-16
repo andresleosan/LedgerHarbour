@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { usePathname, useSearchParams } from "next/navigation";
 
 import type { AuthIdentity } from "@/modules/auth/auth-provider";
+import { signOutFirebaseUser, type FirebaseClientConfig } from "@/modules/auth/firebase-client";
 import type { BusinessSummary } from "@/modules/tenancy/portfolio-service";
 import BusinessSwitcher from "@/ui/BusinessSwitcher";
 import LanguageSwitcher from "@/ui/LanguageSwitcher";
@@ -13,10 +14,11 @@ interface AppShellProps {
   identity: AuthIdentity;
   businesses: readonly BusinessSummary[];
   locale: "en" | "es";
+  firebaseConfig?: FirebaseClientConfig;
   signOutAction: (formData: FormData) => void | Promise<void>;
 }
 
-export default function AppShell({ children, identity, businesses, locale, signOutAction }: AppShellProps) {
+export default function AppShell({ children, identity, businesses, locale, firebaseConfig, signOutAction }: AppShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeLocale = searchParams.get("locale") === "es" ? "es" : locale;
@@ -99,7 +101,7 @@ export default function AppShell({ children, identity, businesses, locale, signO
            <span className="shell-nav-disabled" aria-disabled="true" title={copy.unavailable}>{copy.documents}</span>
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/settings/members`)}>{copy.settings}</a> : <span className="shell-nav-disabled">{copy.settings}</span>}
         </nav>
-        <div className="shell-user"><span><strong>{identity.displayName}</strong>{identity.email}</span><form action={signOutAction}><button className="sign-out" type="submit">{copy.signOut}</button></form></div>
+        <div className="shell-user"><span><strong>{identity.displayName}</strong>{identity.email}</span><form action={signOutAction} onSubmit={async (event) => { event.preventDefault(); const form = event.currentTarget; try { await signOutFirebaseUser(firebaseConfig); } finally { await signOutAction(new FormData(form)); } }}><button className="sign-out" type="submit">{copy.signOut}</button></form></div>
       </header>
       <main className="shell-main"><LanguageSwitcher locale={activeLocale} /><div className="shell-layout"><BusinessSwitcher businesses={businesses} locale={activeLocale} /><div className="shell-content">{children}</div></div></main>
     </div>

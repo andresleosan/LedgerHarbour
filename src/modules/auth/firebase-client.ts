@@ -7,7 +7,7 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signInWithRedirect,
+  signInWithPopup,
   signOut,
   type UserCredential,
 } from "firebase/auth";
@@ -41,9 +41,9 @@ export async function signInWithFirebaseEmail(config: FirebaseClientConfig, emai
   return register ? createUserWithEmailAndPassword(auth, email, password) : signInWithEmailAndPassword(auth, email, password);
 }
 
-export async function signInWithFirebaseGoogle(config: FirebaseClientConfig): Promise<void> {
+export async function signInWithFirebaseGoogle(config: FirebaseClientConfig): Promise<UserCredential> {
   const auth = getAuth(firebaseApp(config));
-  await signInWithRedirect(auth, new GoogleAuthProvider());
+  return signInWithPopup(auth, new GoogleAuthProvider());
 }
 
 export async function getFirebaseGoogleRedirectResult(config: FirebaseClientConfig): Promise<UserCredential | null> {
@@ -64,6 +64,8 @@ export async function signInWithFirebaseCredential(
   return signInWithGoogle({ idToken: await credential.user.getIdToken() });
 }
 
-export async function signOutFirebaseUser(config: FirebaseClientConfig): Promise<void> {
-  await signOut(getAuth(firebaseApp(config)));
+export async function signOutFirebaseUser(config?: FirebaseClientConfig): Promise<void> {
+  const app = getApps()[0] ?? (config ? firebaseApp(config) : null);
+  if (!app) return;
+  await signOut(getAuth(app));
 }

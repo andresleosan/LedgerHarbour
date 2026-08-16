@@ -17,6 +17,14 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     invoiceRepository: persistence.invoiceRepository,
   });
   const locale = "en" as const;
+  const firebaseConfig = process.env.AUTH_MODE === "firebase"
+    ? {
+        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "",
+        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "",
+        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "",
+        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "",
+      }
+    : undefined;
 
   async function signOutAction() {
     "use server";
@@ -24,5 +32,5 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     redirect("/login");
   }
 
-  return <AppShell identity={identity} businesses={businesses} locale={locale} signOutAction={signOutAction}>{children}</AppShell>;
+  return <AppShell identity={identity} businesses={businesses} locale={locale} firebaseConfig={firebaseConfig} signOutAction={signOutAction}>{children}</AppShell>;
 }

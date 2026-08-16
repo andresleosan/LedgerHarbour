@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { AUTH_ERROR_CODES, AuthError, toAuthError } from "@/modules/auth/auth-errors";
 import {
@@ -40,6 +40,7 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [errorKey, setErrorKey] = useState<ErrorKey | null>(null);
   const [provider] = useState<AuthProvider>(() => createAuthProviderFromActions(providerActions));
+  const firebaseGoogleCompletionStarted = useRef(false);
   const router = useRouter();
   const copy = messages[locale].auth;
   const isLogin = mode === "login";
@@ -55,9 +56,12 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
     void getFirebaseGoogleRedirectResult(firebaseConfig)
       .then(async (firebaseCredential) => {
         if (!firebaseCredential || cancelled) return;
+        if (firebaseGoogleCompletionStarted.current) return;
+        firebaseGoogleCompletionStarted.current = true;
         const identity = await signInWithFirebaseCredential(firebaseCredential, provider.signInWithGoogle);
         if (cancelled) return;
         if (!identity) {
+          firebaseGoogleCompletionStarted.current = false;
           setErrorKey("missingIdentity");
           return;
         }
@@ -66,6 +70,7 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
       })
       .catch((error) => {
         if (!cancelled) {
+          firebaseGoogleCompletionStarted.current = false;
           toAuthError(error);
           setErrorKey("providerError");
         }
@@ -130,7 +135,17 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
     try {
       if (isFirebase && !firebaseConfig) throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE);
       if (isFirebase) {
-        await signInWithFirebaseGoogle(firebaseConfig!);
+        const firebaseCredential = await signInWithFirebaseGoogle(firebaseConfig!);
+        if (firebaseGoogleCompletionStarted.current) return;
+        firebaseGoogleCompletionStarted.current = true;
+        const identity = await signInWithFirebaseCredential(firebaseCredential, provider.signInWithGoogle);
+        if (!identity) {
+          firebaseGoogleCompletionStarted.current = false;
+          setErrorKey("missingIdentity");
+          return;
+        }
+        setFeedback({ type: "signedIn", email: identity.email });
+        router.replace("/onboarding");
         return;
       }
       const identity = await provider.signInWithGoogle();
@@ -142,6 +157,7 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
       setFeedback({ type: "signedIn", email: identity.email });
       if (isFirebase) router.replace("/onboarding");
     } catch (error) {
+      if (isFirebase) firebaseGoogleCompletionStarted.current = false;
       toAuthError(error);
       setErrorKey("providerError");
     }

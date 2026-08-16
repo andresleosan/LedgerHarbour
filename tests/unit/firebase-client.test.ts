@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const signInWithRedirect = vi.hoisted(() => vi.fn());
+const signInWithPopup = vi.hoisted(() => vi.fn());
 const getRedirectResult = vi.hoisted(() => vi.fn());
 const getAuth = vi.hoisted(() => vi.fn(() => "auth"));
 const signOut = vi.hoisted(() => vi.fn());
@@ -16,8 +16,7 @@ vi.mock("firebase/auth", () => ({
   getRedirectResult,
   GoogleAuthProvider: class GoogleAuthProvider {},
   signInWithEmailAndPassword: vi.fn(),
-  signInWithPopup: vi.fn(),
-  signInWithRedirect,
+  signInWithPopup,
   signOut,
 }));
 
@@ -40,11 +39,13 @@ describe("Firebase Google authentication", () => {
     vi.clearAllMocks();
   });
 
-  it("starts authentication with a redirect instead of a popup", async () => {
-    await signInWithFirebaseGoogle(config);
+  it("starts authentication with a popup and returns its credential", async () => {
+    const credential = { user: { getIdToken: vi.fn() } };
+    signInWithPopup.mockResolvedValue(credential);
 
-    expect(signInWithRedirect).toHaveBeenCalledOnce();
-    expect(signInWithRedirect.mock.calls[0]?.[0]).toBe("auth");
+    await expect(signInWithFirebaseGoogle(config)).resolves.toBe(credential);
+    expect(signInWithPopup).toHaveBeenCalledOnce();
+    expect(signInWithPopup.mock.calls[0]?.[0]).toBe("auth");
   });
 
   it("reads the Google result after returning from the redirect", async () => {
