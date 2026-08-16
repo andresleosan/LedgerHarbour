@@ -38,6 +38,12 @@
 - Modify: `.env.example` - Document the provider selector and Google settings without secrets.
 - Modify: `docs/STACK.md` - Record the integration, cost estimate, and billing alert requirement.
 - Create: `docs/google-document-ai.md` - Setup, IAM, secret handling, limits, retries, and operational fallback.
+- Create: `docs/superpowers/specs/2026-08-16-authenticated-shell-visual-language-design.md` - Approved visual DNA and language consolidation rules.
+- Modify: `src/ui/AppShell.tsx`, `src/ui/LanguageSwitcher.tsx` - Single global language control and shared visual tokens.
+- Modify: `src/ui/useUrlLocale.ts` - Preserve pathname and functional query params during locale changes.
+- Modify: `src/app/(app)/business/[businessId]/upload/page.tsx`, `src/app/(app)/business/[businessId]/invoices/page.tsx`, `src/app/(app)/business/[businessId]/invoices/[invoiceId]/page.tsx` - Remove duplicate toolbars and align operational surfaces.
+- Modify: `src/app/(app)/business/[businessId]/members/page.tsx`, `src/app/(app)/business/[businessId]/settings/categories/page.tsx`, `src/app/(app)/business/[businessId]/settings/currencies/page.tsx`, `src/app/(app)/business/[businessId]/settings/members/page.tsx`, `src/app/(app)/business/[businessId]/settings/danger-zone/page.tsx` - Remove duplicate language controls and use shared shell styling.
+- Modify: `tests/e2e/navigation/business-switcher.spec.ts` - Verify one authenticated language control, locale preservation, responsive layout, focus, and reduced motion.
 - Modify: `package.json`, `pnpm-lock.yaml` - Add the pinned Google Document AI dependency.
 
 ---
@@ -419,7 +425,96 @@ git commit -m "docs: document Google Document AI setup and cost"
 
 ---
 
-### Task 6: Full Verification and Production Gate
+### Task 6: Minimal Authenticated Visual System and Language Consolidation
+
+**Files:**
+- Modify: `src/ui/AppShell.tsx`
+- Modify: `src/ui/LanguageSwitcher.tsx`
+- Modify: `src/ui/useUrlLocale.ts`
+- Modify: `src/app/(app)/business/[businessId]/upload/page.tsx`
+- Modify: `src/app/(app)/business/[businessId]/invoices/page.tsx`
+- Modify: `src/app/(app)/business/[businessId]/invoices/[invoiceId]/page.tsx`
+- Modify: `src/app/(app)/business/[businessId]/members/page.tsx`
+- Modify: `src/app/(app)/business/[businessId]/settings/categories/page.tsx`
+- Modify: `src/app/(app)/business/[businessId]/settings/currencies/page.tsx`
+- Modify: `src/app/(app)/business/[businessId]/settings/members/page.tsx`
+- Modify: `src/app/(app)/business/[businessId]/settings/danger-zone/page.tsx`
+- Modify: `tests/e2e/navigation/business-switcher.spec.ts`
+- Reference: `docs/superpowers/specs/2026-08-16-authenticated-shell-visual-language-design.md`
+
+**Interfaces:**
+- Consumes: `LanguageSwitcher`, `useUrlLocale`, existing `AppShell` navigation and the approved Design DNA.
+- Produces: One authenticated language control, consistent operational surface primitives, preserved locale/filter query parameters, and responsive accessible pages.
+
+- [ ] **Step 1: Add failing browser assertions for the duplicate-control bug**
+
+Extend `tests/e2e/navigation/business-switcher.spec.ts` after navigating to an authenticated business route:
+
+```ts
+await expect(page.locator(".language-switcher")).toHaveCount(1);
+await expect(page.locator(".toolbar")).toHaveCount(0);
+await expect(page.getByRole("link", { name: "Español" })).toHaveAttribute("href", /locale=es/);
+```
+
+Keep assertions that the current pathname, invoice filter, focus outline, reduced-motion transition, contrast, and mobile `scrollWidth` remain valid.
+
+- [ ] **Step 2: Run the focused browser test and verify RED**
+
+Run:
+
+```bash
+corepack pnpm exec playwright test tests/e2e/navigation/business-switcher.spec.ts
+```
+
+Expected: the new count assertion fails because the authenticated upload page and other pages render their own language toolbar in addition to `AppShell`.
+
+- [ ] **Step 3: Make `AppShell` the only authenticated language owner**
+
+Move `LanguageSwitcher` into the global header utility area beside the signed-in user controls. Keep its accessible `aria-label`, English/Spanish labels, and URL generation, but render it as a compact segmented control with one active state, visible keyboard focus, and no repeated visible `Language/Idioma` label on each page.
+
+Add CSS variables in `AppShell` for the approved palette and shared control states. Keep contrast at 4.5:1 or higher, use only short hover/focus transitions, and preserve reduced-motion behavior.
+
+- [ ] **Step 4: Remove local language toolbars without losing locale behavior**
+
+Remove the local toolbar markup and its redundant styles from upload, invoices list, invoice review, members, categories, currencies, settings members, and danger-zone pages. Keep each page's `locale` resolution and `hrefFor` calls where they are needed for links, filters, copy, and redirects. Do not remove auth/onboarding selectors in this task.
+
+Update `useUrlLocale` and the server-side invoice filter links so changing language preserves all functional query parameters, especially `status` on invoices. The shell selector must preserve the current pathname and query string rather than reconstructing a page-specific URL.
+
+- [ ] **Step 5: Normalize the operational visual primitives**
+
+Use the shared shell tokens in the touched pages to align:
+
+- one card radius and border treatment;
+- one primary teal button and one secondary action treatment;
+- consistent input height, focus ring, badge shape, and error/success colors;
+- moderate page headings instead of oversized upload/review titles;
+- mobile single-column layout with no horizontal overflow;
+- keyboard focus and `prefers-reduced-motion` behavior.
+
+Do not add Tailwind, shadcn/ui, Magic UI, or Aceternity UI as mandatory dependencies; extract only the structural patterns from the approved references.
+
+- [ ] **Step 6: Run focused browser and static verification**
+
+Run:
+
+```bash
+corepack pnpm exec playwright test tests/e2e/navigation/business-switcher.spec.ts
+corepack pnpm lint
+corepack pnpm build
+```
+
+Expected: the browser test passes in English and Spanish, the authenticated route contains one `.language-switcher`, no `.toolbar`, the mobile viewport has no overflow, and lint/build exit successfully.
+
+- [ ] **Step 7: Commit the visual pass**
+
+```bash
+git add src/ui/AppShell.tsx src/ui/LanguageSwitcher.tsx src/ui/useUrlLocale.ts src/app/(app)/business/[businessId] tests/e2e/navigation/business-switcher.spec.ts
+git commit -m "feat: simplify authenticated visual language"
+```
+
+---
+
+### Task 7: Full Verification and Production Gate
 
 **Files:**
 - Modify: `tasks.md` if present, otherwise record status in the final handoff only.
