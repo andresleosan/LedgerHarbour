@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { AUTH_ERROR_CODES, AuthError, toAuthError } from "@/modules/auth/auth-errors";
 import {
@@ -10,7 +10,14 @@ import {
   type AuthProvider,
   type AuthProviderActions,
 } from "@/modules/auth/auth-provider";
-import { signInWithFirebaseEmail, signInWithFirebaseGoogle, type FirebaseClientConfig } from "@/modules/auth/firebase-client";
+import {
+  getFirebaseGoogleRedirectResult,
+  signInWithFirebaseCredential,
+  signInWithFirebaseEmail,
+  signInWithFirebaseGoogle,
+  signOutFirebaseUser,
+  type FirebaseClientConfig,
+} from "@/modules/auth/firebase-client";
 import { messages, type SupportedLocale } from "@/i18n/config";
 
 type AuthFormMode = "login" | "register";
@@ -41,6 +48,32 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
   const authCopy = isLogin ? loginCopy : registerCopy;
   const isFirebase = authMode === "firebase";
 
+  useEffect(() => {
+    if (!isFirebase || !isLogin || !firebaseConfig) return;
+    let cancelled = false;
+
+    void getFirebaseGoogleRedirectResult(firebaseConfig)
+      .then(async (firebaseCredential) => {
+        if (!firebaseCredential || cancelled) return;
+        const identity = await signInWithFirebaseCredential(firebaseCredential, provider.signInWithGoogle);
+        if (cancelled) return;
+        if (!identity) {
+          setErrorKey("missingIdentity");
+          return;
+        }
+        setFeedback({ type: "signedIn", email: identity.email });
+        router.replace("/onboarding");
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          toAuthError(error);
+          setErrorKey("providerError");
+        }
+      });
+
+    return () => { cancelled = true; };
+  }, [firebaseConfig, isFirebase, isLogin, provider, router]);
+
   const clearFeedback = () => {
     setFeedback(null);
     setErrorKey(null);
@@ -65,9 +98,7 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
         return;
       }
 
-      if (!isLogin) {
-        await provider.signOut();
-      }
+      if (!isLogin) await provider.signOut();
 
       setFeedback({ type: isLogin ? "signedIn" : "created", email: identity.email });
       if (isFirebase && isLogin) router.replace("/onboarding");
@@ -78,8 +109,18 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
           ? "invalidEmail"
           : authError.code === AUTH_ERROR_CODES.MISSING_IDENTITY
             ? "missingIdentity"
-            : "providerError",
+          : "providerError",
       );
+    } finally {
+      if (!isLogin && isFirebase && firebaseConfig) {
+        try {
+          await signOutFirebaseUser(firebaseConfig);
+        } catch (error) {
+          setFeedback(null);
+          toAuthError(error);
+          setErrorKey("providerError");
+        }
+      }
     }
   };
 
@@ -88,8 +129,11 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
 
     try {
       if (isFirebase && !firebaseConfig) throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE);
-      const firebaseCredential = isFirebase ? await signInWithFirebaseGoogle(firebaseConfig!) : null;
-      const identity = await provider.signInWithGoogle(firebaseCredential ? { idToken: await firebaseCredential.user.getIdToken() } : undefined);
+      if (isFirebase) {
+        await signInWithFirebaseGoogle(firebaseConfig!);
+        return;
+      }
+      const identity = await provider.signInWithGoogle();
 
       if (!identity) {
         setErrorKey("missingIdentity");
