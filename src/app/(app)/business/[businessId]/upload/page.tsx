@@ -70,7 +70,7 @@ export default function UploadPage({ params }: { params: Promise<{ businessId: s
     try {
       const response = await fetch(`/api/documents/${document.id}/process`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
       if (!response.ok) { setErrorCode("OCR_PROCESSING_FAILED"); return; }
-      router.push(`/business/${businessId}/invoices?locale=${locale}`);
+      router.push(hrefFor(`/business/${businessId}/invoices`));
     } catch {
       setErrorCode("OCR_PROCESSING_FAILED");
     } finally {

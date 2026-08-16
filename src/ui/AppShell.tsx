@@ -78,7 +78,7 @@ export default function AppShell({ children, identity, businesses, locale, fireb
         .business-option a, .business-option-disabled { display: block; padding: 10px; border-radius: 10px; text-decoration: none; }
         .business-option a:hover { background: #edf7f3; }
         .business-option-disabled { background: #f4f6f4; cursor: not-allowed; }
-        .business-option-name { display: block; overflow-wrap: anywhere; font-size: .85rem; font-weight: 800; }
+         .business-option-name { display: block; min-width: 0; overflow-wrap: anywhere; font-size: .85rem; font-weight: 800; }
          .business-option-meta { display: flex; align-items: center; justify-content: space-between; gap: 5px; margin-top: 6px; color: #536b69; font-size: .7rem; text-transform: capitalize; }
         .status-badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 7px; font-size: .66rem; font-weight: 850; text-transform: none; }
         .status-badge-active { background: #d9eeea; color: #075b57; }
@@ -87,7 +87,8 @@ export default function AppShell({ children, identity, businesses, locale, fireb
          .language-switcher { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid #9bb7b0; border-radius: 999px; background: #fff; transition: background-color .18s ease, border-color .18s ease; }
          .language-switcher a { border-radius: 999px; padding: 6px 8px; color: #315b60; font-size: .76rem; font-weight: 800; text-decoration: none; }
          .language-switcher a:hover, .language-switcher a[aria-current="page"] { background: #d9eeea; color: #075b57; }
-         .language-switcher a:focus-visible, .app-shell button:focus-visible, .app-shell a:focus-visible, .app-shell input:focus-visible, .app-shell textarea:focus-visible { outline: 3px solid var(--lh-coral-focus); outline-offset: 3px; }
+          .language-switcher a:focus-visible, .app-shell button:focus-visible, .app-shell a:focus-visible, .app-shell input:focus-visible, .app-shell textarea:focus-visible { outline: 3px solid var(--lh-coral-focus); outline-offset: 3px; }
+          .app-shell .invoice-hero a:focus-visible, .app-shell .review-preview a:focus-visible { outline-color: #fff; }
          .operational-page { min-width: 0; }
          .page-shell { width: min(100%, 980px); margin: 0 auto; }
          .page-back { display: inline-flex; margin-bottom: 20px; color: var(--lh-teal); font-weight: 800; text-decoration: none; }
@@ -127,7 +128,8 @@ export default function AppShell({ children, identity, businesses, locale, fireb
          .filter-button[aria-pressed="true"] { border-color: var(--lh-teal); background: #d7eee8; color: var(--lh-teal-dark); }
          .invoice-list { display: grid; gap: 10px; }
          .invoice-row { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 16px; border: 1px solid var(--lh-border); border-radius: 12px; background: #fff; }
-         .invoice-row strong { overflow-wrap: anywhere; }
+          .invoice-row > div:first-child, .settings-item > div:first-child { min-width: 0; overflow-wrap: anywhere; }
+          .invoice-row strong, .settings-item strong, .settings-item small { overflow-wrap: anywhere; }
          .invoice-row p { margin: 5px 0 0; color: var(--lh-muted); font-size: .86rem; }
          .invoice-row a { display: inline-flex; align-items: center; color: #315b60; text-decoration: none; white-space: nowrap; }
          .review-shell { max-width: 1120px; }
