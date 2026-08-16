@@ -13,6 +13,7 @@ Prototipo local/no comercial. El objetivo de la siguiente fase es una prueba des
 - Zod
 - Vitest
 - Playwright
+- Playwright MCP: habilitado globalmente en OpenCode con `@playwright/mcp@0.0.79` y navegador Chrome.
 - Monolito modular; no se separan servicios hasta que una necesidad medida lo justifique.
 
 ## Arquitectura de prototipo desplegable
