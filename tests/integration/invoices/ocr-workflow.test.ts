@@ -6,7 +6,9 @@ import { clearCurrentIdentity, setCurrentIdentity } from "../../../src/modules/a
 import { createDocument, createDocumentRepository, type Document } from "../../../src/modules/documents/document-service";
 import type { StorageAdapter } from "../../../src/modules/documents/storage-adapter";
 import { FakeOcrProvider } from "../../../src/modules/invoices/fake-ocr-provider";
+import { OcrProviderError } from "../../../src/modules/invoices/ocr-provider";
 import type { OcrProvider } from "../../../src/modules/invoices/ocr-provider";
+import { OcrConfigurationError } from "../../../src/modules/invoices/ocr-provider-factory";
 import {
   approveInvoice,
   createInvoiceRepository,
@@ -71,6 +73,7 @@ describe("OCR workflow boundaries", () => {
 
   beforeEach(async () => {
     process.env.AUTH_MODE = "development";
+    process.env.OCR_PROVIDER = "fake";
     tenancy = createInMemoryOnboardingRepository();
     documentRepository = createDocumentRepository();
     jobs = createJobRepository();
@@ -154,6 +157,63 @@ describe("OCR workflow boundaries", () => {
       errorSummary: "OCR processing failed.",
     });
     expect(jobs.jobs.get(job.id)?.errorSummary).not.toContain("fake OCR provider failure");
+  });
+
+  it("terminally fails non-retryable provider errors without invoking the provider again", async () => {
+    let providerCalls = 0;
+    const provider: OcrProvider = {
+      async extract() {
+        providerCalls += 1;
+        throw new OcrProviderError(false);
+      },
+    };
+    const { queue, worker } = workflow(provider);
+    const job = await queue.queueOcr(documentId, user("member"));
+
+    await worker.processOcrJob(job.id);
+
+    expect(jobs.jobs.get(job.id)).toMatchObject({
+      status: "failed",
+      retryCount: 3,
+      errorSummary: "OCR processing failed.",
+    });
+    await expect(documentRepository.getStatus(documentId)).resolves.toBe("failed");
+
+    await worker.processOcrJob(job.id);
+
+    expect(providerCalls).toBe(1);
+  });
+
+  it("increments retry count for transient provider errors while leaving the job retryable", async () => {
+    const provider: OcrProvider = {
+      async extract() {
+        throw new OcrProviderError(true);
+      },
+    };
+    const { queue, worker } = workflow(provider);
+    const job = await queue.queueOcr(documentId, user("member"));
+
+    await worker.processOcrJob(job.id);
+
+    expect(jobs.jobs.get(job.id)).toMatchObject({ status: "failed", retryCount: 1 });
+  });
+
+  it("terminally fails OCR configuration errors", async () => {
+    let providerCalls = 0;
+    const provider: OcrProvider = {
+      async extract() {
+        providerCalls += 1;
+        throw new OcrConfigurationError();
+      },
+    };
+    const { queue, worker } = workflow(provider);
+    const job = await queue.queueOcr(documentId, user("member"));
+
+    await worker.processOcrJob(job.id);
+    await worker.processOcrJob(job.id);
+
+    expect(jobs.jobs.get(job.id)).toMatchObject({ status: "failed", retryCount: 3 });
+    expect(providerCalls).toBe(1);
   });
 
   it("claims a queued job once when two workers process it concurrently", async () => {

@@ -1,5 +1,6 @@
 import type { OcrProvider } from "../invoices/ocr-provider";
-import { FakeOcrProvider } from "../invoices/fake-ocr-provider";
+import { OcrProviderError } from "../invoices/ocr-provider";
+import { createOcrProvider, OcrConfigurationError } from "../invoices/ocr-provider-factory";
 import {
   createInvoiceFromOcr,
   resolveDefaultDocumentRepository,
@@ -10,7 +11,7 @@ import {
 import type { DocumentRepository } from "../documents/document-service";
 import type { StorageAdapter } from "../documents/storage-adapter";
 import { defaultOnboardingRepository, type OnboardingRepository } from "../tenancy/business-service";
-import { BusinessLifecycleError, requireBusinessOperational } from "../tenancy/business-lifecycle-service";
+import { requireBusinessOperational } from "../tenancy/business-lifecycle-service";
 import { createTenantContext } from "../tenancy/tenant-context";
 import {
   getJobDependencies,
@@ -42,6 +43,10 @@ async function failJob(job: Job, jobs: JobRepository): Promise<void> {
   await jobs.update({ ...job, status: "failed", retryCount: nextRetryCount, errorSummary: GENERIC_FAILURE, updatedAt: new Date().toISOString() });
 }
 
+async function failJobTerminal(job: Job, jobs: JobRepository): Promise<void> {
+  await jobs.update({ ...job, status: "failed", retryCount: MAX_RETRY_COUNT, errorSummary: GENERIC_FAILURE, updatedAt: new Date().toISOString() });
+}
+
 export interface OcrWorker {
   processOcrJob(jobId: string): Promise<void>;
 }
@@ -71,7 +76,7 @@ export function createOcrWorker(input: OcrWorkerDependencies = {}): OcrWorker {
         if (!processing) return;
         const storage = input.storage ?? resolveDefaultStorage();
         const data = await bytesFrom(await storage.get(document.privateObjectKey));
-        const provider = input.ocrProvider ?? new FakeOcrProvider();
+        const provider = input.ocrProvider ?? createOcrProvider();
         const result = await provider.extract({
           documentId: document.id,
           fileName: document.originalFileName,
@@ -87,11 +92,11 @@ export function createOcrWorker(input: OcrWorkerDependencies = {}): OcrWorker {
         await jobs.update({ ...processing, status: "completed", errorSummary: null, updatedAt: new Date().toISOString() });
       } catch (error) {
         await setDocumentState(deps.documentRepository, document.id as import("../invoices/ocr-provider").DocumentId, "failed");
-        if (error instanceof BusinessLifecycleError) {
+        if (error instanceof OcrConfigurationError || (error instanceof OcrProviderError && !error.retryable)) {
+          await failJobTerminal(processing ?? job, jobs);
+        } else {
           await failJob(processing ?? job, jobs);
-          return;
         }
-        await failJob(processing ?? job, jobs);
       }
     },
   };
