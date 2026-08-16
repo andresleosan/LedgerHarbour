@@ -22,7 +22,7 @@ Prototipo local/no comercial. El objetivo de la siguiente fase es una prueba des
 - PostgreSQL objetivo: Neon Free; migracion inicial verificada remotamente con 11 tablas requeridas.
 - Auth: Firebase Authentication Spark; adapter email/password + Google implementado, activacion de staging pendiente.
 - Storage privado: Cloudflare R2 Standard.
-- OCR: Fake OCR local; proveedor externo pendiente de aprobacion.
+- OCR: adapter Google Document AI Invoice Parser implementado; configuracion runtime y alerta de billing pendientes. Fake OCR se conserva para desarrollo y pruebas.
 - Rate limiting: memoria local por defecto; adapter Upstash preparado para staging.
 
 ## Costo
@@ -36,7 +36,7 @@ Objetivo inicial: `US$0/mes` mientras el proyecto sea un prototipo no comercial 
 | Cloudflare R2 Standard | 10 GB-month, 1M Class A, 10M Class B; egress sin cargo | US$0 | Configurar alertas de cuenta; sobrecuota pasa a cobro |
 | Upstash Redis | Free tier para bajo volumen de staging | US$0 inicial | Verificar limites y configurar alerta antes de usar plan de pago |
 | Vercel Hobby | Cuotas gratuitas de requests, funciones y transferencia | US$0 | Solo prototipo/no comercial; revisar limites y suspension antes de publicar |
-| OCR real | No integrado | US$0 ahora | Requiere cotizacion, limite de gasto y fallback antes de integrarse |
+| Google Document AI Invoice Parser | Invoice Parser: US$0.10 por conteo de hasta 10 paginas; costo final depende del volumen | US$0.10 por conteo de hasta 10 paginas | billing alert: required/not verified; configurar antes de activar produccion |
 
 Las cuotas y precios cambian. Antes de crear cuentas o activar billing se debe volver a verificar la pagina oficial del proveedor y obtener confirmacion del operador.
 
@@ -55,7 +55,7 @@ El storage de documentos dispone de `STORAGE_MODE=local|r2`. `local` es el valor
 - Firebase reemplaza el provider de desarrollo mediante `AUTH_MODE=firebase`; requiere probar el boundary de identidad y configurar Email/Password + Google en el proyecto.
 - Rate limiting sigue siendo obligatorio antes de exposicion publica; activar `RATE_LIMIT_MODE=upstash` en staging.
 - Las migraciones productivas requieren backup verificado, rollback probado y confirmacion explicita.
-- R2/Firebase/Upstash estan activados en produccion: el login Google conserva sesion, el rate limiter responde y R2 confirmo subida/descarga privada; OCR real sigue pendiente.
+- R2/Firebase/Upstash estan activados en produccion: el login Google conserva sesion, el rate limiter responde y R2 confirmo subida/descarga privada; OCR real requiere configuracion runtime y alerta de billing.
 - `corepack pnpm audit --json` queda en cero vulnerabilidades conocidas tras fijar `sharp@0.35.0` y `postcss@8.5.23` bajo Next; debe repetirse en cada release.
 - Este documento no autoriza despliegue ni gasto.
 
