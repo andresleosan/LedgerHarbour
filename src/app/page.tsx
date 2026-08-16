@@ -28,9 +28,8 @@ export default async function Home({ searchParams }: HomeProps) {
       <div className={styles.backgroundGrid} aria-hidden="true" />
 
       <header className={styles.header}>
-        <a className={styles.brand} href={localizedPath("/", locale)} aria-label="LedgerHarbour, inicio">
-          <span className={styles.brandMark} aria-hidden="true">LH</span>
-          <span>LedgerHarbour</span>
+         <a className={styles.brand} href={localizedPath("/", locale)} aria-label="LedgerHarbour, inicio">
+           <img className={styles.brandLogo} src="/brand/ledgerharbour-logo.png" alt="LedgerHarbour" width={148} height={99} />
         </a>
         <nav className={styles.nav} aria-label={copy.languageLabel}>
           <a href={localizedSection("flujo", locale)}>{copy.nav.howItWorks}</a>
@@ -121,10 +120,9 @@ export default async function Home({ searchParams }: HomeProps) {
         </div>
       </section>
 
-      <footer className={styles.footer}>
-        <div>
-          <span className={styles.brandMark} aria-hidden="true">LH</span>
-          <strong>LedgerHarbour</strong>
+       <footer className={styles.footer}>
+         <div>
+           <img className={styles.footerLogo} src="/brand/ledgerharbour-logo.png" alt="LedgerHarbour" width={132} height={88} />
         </div>
         <p>{copy.footerDescription}</p>
         <a href={localizedPath("/login", locale)}>{copy.openDemo} <span aria-hidden="true">-&gt;</span></a>

@@ -174,8 +174,8 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
         .auth-shell { width: min(100%, 1080px); min-height: 650px; display: grid; grid-template-columns: .9fr 1.1fr; overflow: hidden; border: 1px solid #d8ded8; border-radius: 28px; background: #fffdf8; box-shadow: 0 24px 70px rgba(16, 40, 61, .12); }
          .auth-aside { display: flex; flex-direction: column; justify-content: space-between; padding: 42px; background: #10283d; color: #f8f4ec; }
          .aside-top { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
-         .brand { display: flex; align-items: center; gap: 12px; font-size: 1.1rem; font-weight: 750; letter-spacing: .02em; }
-         .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #65c6ba; border-radius: 10px; color: #65c6ba; font-size: .82rem; font-weight: 800; }
+          .brand { display: block; width: fit-content; }
+          .brand-logo { display: block; width: 180px; height: 120px; object-fit: contain; }
          .home-link { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(101, 198, 186, .7); border-radius: 10px; color: #65c6ba; transition: background-color .18s ease, color .18s ease; }
          .home-link:hover { background: #65c6ba; color: #10283d; }
          .home-link svg { width: 19px; height: 19px; }
@@ -213,7 +213,8 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
           .auth-shell { min-height: 100vh; grid-template-columns: 1fr; border: 0; border-radius: 0; box-shadow: none; }
           .auth-aside { min-height: 170px; padding: 28px 24px; }
           .aside-note { display: none; }
-          .auth-panel { padding: 24px; }
+           .auth-panel { padding: 24px; }
+           .brand-logo { width: 150px; height: 100px; }
           .auth-content { margin-top: 54px; }
         }
         @media (prefers-reduced-motion: reduce) {
@@ -223,7 +224,7 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
       <section className="auth-shell" aria-labelledby="auth-title">
          <aside className="auth-aside">
            <div className="aside-top">
-             <div className="brand"><span className="brand-mark" aria-hidden="true">{copy.brandMark}</span><span>{copy.brand}</span></div>
+              <div className="brand"><img className="brand-logo" src="/brand/ledgerharbour-logo.png" alt="LedgerHarbour" width={180} height={120} /></div>
              <Link className="home-link" href="/" aria-label={copy.login.homeLabel}>
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                  <path d="m3 10 9-7 9 7" />

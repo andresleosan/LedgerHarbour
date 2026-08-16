@@ -60,17 +60,20 @@
   text-decoration: none;
 }
 
-.brandMark {
-  display: inline-grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border: 1px solid var(--teal);
-  border-radius: 10px;
-  color: var(--teal);
-  font-size: .72rem;
-  font-weight: 850;
-  letter-spacing: .04em;
+.brandLogo,
+.footerLogo {
+  display: block;
+  object-fit: contain;
+}
+
+.brandLogo {
+  width: 148px;
+  height: 99px;
+}
+
+.footerLogo {
+  width: 132px;
+  height: 88px;
 }
 
 .nav {
@@ -405,13 +408,6 @@
   font-size: .85rem;
 }
 
-.footer .brandMark {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  font-size: .62rem;
-}
-
 .footer p {
   margin: 0;
 }
@@ -460,6 +456,11 @@
 
   .header {
     min-height: 76px;
+  }
+
+  .brandLogo {
+    width: 110px;
+    height: 74px;
   }
 
   .nav {
