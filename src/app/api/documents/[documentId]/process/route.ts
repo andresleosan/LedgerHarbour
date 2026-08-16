@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getCurrentIdentity } from "../../../../../modules/auth/session";
 import { JobError, JOB_ERROR_CODES, queueOcr } from "../../../../../modules/jobs/job-service";
+import { processOcrJob } from "../../../../../modules/jobs/ocr-worker";
 import type { DocumentId } from "../../../../../modules/invoices/ocr-provider";
 import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
 
@@ -35,14 +36,26 @@ export async function POST(request: Request, context: RouteContext) {
 
   try {
     const { documentId } = await context.params;
-     const persistence = getPersistenceContext();
-     const job = await queueOcr(documentId as DocumentId, identity, {
-       tenancyRepository: persistence.tenancyRepository,
-       documentRepository: persistence.documentRepository,
-       jobs: persistence.jobRepository,
-       invoices: persistence.invoiceRepository,
-     });
-    return NextResponse.json({ job }, { status: 202 });
+    const persistence = getPersistenceContext();
+    const job = await queueOcr(documentId as DocumentId, identity, {
+      tenancyRepository: persistence.tenancyRepository,
+      documentRepository: persistence.documentRepository,
+      jobs: persistence.jobRepository,
+      invoices: persistence.invoiceRepository,
+    });
+    await processOcrJob(job.id, {
+      tenancyRepository: persistence.tenancyRepository,
+      documentRepository: persistence.documentRepository,
+      jobs: persistence.jobRepository,
+      invoices: persistence.invoiceRepository,
+      storage: persistence.storage,
+    });
+    const finalJob = await persistence.jobRepository.findById(job.id);
+    if (!finalJob) return errorResponse(new JobError(JOB_ERROR_CODES.JOB_NOT_FOUND));
+    if (finalJob.status === "failed") {
+      return NextResponse.json({ error: { code: "OCR_PROCESSING_FAILED", message: "The OCR request could not be processed." } }, { status: 502 });
+    }
+    return NextResponse.json({ job: finalJob }, { status: 202 });
   } catch (error) {
     return errorResponse(error);
   }

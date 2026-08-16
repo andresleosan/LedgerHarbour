@@ -18,7 +18,7 @@ import {
   resolveDefaultStorage,
   type InMemoryInvoiceRepository,
 } from "../../../src/modules/invoices/invoice-service";
-import { createOcrWorker, processOcrJob } from "../../../src/modules/jobs/ocr-worker";
+import { createOcrWorker } from "../../../src/modules/jobs/ocr-worker";
 import {
   createJobRepository,
   createJobService,
@@ -584,17 +584,12 @@ describe("OCR workflow boundaries", () => {
     expect(malformedProcess.status).toBe(400);
     await expect(malformedProcess.json()).resolves.toEqual({ error: { code: "INVALID_JOB_REQUEST", message: "The OCR job request is invalid." } });
 
-    const queued = await processRoute(new Request("http://localhost", { method: "POST", body: "{}" }), {
+    const processed = await processRoute(new Request("http://localhost", { method: "POST", body: "{}" }), {
       params: Promise.resolve({ documentId: routeState.documentId }),
     });
-    expect(queued.status).toBe(202);
-    const queuedBody = await queued.json() as { job: { id: string; status: string; documentId: string } };
-    expect(queuedBody).toEqual({ job: expect.objectContaining({ status: "queued", documentId: routeState.documentId }) });
-
-    await expect(processRoute(new Request("http://localhost", { method: "POST", body: "{}" }), {
-      params: Promise.resolve({ documentId: routeState.documentId }),
-    })).resolves.toMatchObject({ status: 202 });
-    await processOcrJob(queuedBody.job.id);
+    expect(processed.status).toBe(202);
+    const processedBody = await processed.json() as { job: { id: string; status: string; documentId: string } };
+    expect(processedBody).toEqual({ job: expect.objectContaining({ status: "completed", documentId: routeState.documentId }) });
 
     const defaultInvoices = globalRepository<InMemoryInvoiceRepository>("ledgerharbour.task8.inMemoryInvoiceRepository");
     const invoiceId = (await defaultInvoices.listByBusinessId(routeState.businessId as typeof ownerBusiness.id))[0]?.id as InvoiceId;
@@ -694,6 +689,40 @@ describe("OCR workflow boundaries", () => {
       defaultJobs.findByDocumentId = originalFind;
     }
   });
+
+  it("returns a generic 502 when the configured OCR provider fails terminally", async () => {
+    const routeState = await setupDefaultRouteState("route-failed-document");
+    await setCurrentIdentity(identityFor("route-member"));
+    const originalProvider = process.env.OCR_PROVIDER;
+    const originalConfiguration = {
+      GOOGLE_CLOUD_PROJECT_ID: process.env.GOOGLE_CLOUD_PROJECT_ID,
+      GOOGLE_CLOUD_LOCATION: process.env.GOOGLE_CLOUD_LOCATION,
+      GOOGLE_DOCUMENT_AI_PROCESSOR_ID: process.env.GOOGLE_DOCUMENT_AI_PROCESSOR_ID,
+      GOOGLE_SERVICE_ACCOUNT_JSON: process.env.GOOGLE_SERVICE_ACCOUNT_JSON,
+    };
+
+    process.env.OCR_PROVIDER = "google-document-ai";
+    delete process.env.GOOGLE_CLOUD_PROJECT_ID;
+    delete process.env.GOOGLE_CLOUD_LOCATION;
+    delete process.env.GOOGLE_DOCUMENT_AI_PROCESSOR_ID;
+    delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+
+    try {
+      const failure = await processRoute(new Request("http://localhost", { method: "POST", body: "{}" }), {
+        params: Promise.resolve({ documentId: routeState.documentId }),
+      });
+
+      expect(failure.status).toBe(502);
+      await expect(failure.json()).resolves.toEqual({ error: { code: "OCR_PROCESSING_FAILED", message: "The OCR request could not be processed." } });
+    } finally {
+      if (originalProvider === undefined) delete process.env.OCR_PROVIDER;
+      else process.env.OCR_PROVIDER = originalProvider;
+      for (const [name, value] of Object.entries(originalConfiguration)) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  });
 });
 
 function identityFor(id: string) {
@@ -704,7 +733,7 @@ function globalRepository<T>(key: string): T {
   return (globalThis as typeof globalThis & { [key: symbol]: unknown })[Symbol.for(key)] as T;
 }
 
-async function setupDefaultRouteState(): Promise<{ documentId: string; businessId: string }> {
+async function setupDefaultRouteState(documentId = "route-document"): Promise<{ documentId: string; businessId: string }> {
   defaultOnboardingRepository.businesses.clear();
   defaultOnboardingRepository.memberships.splice(0);
   defaultOnboardingRepository.categories.splice(0);
@@ -716,8 +745,7 @@ async function setupDefaultRouteState(): Promise<{ documentId: string; businessI
   const business = await onboarding.createBusiness({ name: "Route OCR Books" }, identityFor("route-owner"));
   const routeMemberId = await defaultOnboardingRepository.upsertUser(identityFor("route-member"));
   await defaultOnboardingRepository.createMembership({ membershipId: "membership-route-member", userId: routeMemberId, businessId: business.id, role: "administrator", isActive: true });
-  const documentId = "route-document";
-  const privateObjectKey = "business/route-document/private";
+  const privateObjectKey = `business/${documentId}/private`;
   const document: Document = {
     id: documentId,
     businessId: business.id,

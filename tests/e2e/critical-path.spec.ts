@@ -47,21 +47,19 @@ test("verifies the local MVP critical path and cross-tenant access block", async
   const documentId = downloadHref?.match(/documents\/([^/]+)\/download/)?.[1];
   expect(documentId).toBeTruthy();
 
-  const processResponse = await owner.evaluate(async (id) => {
-    const response = await fetch(`/api/documents/${id}/process`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-    return { status: response.status, body: await response.json() };
-  }, documentId);
-  expect(processResponse.status).toBe(202);
-  expect(processResponse.body.job).toMatchObject({ documentId, status: "queued" });
+  const processResponsePromise = owner.waitForResponse((response) => response.url().endsWith(`/api/documents/${documentId}/process`) && response.request().method() === "POST");
+  await owner.getByRole("button", { name: "Process with OCR" }).click();
+  const processResponse = await processResponsePromise;
+  expect(processResponse.status()).toBe(202);
+  await expect(processResponse.json()).resolves.toMatchObject({ job: { documentId, status: "completed" } });
+  await expect(owner).toHaveURL(`/business/${businessId}/invoices?locale=en`);
 
-  const workerResponse = await owner.evaluate(async (jobId) => {
-    const response = await fetch(`/api/test/ocr/${jobId}`, { method: "POST" });
-    return { status: response.status, body: await response.json() };
-  }, processResponse.body.job.id as string);
-  expect(workerResponse.status).toBe(200);
-  expect(workerResponse.body.job).toMatchObject({ documentId, status: "completed" });
-  expect(workerResponse.body.invoice).toMatchObject({ documentId, reviewState: "needs_review" });
-  const invoiceId = workerResponse.body.invoice.id as string;
+  const reviewLink = owner.getByRole("link", { name: "Open review" });
+  await expect(reviewLink).toHaveCount(1);
+  const reviewHref = await reviewLink.getAttribute("href");
+  expect(reviewHref).toMatch(new RegExp(`/business/${businessId}/invoices/[^?]+\\?locale=en`));
+  const invoiceId = reviewHref?.match(/invoices\/([^?]+)\?/)?.[1];
+  expect(invoiceId).toBeTruthy();
 
   const directReviewResponse = await owner.evaluate(async (id) => {
     const response = await fetch(`/api/invoices/${id}/review`);
@@ -71,8 +69,11 @@ test("verifies the local MVP critical path and cross-tenant access block", async
   expect(directReviewResponse.body.invoice).toMatchObject({ id: invoiceId, reviewState: "needs_review" });
 
   const reviewResponse = owner.waitForResponse((response) => response.url().endsWith(`/api/invoices/${invoiceId}/review`) && response.request().method() === "GET");
-  await owner.goto(`/business/${businessId}/invoices/${invoiceId}?locale=es`);
+  await reviewLink.click();
   expect((await reviewResponse).status()).toBe(200);
+  await expect(owner).toHaveURL(`/business/${businessId}/invoices/${invoiceId}?locale=en`);
+  await owner.goto(`/business/${businessId}/invoices/${invoiceId}?locale=es`);
+  await expect(owner).toHaveURL(`/business/${businessId}/invoices/${invoiceId}?locale=es`);
   await expect(owner.getByRole("heading", { name: /Campos extraídos/ })).toBeVisible();
   await expect(owner.getByText(/confianza baja/i).first()).toBeVisible();
   await owner.getByLabel(/proveedor/i).fill("Corrected Supplier");
