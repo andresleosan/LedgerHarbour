@@ -18,7 +18,7 @@ Prototipo local/no comercial. El objetivo de la siguiente fase es una prueba des
 ## Arquitectura de prototipo desplegable
 
 - Hosting: Vercel Hobby.
-- PostgreSQL objetivo: Neon Free; no conectado ni verificado remotamente en esta fase.
+- PostgreSQL objetivo: Neon Free; migracion inicial verificada remotamente con 11 tablas requeridas.
 - Auth: Firebase Authentication Spark.
 - Storage privado: Cloudflare R2 Standard.
 - OCR: Fake OCR local; proveedor externo pendiente de aprobacion.
@@ -45,14 +45,14 @@ El estado local verificado cubre selección de modo, fail-closed sin fallback, c
 
 El esquema relacional existente en `src/db/schema` y `src/db/migrations/0001_initial.sql` es la fuente inicial, sujeto a validacion contra PostgreSQL real.
 
-El storage de documentos se migra por separado a R2; las claves de objetos permanecen privadas y nunca forman parte de DTOs publicos.
+El storage de documentos dispone de `STORAGE_MODE=local|r2`. `local` es el valor por defecto para desarrollo; `r2` requiere las cuatro variables privadas del proveedor y usa un bucket privado. Las claves de objetos permanecen privadas y nunca forman parte de DTOs publicos. Ver `docs/r2-private-storage.md`.
 
 ## Seguridad y produccion
 
 - Firebase reemplaza el provider de desarrollo solo despues de probar el boundary de identidad.
 - Rate limiting sigue siendo obligatorio antes de exposicion publica.
 - Las migraciones productivas requieren backup verificado, rollback probado y confirmacion explicita.
-- La verificacion local del selector no implica que produccion este lista; auth, rate limiting, R2, OCR real y operacion siguen pendientes.
+- La verificacion del adapter R2 es unitaria; la activacion contra el bucket de staging sigue pendiente junto con auth, rate limiting, OCR real y operacion.
 - `corepack pnpm audit --json` queda en cero vulnerabilidades conocidas tras fijar `sharp@0.35.0` y `postcss@8.5.23` bajo Next; debe repetirse en cada release.
 - Este documento no autoriza despliegue ni gasto.
 

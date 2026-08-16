@@ -20,7 +20,7 @@ export type { InvoiceId } from "./ocr-provider";
 import type { Document, DocumentRepository } from "../documents/document-service";
 import { createDocumentRepository } from "../documents/document-service";
 import type { StorageAdapter } from "../documents/storage-adapter";
-import { LocalPrivateStorage } from "../documents/local-private-storage";
+import { createStorageAdapter } from "../documents/storage-factory";
 
 export const INVOICE_ERROR_CODES = {
   INVOICE_NOT_FOUND: "INVOICE_NOT_FOUND",
@@ -175,7 +175,7 @@ function isStorageAdapter(value: unknown): value is StorageAdapter {
 export function resolveDefaultStorage(): StorageAdapter {
   const state = globalThis as GlobalState;
   if (isStorageAdapter(state[STORAGE_KEY])) return state[STORAGE_KEY];
-  const storage = new LocalPrivateStorage();
+  const storage = createStorageAdapter();
   Object.defineProperty(state, STORAGE_KEY, { configurable: false, enumerable: false, writable: false, value: storage });
   return storage;
 }

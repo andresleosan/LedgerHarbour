@@ -10,7 +10,7 @@ import { BusinessLifecycleError, LIFECYCLE_ERROR_CODES, requireBusinessOperation
 import { AUTHORIZATION_ERROR_CODES, AuthorizationError } from "../permissions/authorize";
 import { createTenantContext } from "../tenancy/tenant-context";
 import type { BusinessId, UserId } from "../tenancy/types";
-import { LocalPrivateStorage } from "./local-private-storage";
+import { createStorageAdapter } from "./storage-factory";
 import type { StorageAdapter } from "./storage-adapter";
 import type { ValidatedUpload } from "./file-validation";
 
@@ -161,7 +161,7 @@ function defaultStorage(): StorageAdapter {
   const state = globalThis as GlobalState;
   const existing = state[DOCUMENT_STORAGE_KEY];
   if (isStorageAdapter(existing)) return existing;
-  const storage = new LocalPrivateStorage();
+  const storage = createStorageAdapter();
   Object.defineProperty(state, DOCUMENT_STORAGE_KEY, { configurable: false, enumerable: false, writable: false, value: storage });
   return storage;
 }
@@ -220,29 +220,38 @@ export async function createDocument(
     throw mapBoundaryError(error);
   }
 
-  return repository.transaction(async () => {
-    const documentId = randomUUID();
-    const document: Document = {
-      id: documentId,
-      businessId: business.id,
-      uploaderId: actorId,
-      privateObjectKey: objectKeyFor(business.id, documentId),
-      originalFileName: input.upload.originalFileName,
-      originalMimeType: input.upload.originalMimeType,
-      originalSizeBytes: input.upload.originalSizeBytes,
-      checksum: input.upload.checksum,
-      status: "uploaded",
-      createdAt: new Date().toISOString(),
-    };
-    try {
-      await storage.put({ objectKey: document.privateObjectKey, data: input.upload.data });
-      return await repository.create(document);
-    } catch (error) {
-      try { await storage.delete?.(document.privateObjectKey); } catch { /* cleanup is best effort; public error remains stable */ }
-      if (error instanceof DocumentError) throw error;
-      throw new DocumentError(DOCUMENT_ERROR_CODES.STORAGE_FAILURE);
+  let storedObjectKey: string | undefined;
+  try {
+    return await repository.transaction(async () => {
+      const documentId = randomUUID();
+      const document: Document = {
+        id: documentId,
+        businessId: business.id,
+        uploaderId: actorId,
+        privateObjectKey: objectKeyFor(business.id, documentId),
+        originalFileName: input.upload.originalFileName,
+        originalMimeType: input.upload.originalMimeType,
+        originalSizeBytes: input.upload.originalSizeBytes,
+        checksum: input.upload.checksum,
+        status: "uploaded",
+        createdAt: new Date().toISOString(),
+      };
+      storedObjectKey = document.privateObjectKey;
+      try {
+        await storage.put({ objectKey: document.privateObjectKey, data: input.upload.data });
+        return await repository.create(document);
+      } catch (error) {
+        if (error instanceof DocumentError) throw error;
+        throw new DocumentError(DOCUMENT_ERROR_CODES.STORAGE_FAILURE);
+      }
+    });
+  } catch (error) {
+    if (storedObjectKey) {
+      try { await storage.delete?.(storedObjectKey); } catch { /* cleanup is best effort; public error remains stable */ }
     }
-  });
+    if (error instanceof DocumentError) throw error;
+    throw new DocumentError(DOCUMENT_ERROR_CODES.STORAGE_FAILURE);
+  }
 }
 
 export async function getDocumentForDownload(

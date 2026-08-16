@@ -17,6 +17,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1111.0",
     "drizzle-orm": "0.45.2",
     "next": "15.5.23",
     "next-intl": "4.13.6",

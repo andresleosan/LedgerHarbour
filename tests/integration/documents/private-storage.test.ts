@@ -176,6 +176,22 @@ describe("private document storage and service boundaries", () => {
     })).rejects.toMatchObject({ code: DOCUMENT_ERROR_CODES.DOCUMENT_NOT_FOUND });
   });
 
+  it("cleans storage when the repository transaction fails after the callback", async () => {
+    const { tenancy, created } = await setup();
+    const documentRepository = createDocumentRepository();
+    documentRepository.transaction = async (operation) => {
+      await operation();
+      throw new Error("transaction commit failed");
+    };
+
+    await expect(createDocument({ businessId: created.id, upload: pdf() }, user("member"), {
+      tenancyRepository: tenancy,
+      documentRepository,
+      storage,
+    })).rejects.toMatchObject({ code: DOCUMENT_ERROR_CODES.STORAGE_FAILURE });
+    await expect(storage.listKeys()).resolves.toEqual([]);
+  });
+
   it("authorizes membership before business state and preserves inactive-member behavior", async () => {
     const { tenancy, created } = await setup();
     tenancy.businesses.get(created.id)!.isActive = false;
