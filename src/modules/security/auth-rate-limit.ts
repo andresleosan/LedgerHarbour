@@ -11,6 +11,11 @@ function requestAddress(requestHeaders: Headers): string {
 export async function enforceAuthRateLimit(scope: "email" | "google", identityKey = ""): Promise<void> {
   const requestHeaders = await headers();
   const key = `auth:${scope}:${requestAddress(requestHeaders)}:${identityKey.trim().toLowerCase()}`;
-  const result = await createAuthRateLimiter().limit(key);
+  let result: { success: boolean };
+  try {
+    result = await createAuthRateLimiter().limit(key);
+  } catch {
+    throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE);
+  }
   if (!result.success) throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE);
 }
