@@ -63,3 +63,26 @@ Alcance: autenticación, upload, OCR process, review financiero y controles de a
 - Build: `corepack pnpm build` - exit 0, compilación Next.js y type-check completados.
 - Audit: `corepack pnpm audit --json` - 0 info, 0 low, 0 moderate, 0 high, 0 critical; 556 dependencias totales.
 - E2E: `corepack pnpm exec playwright test tests/e2e/critical-path.spec.ts` con fixtures locales - 1/1 pasa en 28.2 s.
+
+## Fix Round 3
+
+### Finding corregido
+
+- **Alto, bypass multi-identidad por dirección:** cada upload y OCR process ahora consulta simultáneamente el bucket individual y un bucket agregado por dirección. Los límites agregados son upload `20/5 min` y OCR `10/5 min`; sus claves no contienen identidad.
+- **Alto, confianza en headers:** en production sólo se considera `x-vercel-forwarded-for`; si falta se usa `edge-unknown`. Test/desarrollo mantiene los fallbacks para pruebas locales. La operación debe configurar Vercel/edge para sobrescribir el header.
+- **Medio, contrato OCR:** OCR distingue `AuthenticatedRateLimitError` y `AuthenticatedRateLimitUnavailableError` también por sus códigos exportados, devolviendo sólo `429` o `503` genéricos.
+
+### Evidencia Round 3
+
+- RED ejecutado antes de producción: no existía factory agregada, sólo se invocaba el bucket individual, production aceptaba `x-forwarded-for` y OCR mapeaba un código compatible a `503`.
+- GREEN focalizado: `corepack pnpm exec vitest run tests/unit/authenticated-rate-limit.test.ts tests/unit/rate-limit.test.ts tests/security/ocr-process-security.spec.ts` - 3 archivos, 16 tests pasan.
+- Regresión completa: `corepack pnpm test` - 39 archivos pasan, 1 skipped; 362 tests pasan, 1 skipped.
+- Lint: `corepack pnpm lint` - exit 0, sin errores.
+- Build: `corepack pnpm build` - exit 0, compilación Next.js y type-check completados.
+- Audit: `corepack pnpm audit --json` - 0 info, 0 low, 0 moderate, 0 high, 0 critical; 556 dependencias totales.
+- E2E crítico: `$env:AUTH_MODE='development'; $env:OCR_PROVIDER='fake'; corepack pnpm exec playwright test tests/e2e/critical-path.spec.ts` - 1/1 pasa en 28.4 s.
+
+### Concerns Round 3
+
+- Upstash/Redis real no se ejercitó en este entorno; sí se verificaron ambos buckets memory y el fail-closed de production.
+- La garantía de que `x-vercel-forwarded-for` sea sobrescrito por Vercel/edge requiere configuración operativa fuera del repositorio y no puede probarse localmente.

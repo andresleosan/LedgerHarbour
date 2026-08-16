@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createAggregatedRateLimiter,
   createAuthenticatedRateLimiter,
   createAuthRateLimiter,
   InMemoryRateLimiter,
@@ -58,6 +59,15 @@ describe("InMemoryRateLimiter", () => {
     const processLimiter = createAuthenticatedRateLimiter("ocr-process");
 
     expect(uploadLimiter).not.toBe(processLimiter);
+    vi.unstubAllEnvs();
+  });
+
+  it("creates aggregate address limiters separately from identity limiters", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("RATE_LIMIT_MODE", "memory");
+
+    expect(createAggregatedRateLimiter("upload")).not.toBe(createAuthenticatedRateLimiter("upload"));
+    expect(createAggregatedRateLimiter("ocr-process")).not.toBe(createAuthenticatedRateLimiter("ocr-process"));
     vi.unstubAllEnvs();
   });
 });

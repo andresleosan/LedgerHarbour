@@ -12,7 +12,12 @@ vi.mock(import("../../src/modules/security/authenticated-rate-limit"), async (im
 }));
 
 import { POST } from "../../src/app/api/documents/[documentId]/process/route";
-import { AuthenticatedRateLimitError, AuthenticatedRateLimitUnavailableError } from "../../src/modules/security/rate-limit-errors";
+import {
+  AUTHENTICATED_RATE_LIMIT_ERROR_CODE,
+  AUTHENTICATED_RATE_LIMIT_UNAVAILABLE_ERROR_CODE,
+  AuthenticatedRateLimitError,
+  AuthenticatedRateLimitUnavailableError,
+} from "../../src/modules/security/rate-limit-errors";
 
 describe("OCR process security boundary", () => {
   beforeEach(() => {
@@ -39,6 +44,20 @@ describe("OCR process security boundary", () => {
 
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "OCR protection is temporarily unavailable." } });
+    expect(json).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [AUTHENTICATED_RATE_LIMIT_ERROR_CODE, 429, "RATE_LIMITED"],
+    [AUTHENTICATED_RATE_LIMIT_UNAVAILABLE_ERROR_CODE, 503, "RATE_LIMIT_UNAVAILABLE"],
+  ])("maps compatible limiter code %s without parsing the body", async (code, status, publicCode) => {
+    enforceAuthenticatedRateLimit.mockRejectedValue({ code });
+    const json = vi.fn();
+
+    const response = await POST({ headers: new Headers(), json } as unknown as Request, { params: Promise.resolve({ documentId: "document-id" }) });
+
+    expect(response.status).toBe(status);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: publicCode } });
     expect(json).not.toHaveBeenCalled();
   });
 });

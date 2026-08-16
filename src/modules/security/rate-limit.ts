@@ -125,12 +125,31 @@ const AUTHENTICATED_RATE_LIMITS = {
 
 export type AuthenticatedRateLimitScope = keyof typeof AUTHENTICATED_RATE_LIMITS;
 
+const AGGREGATED_RATE_LIMITS = {
+  upload: {
+    keyPrefix: "authenticated-upload-address",
+    maxRequests: 20,
+    windowMs: 5 * 60 * 1000,
+    upstashWindow: "5 m",
+  },
+  "ocr-process": {
+    keyPrefix: "authenticated-ocr-process-address",
+    maxRequests: 10,
+    windowMs: 5 * 60 * 1000,
+    upstashWindow: "5 m",
+  },
+} satisfies Record<AuthenticatedRateLimitScope, RateLimitDefinition>;
+
 export function createAuthRateLimiter(): RateLimiter {
   return createConfiguredRateLimiter(AUTH_RATE_LIMIT);
 }
 
 export function createAuthenticatedRateLimiter(scope: AuthenticatedRateLimitScope): RateLimiter {
   return createConfiguredRateLimiter(AUTHENTICATED_RATE_LIMITS[scope]);
+}
+
+export function createAggregatedRateLimiter(scope: AuthenticatedRateLimitScope): RateLimiter {
+  return createConfiguredRateLimiter(AGGREGATED_RATE_LIMITS[scope]);
 }
 
 export function resetRateLimitersForTests(): void {
