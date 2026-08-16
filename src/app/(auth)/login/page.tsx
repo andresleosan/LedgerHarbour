@@ -5,6 +5,7 @@ import type { AuthIdentity, GoogleSignInInput } from "@/modules/auth/auth-provid
 import { createAuthProvider } from "@/modules/auth/dev-auth-provider";
 import { FirebaseAuthProvider } from "@/modules/auth/firebase-auth-provider";
 import type { AuthProvider } from "@/modules/auth/auth-provider";
+import { enforceAuthRateLimit } from "@/modules/security/auth-rate-limit";
 
 function requireProvider(): AuthProvider {
   if (process.env.AUTH_MODE === "firebase") {
@@ -21,11 +22,13 @@ function requireProvider(): AuthProvider {
 
 async function signInWithEmail(input: EmailSignInInput): Promise<AuthIdentity> {
   "use server";
+  await enforceAuthRateLimit("email", input.email);
   return requireProvider().signInWithEmail(input);
 }
 
 async function signInWithGoogle(input?: GoogleSignInInput): Promise<AuthIdentity> {
   "use server";
+  await enforceAuthRateLimit("google");
   return requireProvider().signInWithGoogle(input);
 }
 
