@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createAuthRateLimiter, InMemoryRateLimiter } from "../../src/modules/security/rate-limit";
+import {
+  createAuthenticatedRateLimiter,
+  createAuthRateLimiter,
+  InMemoryRateLimiter,
+} from "../../src/modules/security/rate-limit";
 
 describe("InMemoryRateLimiter", () => {
   it("allows the configured number of requests and blocks the next one", async () => {
@@ -29,6 +33,31 @@ describe("InMemoryRateLimiter", () => {
     vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
 
     expect(() => createAuthRateLimiter()).toThrow("Upstash rate limiting requires");
+    vi.unstubAllEnvs();
+  });
+
+  it("requires Upstash instead of memory in production", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    process.env.RATE_LIMIT_MODE = "memory";
+
+    try {
+      expect(() => createAuthenticatedRateLimiter("upload")).toThrow("Upstash rate limiting is required");
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("creates independent limiter instances for upload and OCR process", () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("RATE_LIMIT_MODE", "memory");
+
+    const uploadLimiter = createAuthenticatedRateLimiter("upload");
+    const processLimiter = createAuthenticatedRateLimiter("ocr-process");
+
+    expect(uploadLimiter).not.toBe(processLimiter);
     vi.unstubAllEnvs();
   });
 });

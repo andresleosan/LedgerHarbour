@@ -70,7 +70,7 @@ test("shows invalid and oversized validation errors, including Spanish copy", as
   await signIn(page, "documents-validation@example.com");
   const businessId = await createBusiness(page, "E2E Validation Harbour");
   await page.goto(`/business/${businessId}/upload`);
-  await page.getByRole("button", { name: "Espanol" }).click();
+  await page.getByRole("link", { name: "Español" }).click();
   await page.locator('input[type="file"]').setInputFiles({ name: "bad.txt", mimeType: "text/plain", buffer: Buffer.from("not a document") });
   await page.getByRole("button", { name: "Subir documento" }).click();
   await expect(page.locator("p[role='alert']")).toContainText("formato");

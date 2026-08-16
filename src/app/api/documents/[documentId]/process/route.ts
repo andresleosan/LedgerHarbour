@@ -6,6 +6,7 @@ import { JobError, JOB_ERROR_CODES, queueOcr } from "../../../../../modules/jobs
 import { processOcrJob } from "../../../../../modules/jobs/ocr-worker";
 import type { DocumentId } from "../../../../../modules/invoices/ocr-provider";
 import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
+import { enforceAuthenticatedRateLimit } from "../../../../../modules/security/authenticated-rate-limit";
 
 type RouteContext = { params: Promise<{ documentId: string }> };
 const requestSchema = z.object({}).strict();
@@ -23,6 +24,11 @@ function errorResponse(error: unknown): NextResponse {
 export async function POST(request: Request, context: RouteContext) {
   const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
+  try {
+    await enforceAuthenticatedRateLimit("ocr-process", identity.providerUserId);
+  } catch {
+    return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, { status: 429 });
+  }
 
   let body: unknown;
   try {

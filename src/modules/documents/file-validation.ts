@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 
 export const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
+export const MAX_FILE_NAME_LENGTH = 255;
 
 export const UPLOAD_ERROR_CODES = {
   INVALID_METADATA: "INVALID_UPLOAD_METADATA",
@@ -244,6 +245,7 @@ export function validateUpload(input: UploadMetadata): ValidatedUpload {
     !Number.isInteger(input.sizeBytes) || !(input.data instanceof Uint8Array)) {
     return fail(UPLOAD_ERROR_CODES.INVALID_METADATA);
   }
+  if ([...input.name].length > MAX_FILE_NAME_LENGTH) fail(UPLOAD_ERROR_CODES.INVALID_METADATA);
   if (input.data.byteLength === 0) fail(UPLOAD_ERROR_CODES.EMPTY_FILE);
   if (input.sizeBytes !== input.data.byteLength) fail(UPLOAD_ERROR_CODES.SIZE_MISMATCH);
   if (input.sizeBytes > MAX_UPLOAD_SIZE_BYTES) fail(UPLOAD_ERROR_CODES.FILE_TOO_LARGE);

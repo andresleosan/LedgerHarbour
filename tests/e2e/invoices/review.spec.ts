@@ -16,7 +16,7 @@ test.describe("invoice review workspace", () => {
     await expect(page.getByRole("button", { name: /needs review|necesita revisión/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /approved|aprobadas/i })).toBeVisible();
     await expect(page.getByRole("button", { name: /failed|fallidas/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /espanol|english/i }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /español|english/i }).first()).toBeVisible();
 
     await page.keyboard.press("Tab");
     await expect(page.locator(":focus")).toBeVisible();
@@ -129,7 +129,7 @@ test.describe("invoice review workspace", () => {
     await expect(page.getByText(/low confidence/i)).toBeVisible();
     page.on("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: /approve invoice|aprobar factura/i }).click();
-    await expect(page.locator(".error")).toContainText(/complete required fields|completa los campos/i);
+    await expect(page.locator(".page-error")).toContainText(/complete required fields|completa los campos/i);
     await page.getByLabel(/supplier|proveedor/i).fill("Corrected Supplier");
     await page.getByLabel(/notes/i).fill("Checked by finance");
     await page.getByRole("button", { name: /save correction|guardar corrección/i }).click();

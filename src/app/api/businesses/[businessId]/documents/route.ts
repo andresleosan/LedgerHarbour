@@ -7,9 +7,10 @@ import {
   DOCUMENT_ERROR_CODES,
   toSafeDocument,
 } from "../../../../../modules/documents/document-service";
-import { UploadValidationError, UPLOAD_ERROR_CODES, validateUpload } from "../../../../../modules/documents/file-validation";
+import { MAX_UPLOAD_SIZE_BYTES, UploadValidationError, UPLOAD_ERROR_CODES, validateUpload } from "../../../../../modules/documents/file-validation";
 import type { BusinessId } from "../../../../../modules/tenancy/types";
 import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
+import { enforceAuthenticatedRateLimit } from "../../../../../modules/security/authenticated-rate-limit";
 
 type RouteContext = { params: Promise<{ businessId: string }> };
 
@@ -31,6 +32,15 @@ function errorResponse(error: unknown): NextResponse {
 export async function POST(request: Request, context: RouteContext) {
   const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
+  try {
+    await enforceAuthenticatedRateLimit("upload", identity.providerUserId);
+  } catch {
+    return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, { status: 429 });
+  }
+  const contentLength = request.headers.get("content-length");
+  if (contentLength && Number.isFinite(Number(contentLength)) && Number(contentLength) > MAX_UPLOAD_SIZE_BYTES) {
+    return errorResponse(new UploadValidationError(UPLOAD_ERROR_CODES.FILE_TOO_LARGE));
+  }
   const { businessId } = await context.params;
   try {
     const form = await request.formData();

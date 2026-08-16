@@ -279,6 +279,24 @@ describe("development authentication provider", () => {
     );
   });
 
+  it("fails closed in production even when development auth is selected", () => {
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "production";
+    process.env.AUTH_MODE = "development";
+
+    try {
+      expect(createAuthProvider()).toBeNull();
+      expect(() => new DevAuthProvider()).toThrowError(
+        expect.objectContaining({
+          code: AUTH_ERROR_CODES.DEVELOPMENT_MODE_REQUIRED,
+        }),
+      );
+    } finally {
+      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = previousNodeEnv;
+    }
+  });
+
   it("keeps the development guard intrinsic when a consumer passes an argument", () => {
     process.env.AUTH_MODE = "production";
 

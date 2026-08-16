@@ -138,7 +138,7 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
    await page.keyboard.press("Shift+Tab");
    await expectVisibleFocusRing(page.getByRole("button", { name: "English" }));
    await page.keyboard.press("Tab");
-   await expectVisibleFocusRing(page.getByRole("button", { name: "Espanol" }));
+     await expectVisibleFocusRing(page.getByRole("button", { name: "Espanol" }));
    await page.keyboard.press("Tab");
    await expectVisibleFocusRing(page.getByRole("link").first());
    await page.keyboard.press("Tab");
@@ -158,7 +158,7 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
   expect(businessId).toBeTruthy();
 
   await page.goto("/onboarding/join-business");
-  await page.getByRole("button", { name: "Espanol" }).click();
+   await page.getByRole("button", { name: "Espanol" }).click();
   const abortHistory = (url: URL) => url.pathname.endsWith("/join-requests") && url.searchParams.get("mine") === "true";
   await page.route(abortHistory, (route) => route.abort());
   await page.getByLabel("Buscar por nombre del negocio").fill("mobile harbour");
@@ -178,12 +178,14 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
   await memberContext.close();
 
   await page.goto(`/business/${businessId}/members`);
-  await page.getByRole("button", { name: "Espanol" }).click();
+   await page.getByRole("link", { name: "Español" }).click();
    await expect(page.getByRole("heading", { name: "Solicitudes de membresía" })).toBeVisible();
    const approve = page.getByRole("button", { name: "Aprobar solicitud" });
    await expect(approve).toBeVisible();
-    await page.getByRole("button", { name: "Aprobar solicitud" }).focus();
-    await expectVisibleFocusRing(approve);
+     await page.getByRole("button", { name: "Aprobar solicitud" }).focus();
+     await page.keyboard.press("Tab");
+     await page.keyboard.press("Shift+Tab");
+     await expectVisibleFocusRing(approve);
   const normalDuration = await approve.evaluate((element) => parseFloat(getComputedStyle(element).transitionDuration));
   expect(normalDuration).toBeGreaterThan(0.1);
   await page.emulateMedia({ reducedMotion: "reduce" });
@@ -198,6 +200,6 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
    await page.route("**/api/businesses/*/join-requests", (route) => route.abort());
    await page.reload();
    await expect(page.getByText("No pudimos conectar con LedgerHarbour. Comprueba tu conexión e inténtalo de nuevo.")).toBeVisible();
-   await page.getByRole("button", { name: "English" }).click();
+   await page.getByRole("link", { name: "English" }).click();
    await expect(page.getByText("We could not reach LedgerHarbour. Check your connection and try again.")).toBeVisible();
 });

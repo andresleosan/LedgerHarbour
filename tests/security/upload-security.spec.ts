@@ -1,7 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getCurrentIdentity } = vi.hoisted(() => ({ getCurrentIdentity: vi.fn() }));
+const { getCurrentIdentity, enforceAuthenticatedRateLimit } = vi.hoisted(() => ({
+  getCurrentIdentity: vi.fn(),
+  enforceAuthenticatedRateLimit: vi.fn(),
+}));
 vi.mock("../../src/modules/auth/session", () => ({ getCurrentIdentity }));
+vi.mock("../../src/modules/security/authenticated-rate-limit", () => ({ enforceAuthenticatedRateLimit }));
 
 import { createDocument, createDocumentRepository, getDocumentForDownload } from "../../src/modules/documents/document-service";
 import { MAX_UPLOAD_SIZE_BYTES, UPLOAD_ERROR_CODES, validateUpload } from "../../src/modules/documents/file-validation";
@@ -39,6 +43,7 @@ describe("Task 11 upload security matrix", () => {
 
   beforeEach(async () => {
     getCurrentIdentity.mockReset();
+    enforceAuthenticatedRateLimit.mockReset().mockResolvedValue(undefined);
     tenancy = createInMemoryOnboardingRepository();
     storage = new MemoryStorage();
     const business = await createOnboardingServices(tenancy).createBusiness({ name: "Upload Harbour" }, user("owner"));
@@ -50,6 +55,34 @@ describe("Task 11 upload security matrix", () => {
     const response = await POST(new Request("http://localhost/api/businesses/business/documents", { method: "POST", body: new FormData() }), { params: Promise.resolve({ businessId: "business" }) });
     expect(response.status).toBe(401);
     expect(await response.json()).toMatchObject({ error: { code: "IDENTITY_REQUIRED" } });
+  });
+
+  it("returns a generic 429 before materializing multipart data when upload is limited", async () => {
+    getCurrentIdentity.mockReturnValue({ providerUserId: "owner", email: "owner@example.com", displayName: "Owner", emailVerified: true });
+    enforceAuthenticatedRateLimit.mockRejectedValue(new Error("private limiter input@example.com"));
+    const formData = vi.fn();
+
+    const response = await POST({ headers: new Headers(), formData } as unknown as Request, { params: Promise.resolve({ businessId: "business" }) });
+
+    expect(response.status).toBe(429);
+    const body = await response.json();
+    expect(body).toEqual({ error: { code: "RATE_LIMITED", message: "Too many requests." } });
+    expect(JSON.stringify(body)).not.toContain("input@example.com");
+    expect(formData).not.toHaveBeenCalled();
+  });
+
+  it("rejects an oversized Content-Length before materializing multipart data", async () => {
+    getCurrentIdentity.mockReturnValue({ providerUserId: "owner", email: "owner@example.com", displayName: "Owner", emailVerified: true });
+    const formData = vi.fn();
+
+    const response = await POST({
+      headers: new Headers({ "content-length": String(MAX_UPLOAD_SIZE_BYTES + 1) }),
+      formData,
+    } as unknown as Request, { params: Promise.resolve({ businessId: "business" }) });
+
+    expect(response.status).toBe(413);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: UPLOAD_ERROR_CODES.FILE_TOO_LARGE } });
+    expect(formData).not.toHaveBeenCalled();
   });
 
   it("rejects a real multipart request without a file", async () => {

@@ -1,0 +1,1 @@
+export const MAX_REVIEW_PATCH_BYTES = 64 * 1024;

@@ -77,7 +77,7 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   await owner.setViewportSize({ width: 375, height: 812 });
   await owner.emulateMedia({ reducedMotion: "reduce" });
   expect(await owner.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
-  await owner.getByRole("button", { name: "English" }).focus();
+  await owner.getByRole("link", { name: "English" }).focus();
   await owner.keyboard.press("Tab");
   expect(await owner.evaluate(() => {
     const element = document.activeElement;
@@ -128,10 +128,10 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   await owner.getByLabel("Business name confirmation").fill("wrong");
   await owner.getByRole("button", { name: "Confirm transfer" }).click();
   await expect(owner.getByText(/exact current business name/)).toBeVisible();
-  await owner.getByRole("button", { name: "Espanol" }).click();
+  await owner.getByRole("link", { name: "Español" }).click();
   await owner.getByRole("button", { name: "Confirmar transferencia" }).click();
   await expect(owner.getByText(/Introduce el nombre actual exacto/)).toBeVisible();
-  await owner.getByRole("button", { name: "English" }).click();
+  await owner.getByRole("link", { name: "English" }).click();
   await owner.getByLabel("Business name confirmation").fill("Task Six Harbour");
   await owner.getByRole("button", { name: "Confirm transfer" }).click();
   await expect(owner.getByRole("status")).toContainText("Ownership transferred.");
@@ -141,7 +141,7 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   expect(transferredMembers.find((candidate) => candidate.userId === ownerMember.userId)?.role).toBe("administrator");
   expect(transferredMembers.find((candidate) => candidate.userId === transferTargetId)?.role).toBe("owner_admin");
 
-  await owner.getByRole("button", { name: "Espanol" }).click();
+  await owner.getByRole("link", { name: "Español" }).click();
   await expect(owner.getByRole("heading", { name: "Gestionar miembros" })).toBeVisible();
   await expect(owner.locator("html")).toHaveJSProperty("scrollWidth", await owner.evaluate(() => document.documentElement.clientWidth));
 
@@ -187,7 +187,7 @@ test("inactive business blocks join and review operations and preserves member s
   await page.goto(`/business/${businessId}/settings/danger-zone`);
   await expect(page.getByRole("heading", { name: "Danger zone" })).toBeVisible();
   expect(await page.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
-  await page.getByRole("button", { name: "English" }).focus();
+  await page.getByRole("link", { name: "English" }).focus();
   await page.keyboard.press("Tab");
   expect(await page.evaluate(() => {
     const element = document.activeElement;
@@ -196,7 +196,7 @@ test("inactive business blocks join and review operations and preserves member s
   await page.getByLabel("Business name confirmation").fill("wrong");
   await page.getByRole("button", { name: "Deactivate business" }).click();
   await expect(page.getByText(/exact current business name/)).toBeVisible();
-  await page.getByRole("button", { name: "Espanol" }).click();
+  await page.getByRole("link", { name: "Español" }).click();
   await expect(page.getByRole("heading", { name: "Zona de peligro" })).toBeVisible();
   expect(await page.evaluate(() => Array.from(document.querySelectorAll("style")).some((style) => style.textContent?.includes("prefers-reduced-motion")))).toBe(true);
   await page.getByLabel("Confirmación del nombre del negocio").fill("Task Six Lifecycle");

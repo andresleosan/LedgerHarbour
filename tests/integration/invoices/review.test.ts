@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PATCH as categoriesPatch, POST as categoriesPost } from "../../../src/app/api/businesses/[businessId]/categories/route";
 import { POST as currenciesPost } from "../../../src/app/api/businesses/[businessId]/currencies/route";
@@ -11,6 +11,7 @@ import { createInMemoryOnboardingRepository, createOnboardingServices, defaultOn
 import { createCategory, deactivateCategory, type CategoryDependencies } from "../../../src/modules/accounting/category-service";
 import { PATCH as currenciesPatch } from "../../../src/app/api/businesses/[businessId]/currencies/route";
 import { getInvoiceReview, listInvoices, updateInvoiceDraft } from "../../../src/modules/invoices/invoice-review-service";
+import { MAX_REVIEW_PATCH_BYTES } from "../../../src/modules/invoices/review-validation";
 import type { DocumentId, InvoiceId } from "../../../src/modules/invoices/ocr-provider";
 import type { BusinessId, UserId } from "../../../src/modules/tenancy/types";
 
@@ -179,6 +180,41 @@ describe("invoice review boundaries", () => {
     const malformed = await reviewPatch(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ unknown: true }) }), { params: Promise.resolve({ invoiceId: invoice.id }) });
     expect(malformed.status).toBe(400);
     await expect(malformed.json()).resolves.toMatchObject({ error: { code: "INVALID_INVOICE_REVIEW" } });
+  });
+
+  it("does not parse a clearly oversized review JSON body", async () => {
+    await setCurrentIdentity({ providerUserId: "reviewer", email: "reviewer@example.com", displayName: "Reviewer", emailVerified: true });
+    const json = vi.fn(async () => { throw new Error("body should not be parsed"); });
+    const oversized = {
+      headers: new Headers({ "content-length": String(MAX_REVIEW_PATCH_BYTES + 1) }),
+      body: null,
+      json,
+    } as unknown as Request;
+
+    const response = await reviewPatch(oversized, { params: Promise.resolve({ invoiceId: invoice.id }) });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "INVALID_INVOICE_REVIEW" } });
+    expect(json).not.toHaveBeenCalled();
+  });
+
+  it("rejects review fields longer than 2000 characters", async () => {
+    await setCurrentIdentity({ providerUserId: "reviewer", email: "reviewer@example.com", displayName: "Reviewer", emailVerified: true });
+    const response = await reviewPatch(new Request("http://localhost", {
+      method: "PATCH",
+      body: JSON.stringify({ notes: "n".repeat(2001) }),
+    }), { params: Promise.resolve({ invoiceId: invoice.id }) });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({ error: { code: "INVALID_INVOICE_REVIEW" } });
+  });
+
+  it("marks financial review GET responses private and non-cacheable", async () => {
+    await setCurrentIdentity({ providerUserId: "reviewer", email: "reviewer@example.com", displayName: "Reviewer", emailVerified: true });
+
+    const response = await reviewGet(new Request("http://localhost"), { params: Promise.resolve({ invoiceId: invoice.id }) });
+
+    expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 
   it("uses the shared Task 8 document repository for the default review route", async () => {

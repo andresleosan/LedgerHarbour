@@ -13,3 +13,12 @@ coverage/
 *.tsbuildinfo
 .superpowers/
 .playwright-mcp/
+graphify-out/
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+service-account*.json
+firebase-adminsdk*.json
+google-credentials*.json

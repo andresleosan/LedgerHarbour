@@ -19,6 +19,7 @@ import {
   type InMemoryInvoiceRepository,
 } from "../../../src/modules/invoices/invoice-service";
 import { createOcrWorker } from "../../../src/modules/jobs/ocr-worker";
+import { resetRateLimitersForTests } from "../../../src/modules/security/rate-limit";
 import {
   createJobRepository,
   createJobService,
@@ -74,6 +75,7 @@ describe("OCR workflow boundaries", () => {
   beforeEach(async () => {
     process.env.AUTH_MODE = "development";
     process.env.OCR_PROVIDER = "fake";
+    resetRateLimitersForTests();
     tenancy = createInMemoryOnboardingRepository();
     documentRepository = createDocumentRepository();
     jobs = createJobRepository();

@@ -116,9 +116,9 @@ test("verifies the local MVP critical path and cross-tenant access block", async
 
   await owner.goto(`/business/${businessId}/upload?locale=es`);
   await expect(owner.getByRole("heading", { name: "Sube un documento de factura" })).toBeVisible();
-  await owner.getByRole("button", { name: "English" }).focus();
-  await expect(owner.getByRole("button", { name: "English" })).toBeFocused();
-  await expect(owner.getByRole("button", { name: "English" })).toHaveCSS("outline-style", "solid");
+  await owner.getByRole("link", { name: "English" }).focus();
+  await expect(owner.getByRole("link", { name: "English" })).toBeFocused();
+  await expect(owner.getByRole("link", { name: "English" })).toHaveCSS("outline-style", "solid");
   await owner.emulateMedia({ reducedMotion: "reduce" });
   expect(await owner.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
   expect(await owner.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(

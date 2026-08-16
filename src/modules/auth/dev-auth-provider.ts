@@ -90,14 +90,14 @@ export class DevAuthProvider extends InMemoryDevAuthProvider {
   constructor() {
     super();
 
-    if (process.env.AUTH_MODE !== "development") {
+    if (process.env.AUTH_MODE !== "development" || process.env.NODE_ENV === "production") {
       throw new AuthError(AUTH_ERROR_CODES.DEVELOPMENT_MODE_REQUIRED);
     }
   }
 }
 
 export function createAuthProvider(): AuthProvider | null {
-  if (process.env.AUTH_MODE !== "development") {
+  if (process.env.AUTH_MODE !== "development" || process.env.NODE_ENV === "production") {
     return null;
   }
 

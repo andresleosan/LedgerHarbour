@@ -1,3 +1,6 @@
+import { Ratelimit } from "@upstash/ratelimit";
+import { Redis } from "@upstash/redis";
+
 export interface RateLimitResult {
   readonly success: boolean;
   readonly remaining: number;
@@ -12,6 +15,13 @@ interface RateLimitEntry {
   count: number;
   resetAt: number;
 }
+
+type RateLimitDefinition = {
+  keyPrefix: string;
+  maxRequests: number;
+  windowMs: number;
+  upstashWindow: Parameters<typeof Ratelimit.fixedWindow>[1];
+};
 
 export interface InMemoryRateLimiterOptions {
   maxRequests: number;
@@ -58,23 +68,71 @@ class UpstashRateLimiter implements RateLimiter {
   }
 }
 
-let sharedRateLimiter: RateLimiter | null = null;
+const sharedRateLimiters = new Map<string, RateLimiter>();
 
-export function createAuthRateLimiter(): RateLimiter {
-  const mode = process.env.RATE_LIMIT_MODE ?? "memory";
+function createConfiguredRateLimiter(definition: RateLimitDefinition): RateLimiter {
+  const mode = process.env.RATE_LIMIT_MODE ?? (process.env.NODE_ENV === "production" ? "" : "memory");
+  if (process.env.NODE_ENV === "production" && mode !== "upstash") {
+    throw new Error("Upstash rate limiting is required in production");
+  }
   if (mode === "memory") {
-    return sharedRateLimiter ??= new InMemoryRateLimiter({ maxRequests: 10, windowMs: 5 * 60 * 1000 });
+    const key = `memory:${definition.keyPrefix}`;
+    const existing = sharedRateLimiters.get(key);
+    if (existing) return existing;
+    const limiter = new InMemoryRateLimiter({ maxRequests: definition.maxRequests, windowMs: definition.windowMs });
+    sharedRateLimiters.set(key, limiter);
+    return limiter;
   }
   if (mode !== "upstash") throw new Error("Unsupported rate limit mode");
   if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
     throw new Error("Upstash rate limiting requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN");
   }
-  return sharedRateLimiter ??= new UpstashRateLimiter(new Ratelimit({
+
+  const key = `upstash:${definition.keyPrefix}`;
+  const existing = sharedRateLimiters.get(key);
+  if (existing) return existing;
+  const limiter = new UpstashRateLimiter(new Ratelimit({
     redis: Redis.fromEnv(),
-    limiter: Ratelimit.fixedWindow(10, "5 m"),
+    limiter: Ratelimit.fixedWindow(definition.maxRequests, definition.upstashWindow),
     analytics: false,
-    prefix: "ledgerharbour:auth",
+    prefix: `ledgerharbour:${definition.keyPrefix}`,
   }));
+  sharedRateLimiters.set(key, limiter);
+  return limiter;
 }
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
+
+const AUTH_RATE_LIMIT: RateLimitDefinition = {
+  keyPrefix: "auth",
+  maxRequests: 10,
+  windowMs: 5 * 60 * 1000,
+  upstashWindow: "5 m",
+};
+
+const AUTHENTICATED_RATE_LIMITS = {
+  upload: {
+    keyPrefix: "authenticated-upload",
+    maxRequests: 10,
+    windowMs: 5 * 60 * 1000,
+    upstashWindow: "5 m",
+  },
+  "ocr-process": {
+    keyPrefix: "authenticated-ocr-process",
+    maxRequests: 5,
+    windowMs: 5 * 60 * 1000,
+    upstashWindow: "5 m",
+  },
+} satisfies Record<string, RateLimitDefinition>;
+
+export type AuthenticatedRateLimitScope = keyof typeof AUTHENTICATED_RATE_LIMITS;
+
+export function createAuthRateLimiter(): RateLimiter {
+  return createConfiguredRateLimiter(AUTH_RATE_LIMIT);
+}
+
+export function createAuthenticatedRateLimiter(scope: AuthenticatedRateLimitScope): RateLimiter {
+  return createConfiguredRateLimiter(AUTHENTICATED_RATE_LIMITS[scope]);
+}
+
+export function resetRateLimitersForTests(): void {
+  if (process.env.NODE_ENV === "test") sharedRateLimiters.clear();
+}

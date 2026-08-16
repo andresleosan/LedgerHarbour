@@ -169,4 +169,10 @@ describe("document upload validation", () => {
       sizeBytes: 99,
     })).toThrowError(expect.objectContaining({ code: UPLOAD_ERROR_CODES.SIZE_MISMATCH }));
   });
+
+  it("rejects filenames longer than 255 characters before content validation", () => {
+    expect(() => validateUpload(upload(`${"a".repeat(256)}.pdf`, "application/pdf", pdfBytes))).toThrowError(
+      expect.objectContaining({ code: UPLOAD_ERROR_CODES.INVALID_METADATA }),
+    );
+  });
 });
