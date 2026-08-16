@@ -13,7 +13,8 @@ export function useUrlLocale(fallback: SupportedLocale = "en") {
   const hrefFor = (targetPath: string, candidate = locale) => {
     const params = new URLSearchParams(searchParams.toString());
     params.set("locale", candidate);
-    return `${targetPath}?${params.toString()}`;
+    const query = params.toString();
+    return query ? `${targetPath}?${query}` : targetPath;
   };
 
   const setLocale = (candidate: SupportedLocale) => {

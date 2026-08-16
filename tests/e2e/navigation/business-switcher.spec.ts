@@ -70,15 +70,18 @@ test("authenticates, switches authorized businesses, preserves locale, and keeps
   await expect(page.getByRole("heading", { name: secondName })).toBeVisible();
   await expect(page.getByRole("main").getByText("Documentos")).toBeVisible();
   await expect(page.locator(".shell-nav a").filter({ hasText: "Cargar" })).toHaveAttribute("href", `/business/${secondId}/upload?locale=es`);
-  await page.getByRole("link", { name: "Cargar" }).click();
-  await expect(page).toHaveURL(`/business/${secondId}/upload?locale=es`);
-  await expect(page.getByRole("heading", { name: "Sube un documento de factura" })).toBeVisible();
+   await page.getByRole("link", { name: "Cargar" }).click();
+   await expect(page).toHaveURL(`/business/${secondId}/upload?locale=es`);
+   await expect(page.getByRole("heading", { name: "Sube un documento de factura" })).toBeVisible();
+   await expect(page.locator(".language-switcher")).toHaveCount(1);
+   await expect(page.locator(".toolbar")).toHaveCount(0);
+   await expect(page.getByRole("link", { name: "Español" })).toHaveAttribute("href", /locale=es/);
 
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.keyboard.press("Tab");
-  await expect(page.locator(":focus")).toBeVisible();
-  await expect(page.locator(".toolbar").first()).toHaveCSS("transition-duration", "1e-05s");
+   await page.setViewportSize({ width: 390, height: 844 });
+   await page.emulateMedia({ reducedMotion: "reduce" });
+   await page.keyboard.press("Tab");
+   await expect(page.locator(":focus")).toBeVisible();
+   await expect(page.locator(".language-switcher")).toHaveCSS("transition-duration", "1e-05s");
   await expect(page.locator("html")).toHaveJSProperty(
     "scrollWidth",
     await page.evaluate(() => document.documentElement.clientWidth),

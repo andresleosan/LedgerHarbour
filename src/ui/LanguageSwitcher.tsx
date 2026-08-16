@@ -19,7 +19,6 @@ export default function LanguageSwitcher({ locale }: LanguageSwitcherProps) {
 
   return (
     <nav className="language-switcher" aria-label={locale === "es" ? "Idioma" : "Language"}>
-      <span>{locale === "es" ? "Idioma" : "Language"}</span>
       <Link href={hrefFor("en")} aria-current={locale === "en" ? "page" : undefined}>
         English
       </Link>
