@@ -46,3 +46,11 @@ export interface OcrResult {
 export interface OcrProvider {
   extract(input: OcrInput): Promise<OcrResult>;
 }
+
+export class OcrProviderError extends Error {
+  readonly name = "OcrProviderError";
+
+  constructor(readonly retryable: boolean) {
+    super("OCR provider request failed.");
+  }
+}
