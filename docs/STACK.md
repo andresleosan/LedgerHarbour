@@ -55,7 +55,7 @@ El storage de documentos dispone de `STORAGE_MODE=local|r2`. `local` es el valor
 - Firebase reemplaza el provider de desarrollo mediante `AUTH_MODE=firebase`; requiere probar el boundary de identidad y configurar Email/Password + Google en el proyecto.
 - Rate limiting sigue siendo obligatorio antes de exposicion publica; activar `RATE_LIMIT_MODE=upstash` en staging.
 - Las migraciones productivas requieren backup verificado, rollback probado y confirmacion explicita.
-- La verificacion de los adapters R2/Firebase es unitaria; la activacion contra servicios de staging sigue pendiente junto con rate limiting, OCR real y operacion.
+- R2/Firebase/Upstash estan activados en produccion: el login Google conserva sesion, el rate limiter responde y R2 confirmo subida/descarga privada; OCR real sigue pendiente.
 - `corepack pnpm audit --json` queda en cero vulnerabilidades conocidas tras fijar `sharp@0.35.0` y `postcss@8.5.23` bajo Next; debe repetirse en cada release.
 - Este documento no autoriza despliegue ni gasto.
 
