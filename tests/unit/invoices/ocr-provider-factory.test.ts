@@ -35,9 +35,27 @@ const serviceAccountJson = JSON.stringify({
 
 const runtimeEnv = (values: Record<string, string>) => values as NodeJS.ProcessEnv;
 
+const validGoogleEnv = (overrides: Record<string, string> = {}) =>
+  runtimeEnv({
+    OCR_PROVIDER: "google-document-ai",
+    GOOGLE_CLOUD_PROJECT_ID: "demo-project",
+    GOOGLE_CLOUD_LOCATION: "eu",
+    GOOGLE_DOCUMENT_AI_PROCESSOR_ID: "invoice-processor",
+    GOOGLE_SERVICE_ACCOUNT_JSON: serviceAccountJson,
+    ...overrides,
+  });
+
 describe("OCR provider factory", () => {
   it("returns the fake provider when explicitly configured", () => {
-    expect(createOcrProvider(runtimeEnv({ OCR_PROVIDER: "fake" }))).toBeInstanceOf(FakeOcrProvider);
+    expect(
+      createOcrProvider(runtimeEnv({ OCR_PROVIDER: "fake", NODE_ENV: "test" })),
+    ).toBeInstanceOf(FakeOcrProvider);
+  });
+
+  it("rejects the fake provider in production", () => {
+    expect(() =>
+      createOcrProvider(runtimeEnv({ OCR_PROVIDER: "fake", NODE_ENV: "production" })),
+    ).toThrowError(OcrConfigurationError);
   });
 
   it("rejects Google configuration when required values are missing", () => {
@@ -53,13 +71,7 @@ describe("OCR provider factory", () => {
   });
 
   it("constructs Google Document AI with runtime credentials and the exact processor name", async () => {
-    const provider = createOcrProvider(runtimeEnv({
-      OCR_PROVIDER: "google-document-ai",
-      GOOGLE_CLOUD_PROJECT_ID: "demo-project",
-      GOOGLE_CLOUD_LOCATION: "eu",
-      GOOGLE_DOCUMENT_AI_PROCESSOR_ID: "invoice-processor",
-      GOOGLE_SERVICE_ACCOUNT_JSON: serviceAccountJson,
-    }));
+    const provider = createOcrProvider(validGoogleEnv());
 
     expect(provider).toBeInstanceOf(GoogleDocumentAiInvoiceProvider);
     expect(sdkMocks.constructorOptions).toEqual([
@@ -112,5 +124,44 @@ describe("OCR provider factory", () => {
       expect(error).not.toHaveProperty("cause");
       expect(String(error)).not.toContain(secret);
     }
+  });
+
+  it("rejects a service-account JSON object without required credentials", () => {
+    expect(() =>
+      createOcrProvider(validGoogleEnv({ GOOGLE_SERVICE_ACCOUNT_JSON: JSON.stringify({}) })),
+    ).toThrowError(OcrConfigurationError);
+  });
+
+  it("rejects project IDs containing a slash", () => {
+    expect(() =>
+      createOcrProvider(validGoogleEnv({ GOOGLE_CLOUD_PROJECT_ID: "demo/project" })),
+    ).toThrowError(OcrConfigurationError);
+  });
+
+  it("rejects project IDs containing control characters", () => {
+    expect(() =>
+      createOcrProvider(validGoogleEnv({ GOOGLE_CLOUD_PROJECT_ID: "demo\u0000project" })),
+    ).toThrowError(OcrConfigurationError);
+  });
+
+  it("rejects locations outside the supported regions", () => {
+    expect(() =>
+      createOcrProvider(validGoogleEnv({ GOOGLE_CLOUD_LOCATION: "asia" })),
+    ).toThrowError(OcrConfigurationError);
+  });
+
+  it("rejects an empty processor ID", () => {
+    expect(() =>
+      createOcrProvider(validGoogleEnv({ GOOGLE_DOCUMENT_AI_PROCESSOR_ID: "" })),
+    ).toThrowError(OcrConfigurationError);
+  });
+
+  it("rejects processor IDs containing a slash or control character", () => {
+    expect(() =>
+      createOcrProvider(validGoogleEnv({ GOOGLE_DOCUMENT_AI_PROCESSOR_ID: "invoice/processor" })),
+    ).toThrowError(OcrConfigurationError);
+    expect(() =>
+      createOcrProvider(validGoogleEnv({ GOOGLE_DOCUMENT_AI_PROCESSOR_ID: "invoice\u0007processor" })),
+    ).toThrowError(OcrConfigurationError);
   });
 });

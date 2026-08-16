@@ -8,6 +8,8 @@ import { FakeOcrProvider } from "./fake-ocr-provider";
 import type { OcrProvider } from "./ocr-provider";
 
 const INVALID_CONFIGURATION_MESSAGE = "OCR provider configuration is invalid.";
+const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
+const PROJECT_ID_PATTERN = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
 
 export class OcrConfigurationError extends Error {
   readonly name = "OcrConfigurationError";
@@ -22,29 +24,68 @@ function requiredValue(env: NodeJS.ProcessEnv, name: string): string | null {
   return typeof value === "string" && value.trim().length > 0 ? value.trim() : null;
 }
 
+function isValidProjectId(value: string): boolean {
+  return PROJECT_ID_PATTERN.test(value) && !CONTROL_CHARACTER_PATTERN.test(value);
+}
+
+function isValidProcessorId(value: string): boolean {
+  return value.length > 0 && !CONTROL_CHARACTER_PATTERN.test(value) && !/[\\/]/.test(value);
+}
+
+function parseServiceAccountJson(
+  value: string,
+): { client_email: string; private_key: string } & Record<string, unknown> | null {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (
+      parsed === null ||
+      typeof parsed !== "object" ||
+      Array.isArray(parsed)
+    ) {
+      return null;
+    }
+
+    const credentials = parsed as Record<string, unknown>;
+    if (
+      typeof credentials.client_email !== "string" ||
+      credentials.client_email.trim().length === 0 ||
+      typeof credentials.private_key !== "string" ||
+      credentials.private_key.trim().length === 0
+    ) {
+      return null;
+    }
+
+    return credentials as { client_email: string; private_key: string } & Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 function createGoogleProvider(env: NodeJS.ProcessEnv): OcrProvider {
   const projectId = requiredValue(env, "GOOGLE_CLOUD_PROJECT_ID");
   const location = requiredValue(env, "GOOGLE_CLOUD_LOCATION");
   const processorId = requiredValue(env, "GOOGLE_DOCUMENT_AI_PROCESSOR_ID");
   const serviceAccountJson = requiredValue(env, "GOOGLE_SERVICE_ACCOUNT_JSON");
 
-  if (!projectId || !location || !processorId || !serviceAccountJson) {
+  if (
+    !projectId ||
+    !isValidProjectId(projectId) ||
+    !location ||
+    !["us", "eu"].includes(location) ||
+    !processorId ||
+    !isValidProcessorId(processorId) ||
+    !serviceAccountJson
+  ) {
     throw new OcrConfigurationError();
   }
 
-  try {
-    const parsedCredentials: unknown = JSON.parse(serviceAccountJson);
-    if (
-      parsedCredentials === null ||
-      typeof parsedCredentials !== "object" ||
-      Array.isArray(parsedCredentials)
-    ) {
-      throw new Error("invalid credentials shape");
-    }
+  const parsedCredentials = parseServiceAccountJson(serviceAccountJson);
+  if (!parsedCredentials) throw new OcrConfigurationError();
 
+  try {
     const sdkClient = new DocumentProcessorServiceClient({
       apiEndpoint: `${location}-documentai.googleapis.com`,
-      credentials: parsedCredentials as { client_email?: string; private_key?: string },
+      credentials: parsedCredentials,
     });
 
     const client: GoogleDocumentAiClient = {
@@ -98,7 +139,10 @@ function createGoogleProvider(env: NodeJS.ProcessEnv): OcrProvider {
 export function createOcrProvider(env: NodeJS.ProcessEnv = process.env): OcrProvider {
   const provider = env.OCR_PROVIDER;
 
-  if (provider === "fake") return new FakeOcrProvider();
+  if (provider === "fake") {
+    if (env.NODE_ENV?.trim() === "production") throw new OcrConfigurationError();
+    return new FakeOcrProvider();
+  }
   if (provider === "google-document-ai") return createGoogleProvider(env);
 
   throw new OcrConfigurationError();
