@@ -3,12 +3,13 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { AUTH_ERROR_CODES, toAuthError } from "@/modules/auth/auth-errors";
+import { AUTH_ERROR_CODES, AuthError, toAuthError } from "@/modules/auth/auth-errors";
 import {
   createAuthProviderFromActions,
   type AuthProvider,
   type AuthProviderActions,
 } from "@/modules/auth/auth-provider";
+import { signInWithFirebaseEmail, signInWithFirebaseGoogle, type FirebaseClientConfig } from "@/modules/auth/firebase-client";
 import { messages, type SupportedLocale } from "@/i18n/config";
 
 type AuthFormMode = "login" | "register";
@@ -18,13 +19,16 @@ type ErrorKey = "invalidEmail" | "missingIdentity" | "providerError" | "developm
 interface AuthFormProps {
   mode: AuthFormMode;
   providerActions: AuthProviderActions;
+  authMode?: "development" | "firebase";
+  firebaseConfig?: FirebaseClientConfig;
 }
 
 const interpolate = (message: string, email: string) => message.replace("{email}", email);
 
-export default function AuthForm({ mode, providerActions }: AuthFormProps) {
+export default function AuthForm({ mode, providerActions, authMode = "development", firebaseConfig }: AuthFormProps) {
   const [locale, setLocale] = useState<SupportedLocale>("en");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [errorKey, setErrorKey] = useState<ErrorKey | null>(null);
   const [provider] = useState<AuthProvider>(() => createAuthProviderFromActions(providerActions));
@@ -33,6 +37,7 @@ export default function AuthForm({ mode, providerActions }: AuthFormProps) {
   const loginCopy = copy.login;
   const registerCopy = copy.register;
   const authCopy = isLogin ? loginCopy : registerCopy;
+  const isFirebase = authMode === "firebase";
 
   const clearFeedback = () => {
     setFeedback(null);
@@ -44,7 +49,14 @@ export default function AuthForm({ mode, providerActions }: AuthFormProps) {
     clearFeedback();
 
     try {
-      const identity = await provider.signInWithEmail({ email });
+      if (isFirebase && !firebaseConfig) throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE);
+      const firebaseCredential = isFirebase
+        ? await signInWithFirebaseEmail(firebaseConfig!, email, password, !isLogin)
+        : null;
+      const identity = await provider.signInWithEmail({
+        email: firebaseCredential?.user.email ?? email,
+        idToken: firebaseCredential ? await firebaseCredential.user.getIdToken() : undefined,
+      });
 
       if (!identity) {
         setErrorKey("missingIdentity");
@@ -72,7 +84,9 @@ export default function AuthForm({ mode, providerActions }: AuthFormProps) {
     clearFeedback();
 
     try {
-      const identity = await provider.signInWithGoogle();
+      if (isFirebase && !firebaseConfig) throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE);
+      const firebaseCredential = isFirebase ? await signInWithFirebaseGoogle(firebaseConfig!) : null;
+      const identity = await provider.signInWithGoogle(firebaseCredential ? { idToken: await firebaseCredential.user.getIdToken() } : undefined);
 
       if (!identity) {
         setErrorKey("missingIdentity");
@@ -179,6 +193,19 @@ export default function AuthForm({ mode, providerActions }: AuthFormProps) {
                 aria-invalid={errorKey === "invalidEmail"}
                 aria-describedby={errorKey ? "auth-error" : undefined}
               />
+              {isFirebase && (
+                <label htmlFor="password">
+                  Password
+                  <input
+                    id="password"
+                    name="password"
+                    type="password"
+                    autoComplete={isLogin ? "current-password" : "new-password"}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                  />
+                </label>
+              )}
               {errorKey && <p id="auth-error" className="error" role="alert">{copy[errorKey]}</p>}
               <button className="primary-button" type="submit">{authCopy.emailAction}</button>
             </form>
@@ -187,9 +214,9 @@ export default function AuthForm({ mode, providerActions }: AuthFormProps) {
                 <div className="divider">{copy.separator}</div>
                 <button className="google-button" type="button" onClick={handleGoogleSignIn}>
                   {loginCopy.googleAction}
-                  <small>{loginCopy.googleSimulation}</small>
-                </button>
-                <p className="demo-note"><strong>{loginCopy.demoAccount}:</strong> {loginCopy.demoEmail}</p>
+                   {!isFirebase && <small>{loginCopy.googleSimulation}</small>}
+                 </button>
+                 {!isFirebase && <p className="demo-note"><strong>{loginCopy.demoAccount}:</strong> {loginCopy.demoEmail}</p>}
               </>
             )}
             {feedback && (

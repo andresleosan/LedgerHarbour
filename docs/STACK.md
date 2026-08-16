@@ -19,7 +19,7 @@ Prototipo local/no comercial. El objetivo de la siguiente fase es una prueba des
 
 - Hosting: Vercel Hobby.
 - PostgreSQL objetivo: Neon Free; migracion inicial verificada remotamente con 11 tablas requeridas.
-- Auth: Firebase Authentication Spark.
+- Auth: Firebase Authentication Spark; adapter email/password + Google implementado, activacion de staging pendiente.
 - Storage privado: Cloudflare R2 Standard.
 - OCR: Fake OCR local; proveedor externo pendiente de aprobacion.
 
@@ -49,10 +49,10 @@ El storage de documentos dispone de `STORAGE_MODE=local|r2`. `local` es el valor
 
 ## Seguridad y produccion
 
-- Firebase reemplaza el provider de desarrollo solo despues de probar el boundary de identidad.
+- Firebase reemplaza el provider de desarrollo mediante `AUTH_MODE=firebase`; requiere probar el boundary de identidad y configurar Email/Password + Google en el proyecto.
 - Rate limiting sigue siendo obligatorio antes de exposicion publica.
 - Las migraciones productivas requieren backup verificado, rollback probado y confirmacion explicita.
-- La verificacion del adapter R2 es unitaria; la activacion contra el bucket de staging sigue pendiente junto con auth, rate limiting, OCR real y operacion.
+- La verificacion de los adapters R2/Firebase es unitaria; la activacion contra servicios de staging sigue pendiente junto con rate limiting, OCR real y operacion.
 - `corepack pnpm audit --json` queda en cero vulnerabilidades conocidas tras fijar `sharp@0.35.0` y `postcss@8.5.23` bajo Next; debe repetirse en cada release.
 - Este documento no autoriza despliegue ni gasto.
 
