@@ -592,6 +592,7 @@ describe("OCR workflow boundaries", () => {
     expect(processedBody).toEqual({ job: expect.objectContaining({ status: "completed", documentId: routeState.documentId }) });
 
     const defaultInvoices = globalRepository<InMemoryInvoiceRepository>("ledgerharbour.task8.inMemoryInvoiceRepository");
+    await expect(defaultInvoices.listByBusinessId(routeState.businessId as typeof ownerBusiness.id)).resolves.toHaveLength(1);
     const invoiceId = (await defaultInvoices.listByBusinessId(routeState.businessId as typeof ownerBusiness.id))[0]?.id as InvoiceId;
     const getPositive = await invoiceGetRoute(new Request("http://localhost"), { params: Promise.resolve({ invoiceId }) });
     expect(getPositive.status).toBe(200);
@@ -722,6 +723,45 @@ describe("OCR workflow boundaries", () => {
         else process.env[name] = value;
       }
     }
+  });
+
+  it("processes a queued job reused by the process route", async () => {
+    const routeState = await setupDefaultRouteState("route-reused-queued-document");
+    await setCurrentIdentity(identityFor("route-member"));
+    const defaultJobs = globalRepository<InMemoryJobRepository>("ledgerharbour.task8.inMemoryJobRepository");
+    const queued = await createJobService({
+      tenancyRepository: defaultOnboardingRepository,
+      documentRepository: resolveDefaultDocumentRepository(),
+      jobs: defaultJobs,
+    }).queueOcr(routeState.documentId as DocumentId, identityFor("route-member"));
+
+    const response = await processRoute(new Request("http://localhost", { method: "POST", body: "{}" }), {
+      params: Promise.resolve({ documentId: routeState.documentId }),
+    });
+
+    expect(queued.status).toBe("queued");
+    expect(response.status).toBe(202);
+    await expect(response.json()).resolves.toMatchObject({ job: { id: queued.id, status: "completed", documentId: routeState.documentId } });
+  });
+
+  it("returns a conflict when the process route reuses a processing job", async () => {
+    const routeState = await setupDefaultRouteState("route-processing-document");
+    await setCurrentIdentity(identityFor("route-member"));
+    const defaultJobs = globalRepository<InMemoryJobRepository>("ledgerharbour.task8.inMemoryJobRepository");
+    const queued = await createJobService({
+      tenancyRepository: defaultOnboardingRepository,
+      documentRepository: resolveDefaultDocumentRepository(),
+      jobs: defaultJobs,
+    }).queueOcr(routeState.documentId as DocumentId, identityFor("route-member"));
+    await defaultJobs.update({ ...queued, status: "processing", updatedAt: new Date().toISOString() });
+
+    const response = await processRoute(new Request("http://localhost", { method: "POST", body: "{}" }), {
+      params: Promise.resolve({ documentId: routeState.documentId }),
+    });
+
+    expect(response.status).toBe(409);
+    await expect(response.json()).resolves.toEqual({ error: { code: "OCR_JOB_CONFLICT", message: "An OCR job already exists for this document." } });
+    await expect(defaultJobs.findById(queued.id)).resolves.toMatchObject({ status: "processing" });
   });
 });
 

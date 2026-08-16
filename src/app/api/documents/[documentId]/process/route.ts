@@ -43,6 +43,9 @@ export async function POST(request: Request, context: RouteContext) {
       jobs: persistence.jobRepository,
       invoices: persistence.invoiceRepository,
     });
+    if (job.status === "processing") {
+      return errorResponse(new JobError(JOB_ERROR_CODES.OCR_JOB_CONFLICT));
+    }
     await processOcrJob(job.id, {
       tenancyRepository: persistence.tenancyRepository,
       documentRepository: persistence.documentRepository,
