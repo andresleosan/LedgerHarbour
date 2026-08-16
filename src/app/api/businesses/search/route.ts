@@ -8,7 +8,7 @@ import { getPersistenceContext } from "../../../../modules/persistence/repositor
 const querySchema = z.object({ q: z.string() });
 
 export async function GET(request: Request) {
-  const identity = getCurrentIdentity();
+  const identity = await getCurrentIdentity();
   if (!identity) {
     return NextResponse.json(
       { error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } },

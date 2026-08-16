@@ -3,6 +3,7 @@ import { workUnitAsyncStorage } from "next/dist/server/app-render/work-unit-asyn
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { AuthIdentity } from "./auth-provider";
+import { FirebaseAuthProvider } from "./firebase-auth-provider";
 
 export const DEV_SESSION_COOKIE = "ledgerharbour_dev_session";
 export const DEV_SESSION_MAX_AGE = 5 * 60;
@@ -106,7 +107,7 @@ export async function setCurrentIdentity(identity: AuthIdentity): Promise<void> 
   });
 }
 
-export function getCurrentIdentity(): AuthIdentity | null {
+export function getCurrentIdentitySync(): AuthIdentity | null {
   if (!isDevelopmentMode()) {
     return null;
   }
@@ -133,7 +134,22 @@ export function getCurrentIdentity(): AuthIdentity | null {
   return { ...session.identity };
 }
 
+export async function getCurrentIdentity(): Promise<AuthIdentity | null> {
+  if (process.env.AUTH_MODE === "firebase") {
+    try {
+      return await new FirebaseAuthProvider().getCurrentIdentity();
+    } catch {
+      return null;
+    }
+  }
+  return getCurrentIdentitySync();
+}
+
 export async function clearCurrentIdentity(): Promise<void> {
+  if (process.env.AUTH_MODE === "firebase") {
+    try { await new FirebaseAuthProvider().signOut(); } catch { /* cookie cleanup is best effort */ }
+    return;
+  }
   if (!isDevelopmentMode()) {
     return;
   }

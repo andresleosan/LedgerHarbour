@@ -22,10 +22,10 @@ function responseFor(error: unknown): NextResponse {
   return NextResponse.json({ error: { code: "INVOICE_REVIEW_FAILED", message: "The invoice review request could not be completed." } }, { status: 500 });
 }
 
-function actor() { return getCurrentIdentity(); }
+async function actor() { return getCurrentIdentity(); }
 
 export async function GET(_request: Request, context: RouteContext) {
-  const identity = actor();
+  const identity = await actor();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   try {
     const persistence = getPersistenceContext();
@@ -38,7 +38,7 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const identity = actor();
+  const identity = await actor();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: { code: "INVALID_INVOICE_REVIEW", message: "The invoice review request is invalid." } }, { status: 400 }); }

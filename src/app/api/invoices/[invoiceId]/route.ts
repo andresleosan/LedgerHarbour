@@ -38,12 +38,12 @@ function errorResponse(error: unknown): NextResponse {
   return NextResponse.json({ error: { code: "INVOICE_REQUEST_FAILED", message: "The invoice request could not be completed." } }, { status: 500 });
 }
 
-function actorId() {
+async function actorId() {
   return getCurrentIdentity();
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-  const actor = actorId();
+  const actor = await actorId();
   if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   try {
     const persistence = getPersistenceContext();
@@ -58,7 +58,7 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const actor = actorId();
+  const actor = await actorId();
   if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   let body: unknown;
   try {

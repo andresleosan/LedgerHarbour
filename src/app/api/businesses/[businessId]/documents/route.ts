@@ -29,7 +29,7 @@ function errorResponse(error: unknown): NextResponse {
 }
 
 export async function POST(request: Request, context: RouteContext) {
-  const identity = getCurrentIdentity();
+  const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   const { businessId } = await context.params;
   try {

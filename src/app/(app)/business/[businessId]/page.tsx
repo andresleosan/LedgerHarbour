@@ -9,7 +9,7 @@ import { getPersistenceContext } from "@/modules/persistence/repository-factory"
 import StatusBadge from "@/ui/StatusBadge";
 
 export default async function BusinessDashboardPage({ params, searchParams }: { params: Promise<{ businessId: string }>; searchParams?: Promise<{ locale?: string }> }) {
-  const identity = getCurrentIdentity();
+  const identity = await getCurrentIdentity();
   if (!identity) redirect("/login");
   const { businessId } = await params;
   const locale = (await searchParams)?.locale === "es" ? "es" : "en";

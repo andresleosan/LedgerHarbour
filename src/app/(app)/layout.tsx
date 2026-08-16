@@ -7,7 +7,7 @@ import { getPersistenceContext } from "@/modules/persistence/repository-factory"
 import AppShell from "@/ui/AppShell";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
-  const identity = getCurrentIdentity();
+  const identity = await getCurrentIdentity();
   if (!identity) redirect("/login");
 
   const persistence = getPersistenceContext();

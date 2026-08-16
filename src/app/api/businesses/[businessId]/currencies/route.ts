@@ -22,12 +22,12 @@ function responseFor(error: unknown): NextResponse {
   return NextResponse.json({ error: { code: "CURRENCY_REQUEST_FAILED", message: "The currency request could not be completed." } }, { status: 500 });
 }
 
-function identity() {
+async function identity() {
   return getCurrentIdentity();
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-  const actor = identity();
+  const actor = await identity();
   if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   try {
     const persistence = getPersistenceContext();
@@ -40,7 +40,7 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function POST(request: Request, context: RouteContext) {
-  const actor = identity();
+  const actor = await identity();
   if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: { code: "INVALID_CURRENCY_REQUEST", message: "The currency request is invalid." } }, { status: 400 }); }
@@ -57,7 +57,7 @@ export async function POST(request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const actor = identity();
+  const actor = await identity();
   if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   let body: unknown;
   try { body = await request.json(); } catch { return NextResponse.json({ error: { code: "INVALID_CURRENCY_REQUEST", message: "The currency request is invalid." } }, { status: 400 }); }

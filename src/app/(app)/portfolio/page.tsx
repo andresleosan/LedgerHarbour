@@ -6,7 +6,7 @@ import { getPersistenceContext } from "@/modules/persistence/repository-factory"
 import StatusBadge from "@/ui/StatusBadge";
 
 export default async function PortfolioPage({ searchParams }: { searchParams?: Promise<{ locale?: string }> }) {
-  const identity = getCurrentIdentity();
+  const identity = await getCurrentIdentity();
   if (!identity) return null;
   const locale = (await searchParams)?.locale === "es" ? "es" : "en";
   const localeQuery = `?locale=${locale}`;

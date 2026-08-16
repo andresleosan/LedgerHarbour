@@ -30,12 +30,12 @@ function errorResponse(error: unknown): NextResponse {
   return NextResponse.json({ error: { code: "REQUEST_FAILED", message: "The membership change could not be completed." } }, { status: 400 });
 }
 
-function identityOr401() {
+async function identityOr401() {
   return getCurrentIdentity();
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-   const actor = identityOr401();
+   const actor = await identityOr401();
    if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
    const { businessId } = await context.params;
   try {
@@ -48,7 +48,7 @@ export async function GET(_request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-   const actor = identityOr401();
+   const actor = await identityOr401();
    if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   const { businessId, membershipId } = await context.params;
   let input: z.infer<typeof actionSchema>;

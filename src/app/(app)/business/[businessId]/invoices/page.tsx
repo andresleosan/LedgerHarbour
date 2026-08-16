@@ -20,7 +20,7 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
   const copy = messages[locale].invoices;
   let invoices: InvoiceListItem[] = [];
   let listError: "business_unavailable" | null = null;
-  const identity = getCurrentIdentity();
+  const identity = await getCurrentIdentity();
   if (identity) {
     const persistence = getPersistenceContext();
     try {

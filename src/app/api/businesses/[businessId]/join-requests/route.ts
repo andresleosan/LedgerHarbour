@@ -35,13 +35,13 @@ function responseForError(error: unknown, missingBusinessStatus: 400 | 404 = 404
   );
 }
 
-function identityOr401() {
-  const identity = getCurrentIdentity();
+async function identityOr401() {
+  const identity = await getCurrentIdentity();
   return identity ? { identity } : null;
 }
 
 export async function POST(request: Request, context: RouteContext) {
-  const session = identityOr401();
+  const session = await identityOr401();
   if (!session) {
     return NextResponse.json(
       { error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } },
@@ -69,7 +69,7 @@ export async function POST(request: Request, context: RouteContext) {
 }
 
 export async function GET(request: Request, context: RouteContext) {
-  const session = identityOr401();
+  const session = await identityOr401();
   if (!session) {
     return NextResponse.json(
       { error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } },
@@ -94,7 +94,7 @@ export async function GET(request: Request, context: RouteContext) {
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
-  const session = identityOr401();
+  const session = await identityOr401();
   if (!session) {
     return NextResponse.json(
       { error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } },

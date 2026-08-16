@@ -14,7 +14,7 @@ export async function POST(_request: Request, context: RouteContext) {
     return NextResponse.json({ error: { code: "NOT_FOUND", message: "Not found." } }, { status: 404 });
   }
 
-  const identity = getCurrentIdentity();
+  const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
 
   const { jobId } = await context.params;

@@ -2,7 +2,7 @@ import { AUTH_ERROR_CODES, AuthError } from "./auth-errors";
 import type { AuthIdentity, AuthProvider, EmailSignInInput } from "./auth-provider";
 import {
   clearCurrentIdentity,
-  getCurrentIdentity,
+  getCurrentIdentitySync,
   setCurrentIdentity,
 } from "./session";
 
@@ -82,7 +82,7 @@ class InMemoryDevAuthProvider implements AuthProvider {
   }
 
   async getCurrentIdentity(): Promise<AuthIdentity | null> {
-    return getCurrentIdentity();
+    return getCurrentIdentitySync();
   }
 }
 

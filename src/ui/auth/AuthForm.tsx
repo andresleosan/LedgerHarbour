@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { AUTH_ERROR_CODES, AuthError, toAuthError } from "@/modules/auth/auth-errors";
@@ -32,6 +33,7 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
   const [feedback, setFeedback] = useState<Feedback>(null);
   const [errorKey, setErrorKey] = useState<ErrorKey | null>(null);
   const [provider] = useState<AuthProvider>(() => createAuthProviderFromActions(providerActions));
+  const router = useRouter();
   const copy = messages[locale].auth;
   const isLogin = mode === "login";
   const loginCopy = copy.login;
@@ -68,6 +70,7 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
       }
 
       setFeedback({ type: isLogin ? "signedIn" : "created", email: identity.email });
+      if (isFirebase && isLogin) router.replace("/onboarding");
     } catch (error) {
       const authError = toAuthError(error);
       setErrorKey(
@@ -93,6 +96,7 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
         return;
       }
       setFeedback({ type: "signedIn", email: identity.email });
+      if (isFirebase) router.replace("/onboarding");
     } catch (error) {
       toAuthError(error);
       setErrorKey("providerError");
