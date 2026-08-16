@@ -6,7 +6,7 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await page.goto("/login");
   await page.getByLabel("Work email").fill(email);
   await page.getByRole("button", { name: "Continue with email" }).click();
-  await expect(page.getByRole("status")).toContainText("Signed in for development");
+  await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
 async function expectVisibleFocusRing(locator: Locator) {

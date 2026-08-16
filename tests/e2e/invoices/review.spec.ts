@@ -4,7 +4,7 @@ async function signIn(page: import("@playwright/test").Page) {
   await page.goto("/login");
   await page.getByLabel("Work email").fill("invoice-review-shell@example.com");
   await page.getByRole("button", { name: "Continue with email" }).click();
-  await expect(page.getByRole("status")).toContainText("Signed in for development");
+  await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
 test.describe("invoice review workspace", () => {

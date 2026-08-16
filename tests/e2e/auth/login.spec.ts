@@ -6,12 +6,13 @@ test("renders the English login and completes the development email flow", async
 
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Bring clarity to every ledger." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Go to home" })).toHaveAttribute("href", "/");
   await expect(page.getByRole("button", { name: /Continue with Google/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with email" })).toBeVisible();
 
   await page.getByLabel("Work email").fill("admin@admin.com");
   await page.getByRole("button", { name: "Continue with email" }).click();
-  await expect(page.getByRole("status")).toContainText("Signed in for development");
+  await expect(page.getByRole("status")).toContainText("Signed in as");
   await expect.poll(async () => {
     const sessionCookie = (await context.cookies()).find(
       ({ name }) => name === "ledgerharbour_dev_session",

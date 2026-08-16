@@ -72,9 +72,10 @@
       "emailAction": "Continue with email",
       "googleAction": "Continue with Google",
       "googleSimulation": "Development simulation",
+      "homeLabel": "Go to home",
       "demoAccount": "Demo account",
       "demoEmail": "admin@admin.com",
-      "signedIn": "Signed in for development as {email}.",
+      "signedIn": "Signed in as {email}.",
       "registerPrompt": "New to LedgerHarbour?",
       "registerAction": "Create an account"
     },

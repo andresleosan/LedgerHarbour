@@ -108,9 +108,13 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
         a { color: inherit; }
         .auth-page { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: radial-gradient(circle at 15% 10%, rgba(49, 154, 145, .16), transparent 32%), #f8f4ec; }
         .auth-shell { width: min(100%, 1080px); min-height: 650px; display: grid; grid-template-columns: .9fr 1.1fr; overflow: hidden; border: 1px solid #d8ded8; border-radius: 28px; background: #fffdf8; box-shadow: 0 24px 70px rgba(16, 40, 61, .12); }
-        .auth-aside { display: flex; flex-direction: column; justify-content: space-between; padding: 42px; background: #10283d; color: #f8f4ec; }
-        .brand { display: flex; align-items: center; gap: 12px; font-size: 1.1rem; font-weight: 750; letter-spacing: .02em; }
-        .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #65c6ba; border-radius: 10px; color: #65c6ba; font-size: .82rem; font-weight: 800; }
+         .auth-aside { display: flex; flex-direction: column; justify-content: space-between; padding: 42px; background: #10283d; color: #f8f4ec; }
+         .aside-top { display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+         .brand { display: flex; align-items: center; gap: 12px; font-size: 1.1rem; font-weight: 750; letter-spacing: .02em; }
+         .brand-mark { width: 34px; height: 34px; display: grid; place-items: center; border: 1px solid #65c6ba; border-radius: 10px; color: #65c6ba; font-size: .82rem; font-weight: 800; }
+         .home-link { width: 42px; height: 42px; display: grid; place-items: center; border: 1px solid rgba(101, 198, 186, .7); border-radius: 10px; color: #65c6ba; transition: background-color .18s ease, color .18s ease; }
+         .home-link:hover { background: #65c6ba; color: #10283d; }
+         .home-link svg { width: 19px; height: 19px; }
         .aside-note { max-width: 260px; color: #c6d5d5; font-size: .95rem; line-height: 1.65; }
         .aside-rule { width: 70px; height: 4px; margin-bottom: 22px; border-radius: 99px; background: #e47d6c; }
         .auth-panel { padding: 42px clamp(26px, 6vw, 74px); }
@@ -153,8 +157,16 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
         }
       `}</style>
       <section className="auth-shell" aria-labelledby="auth-title">
-        <aside className="auth-aside">
-          <div className="brand"><span className="brand-mark" aria-hidden="true">{copy.brandMark}</span><span>{copy.brand}</span></div>
+         <aside className="auth-aside">
+           <div className="aside-top">
+             <div className="brand"><span className="brand-mark" aria-hidden="true">{copy.brandMark}</span><span>{copy.brand}</span></div>
+             <Link className="home-link" href="/" aria-label={copy.login.homeLabel}>
+               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                 <path d="m3 10 9-7 9 7" />
+                 <path d="M5 9.5V21h14V9.5M9 21v-6h6v6" />
+               </svg>
+             </Link>
+           </div>
           <div>
             <div className="aside-rule" />
             <p className="aside-note">{copy.asideNote}</p>
