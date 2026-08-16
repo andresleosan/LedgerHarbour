@@ -1,8 +1,35 @@
+import { createRequire } from "node:module";
+import path from "node:path";
+
 import { expect, test, type APIResponse } from "@playwright/test";
+
+const require = createRequire(import.meta.url);
+const sharp = require(require.resolve("sharp", { paths: [path.dirname(require.resolve("next"))] }));
 
 async function expectPng(response: APIResponse) {
   expect(response.ok()).toBe(true);
   expect(response.headers()["content-type"]).toContain("image/png");
+}
+
+async function expectTransparentCorners(response: APIResponse) {
+  const { data, info } = await sharp(await response.body()).raw().toBuffer({ resolveWithObject: true });
+  const cornerSize = 12;
+  const corners = [
+    [0, 0],
+    [info.width - cornerSize, 0],
+    [0, info.height - cornerSize],
+    [info.width - cornerSize, info.height - cornerSize],
+  ];
+
+  for (const [left, top] of corners) {
+    let maxAlpha = 0;
+    for (let y = top; y < top + cornerSize; y += 1) {
+      for (let x = left; x < left + cornerSize; x += 1) {
+        maxAlpha = Math.max(maxAlpha, data[(y * info.width + x) * info.channels + 3]);
+      }
+    }
+    expect(maxAlpha).toBe(0);
+  }
 }
 
 test("serves the approved logo and static icon assets", async ({ page, request }) => {
@@ -13,7 +40,9 @@ test("serves the approved logo and static icon assets", async ({ page, request }
 
   await expectPng(await request.get("/brand/ledgerharbour-logo.png"));
   await expectPng(await request.get("/icon.png"));
-  await expectPng(await request.get("/apple-icon.png"));
+  const appleIcon = await request.get("/apple-icon.png");
+  await expectPng(appleIcon);
+  await expectTransparentCorners(appleIcon);
 });
 
 test("uses the full logo on login and in the authenticated shell", async ({ page }) => {
