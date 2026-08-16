@@ -32,6 +32,7 @@
 - Modify: `src/modules/jobs/ocr-worker.ts` - Use the provider factory by default and terminate non-retryable errors without repeated calls.
 - Modify: `src/app/api/documents/[documentId]/process/route.ts` - Execute the queued job and return its final job state for the prototype flow.
 - Modify: `tests/integration/invoices/ocr-workflow.test.ts` - Update process route expectations and cover terminal provider failures.
+- Modify: `tests/e2e/critical-path.spec.ts` - Follow the final process contract and exercise the explicit OCR action.
 - Modify: `src/app/(app)/business/[businessId]/upload/page.tsx` - Add the explicit `Procesar con OCR` action and navigation after processing.
 - Modify: `src/i18n/messages/en.json` - Add English OCR processing labels and errors.
 - Modify: `src/i18n/messages/es.json` - Add Spanish OCR processing labels and errors.
@@ -285,6 +286,7 @@ git commit -m "feat: use configured OCR provider in worker"
 **Files:**
 - Modify: `src/app/api/documents/[documentId]/process/route.ts`
 - Modify: `tests/integration/invoices/ocr-workflow.test.ts`
+- Modify: `tests/e2e/critical-path.spec.ts`
 - Modify: `src/app/(app)/business/[businessId]/upload/page.tsx`
 - Modify: `src/i18n/messages/en.json`
 - Modify: `src/i18n/messages/es.json`
