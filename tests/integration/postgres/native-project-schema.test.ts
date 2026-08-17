@@ -57,5 +57,25 @@ describe.skipIf(!databaseUrl)("native PostgreSQL project schema", () => {
       "projects_status_activity_consistency_check",
       "projects_status_check",
     ]);
+
+    const indexes = await client.query<{ indexname: string }>(`
+      SELECT indexname
+      FROM pg_indexes
+      WHERE schemaname = 'public' AND indexname IN (
+        'projects_business_normalized_name_unique',
+        'projects_business_status_idx',
+        'projects_created_by_idx',
+        'project_memberships_project_user_unique',
+        'project_memberships_project_active_idx'
+      )
+      ORDER BY indexname
+    `);
+    expect(indexes.rows.map((row) => row.indexname)).toEqual([
+      "project_memberships_project_active_idx",
+      "project_memberships_project_user_unique",
+      "projects_business_normalized_name_unique",
+      "projects_business_status_idx",
+      "projects_created_by_idx",
+    ]);
   }, 30_000);
 });

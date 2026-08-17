@@ -7,19 +7,23 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
+async function createProjectFromTenantView(page: import("@playwright/test").Page, businessId: string, name: string) {
+  await page.goto(`/business/${businessId}/projects`);
+  await page.getByLabel("Project name").fill(name);
+  await page.getByRole("button", { name: "Submit request" }).click();
+  await expect(page.getByText("Pending approval")).toBeVisible();
+}
+
 test("creates a pending project, approves it globally, and applies parent suspension", async ({ browser }) => {
   const requester = await browser.newPage();
   await signIn(requester, "task5-requester@example.com");
-  const businessResponse = await requester.evaluate(async () => {
-    const response = await fetch("/api/businesses", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "E2E Project Harbour" }),
-    });
-    return { status: response.status, body: await response.json() };
-  });
-  expect(businessResponse.status).toBe(201);
-  const businessId = businessResponse.body.id as string;
+  await requester.goto("/onboarding/create-business");
+  await requester.getByLabel("Business name").fill("E2E Project Harbour");
+  await requester.getByRole("button", { name: "Submit request" }).click();
+  const businessCreated = await requester.getByRole("status").textContent();
+  const businessId = businessCreated?.match(/Business ID: ([^\s.]+)/)?.[1];
+  expect(businessId).toBeTruthy();
+  if (!businessId) throw new Error("Business creation did not return a business ID");
 
   const admin = await browser.newPage();
   await signIn(admin, "platform-admin@example.com");
@@ -33,26 +37,8 @@ test("creates a pending project, approves it globally, and applies parent suspen
   }, businessId);
   expect(businessApproval.status).toBe(200);
 
-  const request = await requester.evaluate(async (id) => {
-    const response = await fetch(`/api/businesses/${id}/projects`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "E2E Pending Project" }),
-    });
-    return { status: response.status, body: await response.json() };
-  }, businessId);
-  expect(request.status).toBe(201);
-  expect(request.body.status).toBe("pending");
-
-  const rejectedRequest = await requester.evaluate(async (id) => {
-    const response = await fetch(`/api/businesses/${id}/projects`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "E2E Rejected Project" }),
-    });
-    return { status: response.status, body: await response.json() };
-  }, businessId);
-  expect(rejectedRequest.status).toBe(201);
+  await createProjectFromTenantView(requester, businessId, "E2E Pending Project");
+  await createProjectFromTenantView(requester, businessId, "E2E Rejected Project");
 
   await admin.goto("/admin/projects");
   const rejectedRow = admin.locator("li").filter({ hasText: "E2E Rejected Project" });
@@ -64,15 +50,7 @@ test("creates a pending project, approves it globally, and applies parent suspen
   await pendingRow.getByRole("button", { name: "Approve E2E Pending Project" }).click();
   await expect(pendingRow).toContainText("active");
 
-  const lifecycleRequest = await requester.evaluate(async (id) => {
-    const response = await fetch(`/api/businesses/${id}/projects`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: "E2E Lifecycle Project" }),
-    });
-    return { status: response.status, body: await response.json() };
-  }, businessId);
-  expect(lifecycleRequest.status).toBe(201);
+  await createProjectFromTenantView(requester, businessId, "E2E Lifecycle Project");
 
   await admin.goto("/admin/projects");
   const lifecycleRow = admin.locator("li").filter({ hasText: "E2E Lifecycle Project" });
