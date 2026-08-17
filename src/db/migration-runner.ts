@@ -39,6 +39,28 @@ export type MigrationCheck = MigrationResult & {
   requiredTableCount: number;
 };
 
+export function assertRequiredMigrations(
+  initial: MigrationCheck,
+  platform: MigrationCheck,
+): void {
+  if (
+    initial.version !== MIGRATION_VERSION
+    || !initial.applied
+    || initial.requiredTableCount < REQUIRED_TABLES.length
+  ) {
+    throw new Error("Required PostgreSQL initial migration is not applied");
+  }
+  if (
+    platform.version !== PLATFORM_MIGRATION_VERSION
+    || !platform.applied
+  ) {
+    throw new Error("Required PostgreSQL platform control-plane migration is not applied");
+  }
+  if (platform.requiredTableCount < PLATFORM_REQUIRED_TABLES.length) {
+    throw new Error("Required PostgreSQL platform control-plane tables are missing");
+  }
+}
+
 export function resolveMigrationConfig(input: MigrationConfigInput = {}): MigrationConfig {
   const databaseUrl = (input.databaseUrl ?? process.env.DATABASE_URL ?? "").trim();
   const allowStagingMigration = input.allowStagingMigration ?? process.env.ALLOW_STAGING_MIGRATION === "true";

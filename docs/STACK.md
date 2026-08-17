@@ -48,7 +48,7 @@ El estado local verificado cubre selección de modo, fail-closed sin fallback, c
 
 El esquema relacional versionado en `src/db/schema` y `src/db/migrations` es la fuente de persistencia. `0001_initial.sql` crea el dominio existente y `0002_platform_control_plane.sql` agrega `platform_members` y `platform_audit_events`; el runner exige aplicar la inicial antes de la segunda.
 
-El bootstrap de administradores globales vive en `scripts/db/bootstrap-platform-admins.ts`. Solo acepta una lista explícita mediante `--emails` en producción; el fallback por `PLATFORM_ADMIN_EMAILS` requiere `PLATFORM_ADMIN_BOOTSTRAP=true` y no se permite en producción. Las direcciones se normalizan y se guardan sin allowlist de autorización en código; el enlace a `users` queda nullable para el primer login verificado.
+El bootstrap de administradores globales vive en `scripts/db/bootstrap-platform-admins.ts`. Solo acepta una lista explícita mediante `--emails` en producción; el fallback por `PLATFORM_ADMIN_EMAILS` requiere `PLATFORM_ADMIN_BOOTSTRAP=true` y un `NODE_ENV` controlado (`development`, `test` o `staging`), y no se permite en producción. Las direcciones se normalizan y se guardan sin allowlist de autorización en código; el enlace a `users` queda nullable para el primer login verificado.
 
 `platform_audit_events` es append-only mediante trigger y privilegios revocados. Solo conserva actor, acción, target, estados, motivo y timestamp; nunca secretos, tokens ni bytes de documentos. El rollback manual está en `src/db/migrations/rollback/0002_platform_control_plane_down.sql` y no se ejecutó contra producción.
 

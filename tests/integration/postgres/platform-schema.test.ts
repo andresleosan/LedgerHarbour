@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { Client } from "pg";
 
 import { describe, expect, it } from "vitest";
 
@@ -6,6 +7,12 @@ import {
   bootstrapPlatformAdmins,
   type PlatformBootstrapDatabase,
 } from "../../../src/db/platform-bootstrap";
+import {
+  applyInitialMigration,
+  applyPlatformControlPlaneMigration,
+  checkPlatformControlPlaneMigration,
+  type MigrationConfig,
+} from "../../../src/db/migration-runner";
 import { createTestDatabase } from "../../../src/db/test-database";
 
 async function applyPlatformMigration(
@@ -101,8 +108,49 @@ describe("PostgreSQL platform control-plane migration", () => {
       await expect(db.execute(`
         DELETE FROM platform_audit_events WHERE id = 'platform-audit-1'
       `)).rejects.toThrow();
+      await expect(db.execute("TRUNCATE platform_audit_events")).rejects.toThrow();
     } finally {
       await close();
     }
+  }, 30_000);
+});
+
+const nativeDatabaseUrl = process.env.TEST_DATABASE_URL?.trim();
+
+describe.skipIf(!nativeDatabaseUrl)("native PostgreSQL platform migration runner", () => {
+  it("rolls back the ledger and objects before reapplying platform migration", async () => {
+    if (!nativeDatabaseUrl) throw new Error("TEST_DATABASE_URL is required");
+
+    const config: MigrationConfig = {
+      databaseUrl: nativeDatabaseUrl,
+      allowStagingMigration: true,
+    };
+    await applyInitialMigration(config);
+    const applied = await applyPlatformControlPlaneMigration(config);
+    expect(applied.version).toBe("0002_platform_control_plane");
+
+    const rollbackSql = await readFile(
+      new URL("../../../src/db/migrations/rollback/0002_platform_control_plane_down.sql", import.meta.url),
+      "utf8",
+    );
+    const client = new Client({ connectionString: nativeDatabaseUrl });
+    await client.connect();
+    try {
+      await client.query(rollbackSql);
+      const rolledBack = await checkPlatformControlPlaneMigration(config);
+      expect(rolledBack).toEqual({
+        version: "0002_platform_control_plane",
+        applied: false,
+        requiredTableCount: 0,
+      });
+    } finally {
+      await client.end();
+    }
+
+    const reapplied = await applyPlatformControlPlaneMigration(config);
+    expect(reapplied).toEqual({
+      version: "0002_platform_control_plane",
+      applied: true,
+    });
   }, 30_000);
 });

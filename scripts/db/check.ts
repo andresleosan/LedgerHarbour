@@ -1,11 +1,16 @@
-import { checkInitialMigration, resolveMigrationConfig } from "../../src/db/migration-runner";
+import {
+  assertRequiredMigrations,
+  checkInitialMigration,
+  checkPlatformControlPlaneMigration,
+  resolveMigrationConfig,
+} from "../../src/db/migration-runner";
 
 try {
-  const result = await checkInitialMigration(resolveMigrationConfig());
-  if (!result.applied || result.requiredTableCount === 0) {
-    throw new Error("Required PostgreSQL migration is not applied");
-  }
-  console.log(`Verified: ${result.version} (${result.requiredTableCount} required tables)`);
+  const config = resolveMigrationConfig();
+  const initial = await checkInitialMigration(config);
+  const platform = await checkPlatformControlPlaneMigration(config);
+  assertRequiredMigrations(initial, platform);
+  console.log(`Verified: ${initial.version} + ${platform.version} (${initial.requiredTableCount + platform.requiredTableCount} required objects)`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Migration check failed");
   process.exitCode = 1;

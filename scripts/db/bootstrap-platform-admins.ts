@@ -13,10 +13,23 @@ function hasExplicitEmailArgument(args: readonly string[]): boolean {
   return args.some((argument) => argument === "--emails" || argument.startsWith("--emails="));
 }
 
-function emailsFromInput(args: readonly string[], env: NodeJS.ProcessEnv): string[] {
+const CONTROLLED_BOOTSTRAP_ENVIRONMENTS = new Set(["development", "test", "staging"]);
+type PlatformBootstrapEnvironment = {
+  NODE_ENV?: string;
+  PLATFORM_ADMIN_BOOTSTRAP?: string;
+  PLATFORM_ADMIN_EMAILS?: string;
+};
+
+export function resolvePlatformBootstrapEmails(
+  args: readonly string[],
+  env: PlatformBootstrapEnvironment,
+): string[] {
   if (hasExplicitEmailArgument(args)) return resolvePlatformAdminEmails(args);
   if (env.NODE_ENV === "production") {
     throw new Error("Production bootstrap requires the explicit --emails argument");
+  }
+  if (!CONTROLLED_BOOTSTRAP_ENVIRONMENTS.has(env.NODE_ENV ?? "")) {
+    throw new Error("Environment bootstrap requires a controlled non-production environment");
   }
   if (env.PLATFORM_ADMIN_BOOTSTRAP !== "true") {
     throw new Error("PLATFORM_ADMIN_BOOTSTRAP=true is required for environment bootstrap");
@@ -33,7 +46,7 @@ export async function main(
   const databaseUrl = env.DATABASE_URL?.trim();
   if (!databaseUrl) throw new Error("DATABASE_URL is required for platform bootstrap");
 
-  const emails = emailsFromInput(args, env);
+  const emails = resolvePlatformBootstrapEmails(args, env);
   const pool = new Pool({ connectionString: databaseUrl });
   try {
     const result = await bootstrapPlatformAdmins(createDbClient(pool), emails);

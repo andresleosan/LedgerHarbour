@@ -48,6 +48,9 @@ $$;
 CREATE TRIGGER platform_audit_events_append_only
   BEFORE UPDATE OR DELETE ON platform_audit_events
   FOR EACH ROW EXECUTE FUNCTION prevent_platform_audit_event_mutation();
+CREATE TRIGGER platform_audit_events_truncate_append_only
+  BEFORE TRUNCATE ON platform_audit_events
+  FOR EACH STATEMENT EXECUTE FUNCTION prevent_platform_audit_event_mutation();
 
 REVOKE UPDATE, DELETE, TRUNCATE ON platform_audit_events FROM PUBLIC;
 REVOKE DELETE, TRUNCATE ON platform_members FROM PUBLIC;

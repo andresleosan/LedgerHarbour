@@ -11,7 +11,12 @@ import {
   platformRoleEnum,
   schema,
 } from "../../../src/db/schema";
-import { normalizePlatformAdminEmail, resolvePlatformAdminEmails } from "../../../src/db/platform-bootstrap";
+import {
+  normalizePlatformAdminEmail,
+  resolvePlatformAdminEmails,
+} from "../../../src/db/platform-bootstrap";
+import { assertRequiredMigrations } from "../../../src/db/migration-runner";
+import { resolvePlatformBootstrapEmails } from "../../../scripts/db/bootstrap-platform-admins";
 
 const migrationSql = readFileSync(
   new URL("../../../src/db/migrations/0002_platform_control_plane.sql", import.meta.url),
@@ -62,6 +67,8 @@ describe("platform control-plane schema", () => {
       "metadata",
     ]));
     expect(migrationSql).toContain("platform_audit_events_append_only");
+    expect(migrationSql).toContain("platform_audit_events_truncate_append_only");
+    expect(migrationSql).toContain("BEFORE TRUNCATE ON platform_audit_events");
     expect(migrationSql).toContain("REVOKE UPDATE, DELETE, TRUNCATE ON platform_audit_events FROM PUBLIC;");
   });
 
@@ -73,6 +80,7 @@ describe("platform control-plane schema", () => {
     expect(rollbackSql.trimEnd().endsWith("COMMIT;")).toBe(true);
     expect(rollbackSql).toContain("DROP TABLE IF EXISTS platform_audit_events");
     expect(rollbackSql).toContain("DROP TABLE IF EXISTS platform_members");
+    expect(rollbackSql).toContain("DELETE FROM ledgerharbour_schema_migrations");
   });
 
   it("normalizes an explicit bootstrap list without an authorization allowlist", () => {
@@ -82,5 +90,41 @@ describe("platform control-plane schema", () => {
       "partner@example.com",
     ]);
     expect(() => resolvePlatformAdminEmails(["--emails", "not-an-email"])).toThrow("valid email");
+  });
+
+  it("requires explicit production bootstrap and a controlled non-production environment", () => {
+    expect(resolvePlatformBootstrapEmails(["--emails", "operator@example.com"], {
+      NODE_ENV: "production",
+    })).toEqual(["operator@example.com"]);
+    expect(() => resolvePlatformBootstrapEmails([], {
+      NODE_ENV: "production",
+      PLATFORM_ADMIN_EMAILS: "operator@example.com",
+      PLATFORM_ADMIN_BOOTSTRAP: "true",
+    })).toThrow("explicit --emails");
+    expect(() => resolvePlatformBootstrapEmails([], {
+      NODE_ENV: "qa",
+      PLATFORM_ADMIN_EMAILS: "operator@example.com",
+      PLATFORM_ADMIN_BOOTSTRAP: "true",
+    })).toThrow("controlled");
+    expect(() => resolvePlatformBootstrapEmails([], {
+      NODE_ENV: "staging",
+      PLATFORM_ADMIN_EMAILS: "operator@example.com",
+    })).toThrow("PLATFORM_ADMIN_BOOTSTRAP=true");
+    expect(resolvePlatformBootstrapEmails([], {
+      NODE_ENV: "staging",
+      PLATFORM_ADMIN_EMAILS: "operator@example.com",
+      PLATFORM_ADMIN_BOOTSTRAP: "true",
+    })).toEqual(["operator@example.com"]);
+  });
+
+  it("fails the migration check when platform migration or tables are missing", () => {
+    expect(() => assertRequiredMigrations(
+      { version: "0001_initial", applied: true, requiredTableCount: 11 },
+      { version: "0002_platform_control_plane", applied: false, requiredTableCount: 0 },
+    )).toThrow("platform control-plane migration");
+    expect(() => assertRequiredMigrations(
+      { version: "0001_initial", applied: true, requiredTableCount: 11 },
+      { version: "0002_platform_control_plane", applied: true, requiredTableCount: 1 },
+    )).toThrow("platform control-plane tables");
   });
 });
