@@ -26,6 +26,7 @@ export default defineConfig({
     env: {
       ...process.env,
       AUTH_MODE: process.env.AUTH_MODE ?? "development",
+      OCR_PROVIDER: process.env.OCR_PROVIDER ?? "fake",
       // This value is only a disposable test fixture; production must provide an environment secret.
       DEV_SESSION_SECRET: process.env.DEV_SESSION_SECRET ?? "ledgerharbour-e2e-test-only",
     },
