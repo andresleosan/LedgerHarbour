@@ -17,6 +17,7 @@ import {
 } from "../../../src/modules/tenancy/business-lifecycle-service";
 import { createMembershipService, MEMBERSHIP_ERROR_CODES } from "../../../src/modules/tenancy/membership-service";
 import type { UserId } from "../../../src/modules/tenancy/types";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 const identity = (id: string) => ({ providerUserId: id, email: `${id}@example.com`, displayName: id, emailVerified: true });
@@ -46,8 +47,7 @@ describe("membership administration routes and business lifecycle", () => {
   afterEach(async () => clearCurrentIdentity());
 
   it("covers the member route status matrix and stable public errors", async () => {
-    const onboarding = createOnboardingServices(defaultOnboardingRepository);
-    const created = await onboarding.createBusiness({ name: "Route Members" }, identity("owner"));
+    const created = await createApprovedBusiness(defaultOnboardingRepository, "Route Members", identity("owner"));
     const adminId = await defaultOnboardingRepository.upsertUser(identity("admin"));
     const adminMembership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-admin", userId: adminId, businessId: created.id, role: "administrator", isActive: true });
     const ownerId = await defaultOnboardingRepository.upsertUser(identity("owner"));
@@ -68,7 +68,7 @@ describe("membership administration routes and business lifecycle", () => {
     expect(success.status).toBe(200);
     await expect(success.json()).resolves.toEqual({ ok: true });
 
-    const crossBusiness = await onboarding.createBusiness({ name: "Other Route Members" }, identity("other-owner"));
+    const crossBusiness = await createApprovedBusiness(defaultOnboardingRepository, "Other Route Members", identity("other-owner"));
     await setCurrentIdentity(identity("other-owner"));
     await expectError(await patchMemberRoute(requestFor({ action: "remove_administrator" }), contextFor(crossBusiness.id, adminMembership.membershipId)), 404, "MEMBER_NOT_FOUND");
 
@@ -81,8 +81,7 @@ describe("membership administration routes and business lifecycle", () => {
   });
 
   it("covers ownership confirmation, transfer, and lifecycle status contracts", async () => {
-    const onboarding = createOnboardingServices(defaultOnboardingRepository);
-    const created = await onboarding.createBusiness({ name: "Route Lifecycle" }, identity("owner"));
+    const created = await createApprovedBusiness(defaultOnboardingRepository, "Route Lifecycle", identity("owner"));
     const targetId = await defaultOnboardingRepository.upsertUser(identity("target"));
     const targetMembership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-target", userId: targetId, businessId: created.id, role: "administrator", isActive: true });
 
@@ -90,34 +89,21 @@ describe("membership administration routes and business lifecycle", () => {
     await setCurrentIdentity(identity("owner"));
     await expectError(await transferOwnershipRoute(requestFor({ targetMembershipId: targetMembership.membershipId, confirmationName: "wrong", reauthenticatedAt: new Date().toISOString() }, "POST"), lifecycleContext(created.id)), 400, "CONFIRMATION_REQUIRED");
     await expectError(await lifecycleRoute(requestFor({ action: "invalid" }), lifecycleContext(created.id)), 400, "INVALID_ACTION");
-    await expectError(await lifecycleRoute(requestFor({ action: "deactivate", confirmationName: "Route Lifecycle" }), lifecycleContext("missing")), 404, "BUSINESS_NOT_FOUND");
+    await expectError(await lifecycleRoute(requestFor({ action: "deactivate", confirmationName: "Route Lifecycle" }), lifecycleContext("missing")), 403, "PLATFORM_ADMIN_REQUIRED");
 
     const transferred = await transferOwnershipRoute(requestFor({ targetMembershipId: targetMembership.membershipId, confirmationName: "Route Lifecycle", reauthenticatedAt: new Date().toISOString() }, "POST"), lifecycleContext(created.id));
     expect(transferred.status).toBe(200);
     await expect(transferred.json()).resolves.toEqual({ ok: true });
 
     await setCurrentIdentity(identity("target"));
-    const deactivated = await lifecycleRoute(requestFor({ action: "deactivate", confirmationName: "Route Lifecycle" }), lifecycleContext(created.id));
-    expect(deactivated.status).toBe(200);
-    await expect(deactivated.json()).resolves.toEqual({ ok: true });
-    await expectError(await lifecycleRoute(requestFor({ action: "deactivate", confirmationName: "Route Lifecycle" }), lifecycleContext(created.id)), 409, "INACTIVE_BUSINESS");
-    const ownerId = await defaultOnboardingRepository.upsertUser(identity("owner"));
-    const ownerMembership = (await defaultOnboardingRepository.findMembership(ownerId, created.id))!;
-    await expectError(await patchMemberRoute(requestFor({ action: "remove_administrator" }), contextFor(created.id, ownerMembership.membershipId)), 409, "INACTIVE_BUSINESS");
-
-    const reactivated = await lifecycleRoute(requestFor({ action: "reactivate", confirmationName: "Route Lifecycle" }), lifecycleContext(created.id));
-    expect(reactivated.status).toBe(200);
-    await expect(reactivated.json()).resolves.toEqual({ ok: true });
-    expect(defaultOnboardingRepository.auditEvents.map((event) => event.type)).toEqual(expect.arrayContaining([
-      "ownership_transferred",
-      "business_deactivated",
-      "business_reactivated",
-    ]));
+    await expectError(await lifecycleRoute(requestFor({ action: "deactivate", confirmationName: "Route Lifecycle" }), lifecycleContext(created.id)), 403, "PLATFORM_ADMIN_REQUIRED");
+    await expectError(await lifecycleRoute(requestFor({ action: "reactivate", confirmationName: "Route Lifecycle" }), lifecycleContext(created.id)), 403, "PLATFORM_ADMIN_REQUIRED");
+    expect(defaultOnboardingRepository.businesses.get(created.id)).toMatchObject({ status: "active", isActive: true });
+    expect(defaultOnboardingRepository.auditEvents.map((event) => event.type)).toContain("ownership_transferred");
   });
 
   it("covers ownership transfer route 403, 404, 409, invalid target, and stable bodies", async () => {
-    const onboarding = createOnboardingServices(defaultOnboardingRepository);
-    const created = await onboarding.createBusiness({ name: "Ownership Matrix" }, identity("owner"));
+    const created = await createApprovedBusiness(defaultOnboardingRepository, "Ownership Matrix", identity("owner"));
     const targetId = await defaultOnboardingRepository.upsertUser(identity("target"));
     const targetMembership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-target-2", userId: targetId, businessId: created.id, role: "administrator", isActive: true });
     const validConfirmation = {
@@ -163,8 +149,7 @@ describe("membership administration routes and business lifecycle", () => {
   });
 
   it("denies an ordinary Administrator at service and route lifecycle boundaries", async () => {
-    const onboarding = createOnboardingServices(defaultOnboardingRepository);
-    const created = await onboarding.createBusiness({ name: "Administrator Boundary" }, identity("owner"));
+    const created = await createApprovedBusiness(defaultOnboardingRepository, "Administrator Boundary", identity("owner"));
     const administratorId = await defaultOnboardingRepository.upsertUser(identity("administrator"));
     await defaultOnboardingRepository.createMembership({ membershipId: "membership-administrator", userId: administratorId, businessId: created.id, role: "administrator", isActive: true });
     const lifecycle = createBusinessLifecycleService(defaultOnboardingRepository);
@@ -173,7 +158,7 @@ describe("membership administration routes and business lifecycle", () => {
     await expect(membership.removeAdministrator({ businessId: created.id, membershipId: "owner" }, user("administrator")))
       .rejects.toMatchObject({ code: MEMBERSHIP_ERROR_CODES.INSUFFICIENT_CAPABILITY });
     await expect(lifecycle.deactivateBusiness(created.id, user("administrator"), "Administrator Boundary"))
-      .rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.INSUFFICIENT_CAPABILITY });
+      .rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.PLATFORM_ADMIN_REQUIRED });
 
     await setCurrentIdentity(identity("administrator"));
     const ownerId = await defaultOnboardingRepository.upsertUser(identity("owner"));
@@ -186,24 +171,22 @@ describe("membership administration routes and business lifecycle", () => {
     const lifecycleRouteResponse = await lifecycleRoute(requestFor({ action: "deactivate", confirmationName: "Administrator Boundary" }), lifecycleContext(created.id));
     expect(lifecycleRouteResponse.status).toBe(403);
     await expect(lifecycleRouteResponse.json()).resolves.toEqual({
-      error: { code: "INSUFFICIENT_CAPABILITY", message: "Only the Owner Admin can change business lifecycle." },
+      error: { code: "PLATFORM_ADMIN_REQUIRED", message: "Only a platform administrator can change business lifecycle." },
     });
   });
 
-  it("keeps lifecycle state soft and preserves members and audit records", async () => {
+  it("blocks legacy lifecycle writes and preserves the active business", async () => {
     const repository = createInMemoryOnboardingRepository();
-    const onboarding = createOnboardingServices(repository);
-    const created = await onboarding.createBusiness({ name: "Soft Lifecycle" }, user("owner"));
+    const created = await createApprovedBusiness(repository, "Soft Lifecycle", user("owner"));
      repository.memberships.push({ membershipId: "membership-member", userId: user("member"), businessId: created.id, role: "administrator", isActive: true });
     const lifecycle = createBusinessLifecycleService(repository);
 
-    await expect(lifecycle.deactivateBusiness(created.id, user("owner"), "Wrong Name")).rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.CONFIRMATION_REQUIRED });
-    await lifecycle.deactivateBusiness(created.id, user("owner"), "Soft Lifecycle");
-    expect(repository.businesses.get(created.id)).toMatchObject({ isActive: false, name: "Soft Lifecycle" });
+    await expect(lifecycle.deactivateBusiness(created.id, user("owner"), "Wrong Name")).rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.PLATFORM_ADMIN_REQUIRED });
+    expect(repository.businesses.get(created.id)).toMatchObject({ status: "active", isActive: true, name: "Soft Lifecycle" });
     expect(repository.memberships).toContainEqual(expect.objectContaining({ membershipId: "membership-member", userId: user("member"), businessId: created.id, role: "administrator", isActive: true }));
-    await expect(lifecycle.deactivateBusiness(created.id, user("owner"), "Soft Lifecycle")).rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.INACTIVE_BUSINESS });
-    await expect(lifecycle.reactivateBusiness(created.id, user("owner"), "Wrong Name")).rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.CONFIRMATION_REQUIRED });
-    await lifecycle.reactivateBusiness(created.id, user("owner"), "Soft Lifecycle");
+    await expect(lifecycle.deactivateBusiness(created.id, user("owner"), "Soft Lifecycle")).rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.PLATFORM_ADMIN_REQUIRED });
+    await expect(lifecycle.reactivateBusiness(created.id, user("owner"), "Wrong Name")).rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.PLATFORM_ADMIN_REQUIRED });
+    await expect(lifecycle.reactivateBusiness(created.id, user("owner"), "Soft Lifecycle")).rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.PLATFORM_ADMIN_REQUIRED });
     expect(repository.businesses.get(created.id)?.isActive).toBe(true);
     expect(repository.memberships).toContainEqual(expect.objectContaining({ membershipId: "membership-member", userId: user("member"), businessId: created.id, role: "administrator", isActive: true }));
   });
@@ -211,11 +194,11 @@ describe("membership administration routes and business lifecycle", () => {
   it("blocks inactive join requests and reviews while preserving pending state", async () => {
     const repository = createInMemoryOnboardingRepository();
     const onboarding = createOnboardingServices(repository);
-    const created = await onboarding.createBusiness({ name: "Inactive Operations" }, user("owner"));
+    const created = await createApprovedBusiness(repository, "Inactive Operations", user("owner"));
     const pending = await onboarding.requestMembership({ businessId: created.id, requestedRole: "administrator" }, user("requester"));
-    const lifecycle = createBusinessLifecycleService(repository);
-
-    await lifecycle.deactivateBusiness(created.id, user("owner"), "Inactive Operations");
+    const business = repository.businesses.get(created.id)!;
+    business.status = "suspended";
+    business.isActive = false;
     await expect(onboarding.requestMembership({ businessId: created.id, requestedRole: "administrator" }, user("requester-2")))
       .rejects.toMatchObject({ code: "INACTIVE_BUSINESS" });
     await expect(onboarding.listJoinRequests(created.id, user("owner")))
@@ -227,12 +210,11 @@ describe("membership administration routes and business lifecycle", () => {
   });
 
   it("requires an exact lifecycle confirmation at the route boundary", async () => {
-    const onboarding = createOnboardingServices(defaultOnboardingRepository);
-    const created = await onboarding.createBusiness({ name: "Confirmed Lifecycle" }, identity("owner"));
+    const created = await createApprovedBusiness(defaultOnboardingRepository, "Confirmed Lifecycle", identity("owner"));
     await setCurrentIdentity(identity("owner"));
 
     await expectError(await lifecycleRoute(requestFor({ action: "deactivate" }), lifecycleContext(created.id)), 400, "CONFIRMATION_REQUIRED");
-    await expectError(await lifecycleRoute(requestFor({ action: "deactivate", confirmationName: "Wrong" }), lifecycleContext(created.id)), 400, "CONFIRMATION_REQUIRED");
+    await expectError(await lifecycleRoute(requestFor({ action: "deactivate", confirmationName: "Wrong" }), lifecycleContext(created.id)), 403, "PLATFORM_ADMIN_REQUIRED");
     await expect(requireBusinessOperational(defaultOnboardingRepository, created.id)).resolves.toMatchObject({ isActive: true });
     expect(new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.CONFIRMATION_REQUIRED).message).toContain("exact business name");
   });

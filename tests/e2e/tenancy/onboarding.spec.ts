@@ -1,4 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
+import { withPlatformAdmin } from "../helpers/business";
 
 test.describe.configure({ mode: "serial" });
 
@@ -52,13 +53,13 @@ async function expectLightModeContrast(page: import("@playwright/test").Page) {
   for (const ratio of samples) expect(ratio).toBeGreaterThanOrEqual(4.5);
 }
 
-test("creates a business from onboarding and shows its identity", async ({ page }) => {
+test("submits a business request from onboarding and shows its identity", async ({ page }) => {
   await signIn(page, "owner-onboarding@example.com");
   await page.goto("/onboarding");
   await expect(page.getByRole("heading", { name: "Set up your business" })).toBeVisible();
   await page.getByRole("link", { name: "Create a new business" }).click();
   await page.getByLabel("Business name").fill("E2E Harbour Books");
-  await page.getByRole("button", { name: "Create business" }).click();
+  await page.getByRole("button", { name: "Submit request" }).click();
   await expect(page.getByRole("status")).toContainText("E2E Harbour Books");
   await expect(page.getByRole("status")).toContainText("Business ID");
 });
@@ -69,12 +70,20 @@ test("searches, requests access, approves, rejects, and reapplies", async ({ bro
   await signIn(owner, "owner-workflow@example.com");
   await owner.goto("/onboarding/create-business");
   await owner.getByLabel("Business name").fill("E2E Request Harbour");
-  await owner.getByRole("button", { name: "Create business" }).click();
+  await owner.getByRole("button", { name: "Submit request" }).click();
   const status = owner.getByRole("status");
   await expect(status).toBeVisible();
   const text = await status.textContent();
   const businessId = text?.match(/business-[\w-]+/)?.[0];
   expect(businessId).toBeTruthy();
+  await withPlatformAdmin(browser, async (admin) => {
+    const claim = await admin.request.post("/api/platform/claim");
+    expect(claim.status()).toBe(200);
+    const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
+      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+    });
+    expect(approval.status()).toBe(200);
+  });
 
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();
@@ -152,14 +161,22 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
    await expectLightModeContrast(page);
    await page.getByLabel("Nombre del negocio").fill("Mobile Harbour Books");
    await page.keyboard.press("Tab");
-   await expectVisibleFocusRing(page.getByRole("button", { name: "Crear negocio" }));
+    await expectVisibleFocusRing(page.getByRole("button", { name: "Enviar solicitud" }));
    await page.keyboard.press("Enter");
-  const createdStatus = page.getByRole("status");
-  await expect(createdStatus).toContainText("Mobile Harbour Books");
-  const businessId = (await createdStatus.textContent())?.match(/business-[\w-]+/)?.[0];
-  expect(businessId).toBeTruthy();
+   const createdStatus = page.getByRole("status");
+   await expect(createdStatus).toContainText("Mobile Harbour Books");
+   const businessId = (await createdStatus.textContent())?.match(/business-[\w-]+/)?.[0];
+   expect(businessId).toBeTruthy();
+   await withPlatformAdmin(browser, async (admin) => {
+     const claim = await admin.request.post("/api/platform/claim");
+     expect(claim.status()).toBe(200);
+     const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
+       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+     });
+     expect(approval.status()).toBe(200);
+   });
 
-  await page.goto("/onboarding/join-business");
+   await page.goto("/onboarding/join-business");
    await page.getByRole("button", { name: "Espanol" }).click();
   const abortHistory = (url: URL) => url.pathname.endsWith("/join-requests") && url.searchParams.get("mine") === "true";
   await page.route(abortHistory, (route) => route.abort());

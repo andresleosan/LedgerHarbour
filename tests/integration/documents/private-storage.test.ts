@@ -15,11 +15,11 @@ import { LocalPrivateStorage } from "../../../src/modules/documents/local-privat
 import { MAX_UPLOAD_REQUEST_BODY_BYTES, validateUpload } from "../../../src/modules/documents/file-validation";
 import { resetRateLimitersForTests } from "../../../src/modules/security/rate-limit";
 import {
-  createOnboardingServices,
   createInMemoryOnboardingRepository,
   defaultOnboardingRepository,
 } from "../../../src/modules/tenancy/business-service";
 import type { UserId } from "../../../src/modules/tenancy/types";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 const pdfBytes = new Uint8Array(Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\nstartxref\n0\n%%EOF\n"));
@@ -51,10 +51,9 @@ describe("private document storage and service boundaries", () => {
 
   async function setup() {
     const tenancy = createInMemoryOnboardingRepository();
-    const onboarding = createOnboardingServices(tenancy);
-    const created = await onboarding.createBusiness({ name: "Private Books" }, user("owner"));
+    const created = await createApprovedBusiness(tenancy, "Private Books", user("owner"));
     await tenancy.createMembership({ membershipId: "membership-member", userId: user("member"), businessId: created.id, role: "administrator", isActive: true });
-    const other = await onboarding.createBusiness({ name: "Other Books" }, user("other-owner"));
+    const other = await createApprovedBusiness(tenancy, "Other Books", user("other-owner"));
     return { tenancy, created, other };
   }
 
@@ -222,9 +221,8 @@ describe("private document storage and service boundaries", () => {
     expect(unauthenticatedUpload.status).toBe(401);
     await expect(unauthenticatedUpload.json()).resolves.toEqual({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } });
 
-    const onboarding = createOnboardingServices(defaultOnboardingRepository);
     const routeOwner = identity("route-owner");
-    const created = await onboarding.createBusiness({ name: "Route Documents" }, routeOwner);
+    const created = await createApprovedBusiness(defaultOnboardingRepository, "Route Documents", routeOwner);
     await setCurrentIdentity(routeOwner);
 
     const invalidMultipart = await uploadRoute(new Request("http://localhost", { method: "POST", body: "not multipart", headers: { "content-length": "15" } }), contextFor(created.id));

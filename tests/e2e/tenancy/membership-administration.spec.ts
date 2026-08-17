@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { withPlatformAdmin } from "../helpers/business";
 
 test.describe.configure({ mode: "serial" });
 
@@ -23,9 +24,17 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   await signIn(owner, "task6-owner@example.com");
   await owner.goto("/onboarding/create-business");
   await owner.getByLabel("Business name").fill("Task Six Harbour");
-  await owner.getByRole("button", { name: "Create business" }).click();
+  await owner.getByRole("button", { name: "Submit request" }).click();
   const businessId = (await owner.getByRole("status").textContent())?.match(/business-[\w-]+/)?.[0];
   if (!businessId) throw new Error("Business creation did not return an id");
+  await withPlatformAdmin(browser, async (admin) => {
+    const claim = await admin.request.post("/api/platform/claim");
+    expect(claim.status()).toBe(200);
+    const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
+      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+    });
+    expect(approval.status()).toBe(200);
+  });
 
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();
@@ -157,9 +166,17 @@ test("inactive business blocks join and review operations and preserves member s
   await signIn(page, "task6-lifecycle@example.com");
   await page.goto("/onboarding/create-business");
   await page.getByLabel("Business name").fill("Task Six Lifecycle");
-  await page.getByRole("button", { name: "Create business" }).click();
+  await page.getByRole("button", { name: "Submit request" }).click();
   const businessId = (await page.getByRole("status").textContent())?.match(/business-[\w-]+/)?.[0];
   if (!businessId) throw new Error("Business creation did not return an id");
+  await withPlatformAdmin(browser, async (admin) => {
+    const claim = await admin.request.post("/api/platform/claim");
+    expect(claim.status()).toBe(200);
+    const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
+      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+    });
+    expect(approval.status()).toBe(200);
+  });
 
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();
@@ -182,26 +199,10 @@ test("inactive business blocks join and review operations and preserves member s
   expect(pendingResponse.status()).toBe(201);
   const pending = await pendingResponse.json() as { id: string };
 
-  await page.setViewportSize({ width: 375, height: 812 });
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto(`/business/${businessId}/settings/danger-zone`);
-  await expect(page.getByRole("heading", { name: "Danger zone" })).toBeVisible();
-  expect(await page.evaluate(() => window.matchMedia("(prefers-reduced-motion: reduce)").matches)).toBe(true);
-  await page.getByRole("link", { name: "English" }).focus();
-  await page.keyboard.press("Tab");
-  expect(await page.evaluate(() => {
-    const element = document.activeElement;
-    return element ? getComputedStyle(element).outlineStyle : "none";
-  })).toBe("solid");
-  await page.getByLabel("Business name confirmation").fill("wrong");
-  await page.getByRole("button", { name: "Deactivate business" }).click();
-  await expect(page.getByText(/exact current business name/)).toBeVisible();
-  await page.getByRole("link", { name: "Español" }).click();
-  await expect(page.getByRole("heading", { name: "Zona de peligro" })).toBeVisible();
-  expect(await page.evaluate(() => Array.from(document.querySelectorAll("style")).some((style) => style.textContent?.includes("prefers-reduced-motion")))).toBe(true);
-  await page.getByLabel("Confirmación del nombre del negocio").fill("Task Six Lifecycle");
-  await page.getByRole("button", { name: "Desactivar negocio" }).click();
-  await expect(page.getByRole("status")).toContainText("Negocio desactivado.");
+  const suspended = await withPlatformAdmin(browser, (admin) => admin.request.post(`/api/platform/businesses/${businessId}/suspend`, {
+    data: { reason: "E2E inactive business coverage" },
+  }));
+  expect(suspended.status()).toBe(200);
 
   const blockedContext = await browser.newContext();
   const blockedPage = await blockedContext.newPage();
@@ -220,9 +221,10 @@ test("inactive business blocks join and review operations and preserves member s
   });
   expect(blockedReviewMutation.status()).toBe(403);
 
-  await page.getByLabel("Confirmación del nombre del negocio").fill("Task Six Lifecycle");
-  await page.getByRole("button", { name: "Reactivar negocio" }).click();
-  await expect(page.getByRole("status")).toContainText("Negocio reactivado.");
+  const reactivated = await withPlatformAdmin(browser, (admin) => admin.request.post(`/api/platform/businesses/${businessId}/reactivate`, {
+    data: { reason: "E2E lifecycle restoration" },
+  }));
+  expect(reactivated.status()).toBe(200);
   const preservedMembers = await readMembers(page, businessId);
   expect(preservedMembers).toEqual(expect.arrayContaining([
     expect.objectContaining({ role: "owner_admin" }),

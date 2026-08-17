@@ -13,10 +13,11 @@ vi.mock(import("../../src/modules/security/authenticated-rate-limit"), async (im
 import { createDocument, createDocumentRepository, getDocumentForDownload } from "../../src/modules/documents/document-service";
 import { MAX_UPLOAD_REQUEST_BODY_BYTES, MAX_UPLOAD_SIZE_BYTES, UPLOAD_ERROR_CODES, validateUpload } from "../../src/modules/documents/file-validation";
 import { AuthenticatedRateLimitError, AuthenticatedRateLimitUnavailableError } from "../../src/modules/security/rate-limit-errors";
-import { createInMemoryOnboardingRepository, createOnboardingServices, defaultOnboardingRepository, type OnboardingRepository } from "../../src/modules/tenancy/business-service";
+import { createInMemoryOnboardingRepository, defaultOnboardingRepository, type OnboardingRepository } from "../../src/modules/tenancy/business-service";
 import { POST } from "../../src/app/api/businesses/[businessId]/documents/route";
 import type { StorageAdapter } from "../../src/modules/documents/storage-adapter";
 import type { BusinessId, UserId } from "../../src/modules/tenancy/types";
+import { createApprovedBusiness } from "../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 const pdfBytes = new Uint8Array(Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\nstartxref\n0\n%%EOF\n"));
@@ -50,7 +51,7 @@ describe("Task 11 upload security matrix", () => {
     enforceAuthenticatedRateLimit.mockReset().mockResolvedValue(undefined);
     tenancy = createInMemoryOnboardingRepository();
     storage = new MemoryStorage();
-    const business = await createOnboardingServices(tenancy).createBusiness({ name: "Upload Harbour" }, user("owner"));
+    const business = await createApprovedBusiness(tenancy, "Upload Harbour", user("owner"));
     businessId = business.id;
   });
 
@@ -127,7 +128,7 @@ describe("Task 11 upload security matrix", () => {
   it("accepts an authenticated FormData File and returns only the safe document DTO", async () => {
     const identity = { providerUserId: user("route-owner"), email: "route-owner@example.com", displayName: "Route Owner", emailVerified: true };
     getCurrentIdentity.mockReturnValue(identity);
-    const business = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: `HTTP Upload Harbour ${Date.now()}` }, identity);
+    const business = await createApprovedBusiness(defaultOnboardingRepository, `HTTP Upload Harbour ${Date.now()}`, identity);
     const form = new FormData();
     form.set("file", new File([pdfBytes], "route-invoice.pdf", { type: "application/pdf" }));
 
@@ -167,7 +168,7 @@ describe("Task 11 upload security matrix", () => {
   it("denies unauthorized download and keeps the public error generic", async () => {
     const repository = createDocumentRepository();
     const document = await createDocument({ businessId, upload: validateUpload(upload("invoice.pdf", "application/pdf")) }, user("owner"), { tenancyRepository: tenancy, documentRepository: repository, storage });
-    const other = await createOnboardingServices(tenancy).createBusiness({ name: "Other Upload Harbour" }, user("other-owner"));
+    const other = await createApprovedBusiness(tenancy, "Other Upload Harbour", user("other-owner"));
 
     await expect(getDocumentForDownload(document.id, user("other-owner"), { tenancyRepository: tenancy, documentRepository: repository, storage }))
       .rejects.toMatchObject({ code: "BUSINESS_ACCESS_DENIED", message: "Business access denied." });

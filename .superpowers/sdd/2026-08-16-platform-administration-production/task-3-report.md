@@ -2,7 +2,7 @@
 
 ## Estado
 
-`revisión`
+`aprobada`
 
 Task 3 implementada directamente sobre `main`, sin worktree, rama ni delegación.
 
@@ -22,15 +22,24 @@ Task 3 implementada directamente sobre `main`, sin worktree, rama ni delegación
 - Onboarding actualizado para informar solicitud pendiente.
 - DTOs de API sin `createdBy`, claves privadas ni payloads internos.
 
+## Fix Round 1
+
+- `createBusiness` mantiene el contrato público pero solo crea solicitudes `pending`; los fixtures operativos usan aprobación explícita.
+- La autorización platform normaliza `user_id`; el email solo participa en el claim explícito one-time y requiere email verificado.
+- Lifecycle legacy de tenancy bloqueado con `PLATFORM_ADMIN_REQUIRED`; los cambios globales pasan por platform.
+- `serviceExpiresAt` obligatorio y futuro en aprobación; transiciones y razón de suspensión validadas en memoria/Postgres.
+- Rollback de `0003_business_lifecycle` elimina primero su registro del ledger; el test database aplica migraciones en orden.
+- El repositorio platform en memoria comparte singleton entre bundles de Next durante test/dev, preservando el claim entre rutas.
+- Helpers unitarios, integración, Postgres y E2E fueron migrados a solicitud + aprobación real.
+
 ## Pruebas
 
-- `corepack pnpm exec vitest run tests/unit/platform/business-approval.test.ts tests/security/platform-authorization.test.ts tests/integration/tenancy/business-approval.test.ts`: **11 passed**.
-- `corepack pnpm test`: **45 files passed, 1 skipped; 393 passed, 2 skipped**.
-- `corepack pnpm exec playwright test tests/e2e/platform/business-approval.spec.ts`: **1 passed**.
+- `corepack pnpm exec vitest run`: **47 files passed, 1 skipped; 397 passed, 2 skipped**.
+- `corepack pnpm exec playwright test --workers=1`: **25 passed**.
 - `corepack pnpm lint`: **passed**.
 - `corepack pnpm exec tsc --noEmit`: **passed**.
 - `corepack pnpm build`: **passed**.
-- `corepack pnpm audit --json`: **0 vulnerabilities**.
+- `corepack pnpm audit --prod`: **no known vulnerabilities**.
 - `git diff --check`: **passed**.
 
 ## Concerns

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  createBusiness,
   createBusinessRequest,
   createInMemoryOnboardingRepository,
 } from "../../../src/modules/tenancy/business-service";
@@ -19,7 +20,7 @@ describe("business approval lifecycle", () => {
   it("creates a pending business without operational membership", async () => {
     const tenancy = createInMemoryOnboardingRepository();
 
-    const created = await createBusinessRequest({ name: "Pending Harbour" }, user("requester"), tenancy);
+    const created = await createBusiness({ name: "Pending Harbour" }, user("requester"), tenancy);
 
     expect(created).toMatchObject({ status: "pending", isActive: false });
     await expect(tenancy.listMemberships(created.id)).resolves.toEqual([]);
@@ -68,13 +69,13 @@ describe("business approval lifecycle", () => {
     const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
     const created = await createBusinessRequest({ name: "Protected Harbour" }, user("requester"), tenancy);
 
-    await expect(service.approveBusiness(created.id, user("requester"), {})).rejects.toMatchObject({
+    await expect(service.approveBusiness(created.id, user("requester"), { serviceExpiresAt: "2026-09-16T00:00:00.000Z" })).rejects.toMatchObject({
       code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED,
     });
 
     platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
     await service.rejectBusiness(created.id, user("platform-admin"), { reason: "Incomplete request" });
-    await expect(service.approveBusiness(created.id, user("platform-admin"), {})).rejects.toMatchObject({
+    await expect(service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: "2026-09-16T00:00:00.000Z" })).rejects.toMatchObject({
       code: PLATFORM_ERROR_CODES.INVALID_TRANSITION,
     });
   });
@@ -85,7 +86,7 @@ describe("business approval lifecycle", () => {
     const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
     const created = await createBusinessRequest({ name: "Service Harbour" }, user("requester"), tenancy);
     platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
-    await service.approveBusiness(created.id, user("platform-admin"), {});
+    await service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: "2026-09-16T00:00:00.000Z" });
 
     await service.suspendBusiness(created.id, user("platform-admin"), { reason: "Subscription unpaid" });
     await expect(tenancy.findBusinessStatus(created.id)).resolves.toBe("suspended");
@@ -96,10 +97,54 @@ describe("business approval lifecycle", () => {
     await expect(tenancy.findBusiness(business(created.id))).resolves.toMatchObject({ status: "active" });
   });
 
+  it("rejects an unlinked identity even when its email matches a platform member", async () => {
+    const tenancy = createInMemoryOnboardingRepository();
+    const platform = createInMemoryPlatformRepository();
+    const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+    platform.addMember({ id: "platform-1", userId: null, normalizedEmail: "admin@example.com" });
+
+    await expect(service.listBusinesses({
+      providerUserId: "different-provider",
+      email: "admin@example.com",
+      displayName: "Impostor",
+      emailVerified: true,
+    })).rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED });
+
+    await expect(service.claimPlatformMember({
+      providerUserId: "different-provider",
+      email: "admin@example.com",
+      displayName: "Verified Admin",
+      emailVerified: true,
+    })).resolves.toMatchObject({ id: "platform-1", userId: expect.stringMatching(/^user-/) });
+    await expect(service.listBusinesses({
+      providerUserId: "different-provider",
+      email: "admin@example.com",
+      displayName: "Verified Admin",
+      emailVerified: true,
+    })).resolves.toEqual([]);
+  });
+
+  it("requires a future service expiration date to approve", async () => {
+    const tenancy = createInMemoryOnboardingRepository();
+    const platform = createInMemoryPlatformRepository();
+    const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+    const created = await createBusiness({ name: "Expiring Harbour" }, user("requester"), tenancy);
+    platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
+
+    await expect(service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: "2020-01-01T00:00:00.000Z" }))
+      .rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.INVALID_DATE });
+    await expect(service.approveBusiness(created.id, user("platform-admin"), {} as never))
+      .rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.INVALID_DATE });
+  });
+
   it.each(["pending", "suspended", "rejected"] as const)("denies the shared operational boundary for %s businesses", async (status) => {
     const tenancy = createInMemoryOnboardingRepository();
     const created = await createBusinessRequest({ name: `${status} Harbour` }, user("requester"), tenancy);
-    if (status !== "pending") await tenancy.updateBusinessLifecycle(created.id, { status });
+    if (status !== "pending") {
+      const stored = tenancy.businesses.get(created.id)!;
+      stored.status = status;
+      stored.isActive = false;
+    }
 
     await expect(requireBusinessOperational(tenancy, created.id)).rejects.toMatchObject({
       code: "INACTIVE_BUSINESS",

@@ -14,6 +14,7 @@ import { getInvoiceReview, listInvoices, updateInvoiceDraft } from "../../../src
 import { MAX_REVIEW_PATCH_BYTES } from "../../../src/modules/invoices/review-validation";
 import type { DocumentId, InvoiceId } from "../../../src/modules/invoices/ocr-provider";
 import type { BusinessId, UserId } from "../../../src/modules/tenancy/types";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 const businessId = (value: string) => value as BusinessId;
@@ -30,7 +31,7 @@ describe("invoice review boundaries", () => {
     tenancy = createInMemoryOnboardingRepository();
     documents = createDocumentRepository();
     invoices = createInvoiceRepository();
-    business = await createOnboardingServices(tenancy).createBusiness({ name: "Review Books" }, user("owner"));
+    business = await createApprovedBusiness(tenancy, "Review Books", user("owner"));
     await tenancy.createMembership({ membershipId: "membership-reviewer", userId: user("reviewer"), businessId: business.id, role: "administrator", isActive: true });
     const document: Document = {
       id: "review-document",
@@ -99,7 +100,7 @@ describe("invoice review boundaries", () => {
       displayName: "Invoice User",
       emailVerified: true,
     };
-    const identityBusiness = await createOnboardingServices(repository).createBusiness({ name: "Identity Invoices" }, identity);
+    const identityBusiness = await createApprovedBusiness(repository, "Identity Invoices", identity);
     const identityDocuments = createDocumentRepository();
     const identityInvoices = createInvoiceRepository();
     const identityDocument: Document = {
@@ -218,7 +219,7 @@ describe("invoice review boundaries", () => {
   });
 
   it("uses the shared Task 8 document repository for the default review route", async () => {
-    const defaultBusiness = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: `Default Review ${Date.now()}` }, user("default-owner"));
+    const defaultBusiness = await createApprovedBusiness(defaultOnboardingRepository, `Default Review ${Date.now()}`, user("default-owner"));
     await defaultOnboardingRepository.createMembership({ membershipId: "membership-default-reviewer", userId: user("default-reviewer"), businessId: defaultBusiness.id, role: "administrator", isActive: true });
     const document = { ...((await documents.findById(invoice.documentId)) as Document), id: "default-review-document", businessId: defaultBusiness.id, uploaderId: user("default-reviewer") };
     await resolveDefaultDocumentRepository().create(document);
@@ -246,7 +247,7 @@ describe("invoice review boundaries", () => {
 
   it("returns a stable 409 contract for category repository conflicts", async () => {
     const categoryOwner = { providerUserId: "route-category-owner", email: "route-category-owner@example.com", displayName: "Owner", emailVerified: true };
-    const defaultBusiness = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: `Category Conflict ${Date.now()}` }, categoryOwner);
+    const defaultBusiness = await createApprovedBusiness(defaultOnboardingRepository, `Category Conflict ${Date.now()}`, categoryOwner);
     await setCurrentIdentity(categoryOwner);
     const originalAppendAuditEvent = defaultOnboardingRepository.appendAuditEvent;
     defaultOnboardingRepository.appendAuditEvent = async () => { throw new Error("category write failed"); };
@@ -261,7 +262,7 @@ describe("invoice review boundaries", () => {
 
   it("returns a stable 409 contract for category update repository conflicts", async () => {
     const categoryOwner = { providerUserId: "route-category-update-owner", email: "route-category-update-owner@example.com", displayName: "Owner", emailVerified: true };
-    const defaultBusiness = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: `Category Update Conflict ${Date.now()}` }, categoryOwner);
+    const defaultBusiness = await createApprovedBusiness(defaultOnboardingRepository, `Category Update Conflict ${Date.now()}`, categoryOwner);
     await setCurrentIdentity(categoryOwner);
     const category = await createCategory({ businessId: defaultBusiness.id, name: "Update Category" }, categoryOwner);
     const originalAppendAuditEvent = defaultOnboardingRepository.appendAuditEvent;
@@ -277,7 +278,7 @@ describe("invoice review boundaries", () => {
 
   it("returns a stable 409 contract for currency repository conflicts", async () => {
     const currencyOwner = { providerUserId: "route-currency-owner", email: "route-currency-owner@example.com", displayName: "Owner", emailVerified: true };
-    const defaultBusiness = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: `Currency Conflict ${Date.now()}` }, currencyOwner);
+    const defaultBusiness = await createApprovedBusiness(defaultOnboardingRepository, `Currency Conflict ${Date.now()}`, currencyOwner);
     await setCurrentIdentity(currencyOwner);
     const first = await currenciesPost(new Request("http://localhost", { method: "POST", body: JSON.stringify({ name: "Route Currency", symbol: "RC", decimalCount: 2, isoCode: "RTC" }) }), { params: Promise.resolve({ businessId: defaultBusiness.id }) });
     expect(first.status).toBe(201);
@@ -296,7 +297,7 @@ describe("invoice review boundaries", () => {
 
   it("returns a stable 409 contract for currency deactivation repository conflicts", async () => {
     const currencyOwner = { providerUserId: "route-currency-update-owner", email: "route-currency-update-owner@example.com", displayName: "Owner", emailVerified: true };
-    const defaultBusiness = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: `Currency Update Conflict ${Date.now()}` }, currencyOwner);
+    const defaultBusiness = await createApprovedBusiness(defaultOnboardingRepository, `Currency Update Conflict ${Date.now()}`, currencyOwner);
     await setCurrentIdentity(currencyOwner);
     const created = await currenciesPost(new Request("http://localhost", { method: "POST", body: JSON.stringify({ name: "Update Currency", symbol: "UC", decimalCount: 2, isoCode: "UCU" }) }), { params: Promise.resolve({ businessId: defaultBusiness.id }) });
     const currency = await created.json() as { id: string };

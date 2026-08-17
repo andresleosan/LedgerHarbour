@@ -19,11 +19,11 @@ import {
 } from "../../../src/modules/jobs/postgres-job-repository";
 import type { Job } from "../../../src/modules/jobs/job-service";
 import { createPostgresOnboardingRepository } from "../../../src/modules/tenancy/postgres-tenancy-repository";
-import { createOnboardingServices } from "../../../src/modules/tenancy/business-service";
 import { approveInvoice } from "../../../src/modules/invoices/invoice-service";
 import { createPersistenceContext } from "../../../src/modules/persistence/repository-factory";
 import type { BusinessId, UserId } from "../../../src/modules/tenancy/types";
 import type { DocumentId, InvoiceId } from "../../../src/modules/invoices/ocr-provider";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 const business = (value: string) => value as BusinessId;
@@ -103,8 +103,7 @@ function makeJob(input: Partial<Job> = {}): Job {
 async function fixture() {
   const state = await createTestDatabase();
   const tenancy = createPostgresOnboardingRepository(state.db);
-  const onboarding = createOnboardingServices(tenancy);
-  const createdBusiness = await onboarding.createBusiness({ name: "Postgres Finance" }, identity("owner-1"));
+  const createdBusiness = await createApprovedBusiness(tenancy, "Postgres Finance", identity("owner-1"));
   const memberId = await tenancy.upsertUser(identity("member-1"));
   await tenancy.createMembership({
     membershipId: "membership-member-1",
@@ -348,7 +347,7 @@ describe("PostgreSQL finance repositories", () => {
     const state = await fixture();
     try {
       await state.documentRepository.create(makeDocument({ businessId: state.businessId, uploaderId: state.ownerId }));
-      const other = await createOnboardingServices(createPostgresOnboardingRepository(state.db)).createBusiness({ name: "Other Finance" }, identity("other-owner"));
+      const other = await createApprovedBusiness(createPostgresOnboardingRepository(state.db), "Other Finance", identity("other-owner"));
       await expect(state.jobRepository.create(makeJob({ businessId: state.businessId, requestedBy: other.createdBy }))).rejects.toMatchObject({ code: "OCR_JOB_CONFLICT" });
       const job = makeJob({ businessId: state.businessId, requestedBy: state.ownerId });
       await expect(state.jobRepository.transaction(async () => {

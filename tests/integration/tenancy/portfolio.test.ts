@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   createInMemoryOnboardingRepository,
-  createOnboardingServices,
   type Business,
 } from "../../../src/modules/tenancy/business-service";
 import {
@@ -18,6 +17,7 @@ import {
   listUserBusinesses,
 } from "../../../src/modules/tenancy/portfolio-service";
 import type { BusinessId, UserId } from "../../../src/modules/tenancy/types";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 const business = (value: string) => value as BusinessId;
@@ -84,7 +84,7 @@ async function createBusiness(
   actorId: UserId,
 ): Promise<{ business: Business; repository: ReturnType<typeof createInMemoryOnboardingRepository> }> {
   const repository = createInMemoryOnboardingRepository();
-  const business = await createOnboardingServices(repository).createBusiness({ name }, actorId);
+  const business = await createApprovedBusiness(repository, name, actorId);
   return { business, repository };
 }
 
@@ -92,9 +92,8 @@ describe("portfolio tenant boundary", () => {
   it("lists only active memberships and preserves the real role, including inactive businesses", async () => {
     const repository = createInMemoryOnboardingRepository();
     const actorId = user("portfolio-user");
-    const onboarding = createOnboardingServices(repository);
-    const active = await onboarding.createBusiness({ name: "Active Books" }, actorId);
-    const inactive = await onboarding.createBusiness({ name: "Closed Books" }, actorId);
+    const active = await createApprovedBusiness(repository, "Active Books", actorId);
+    const inactive = await createApprovedBusiness(repository, "Closed Books", actorId);
     inactive.isActive = false;
     repository.businesses.get(inactive.id)!.isActive = false;
     repository.memberships.push({
@@ -126,8 +125,7 @@ describe("portfolio tenant boundary", () => {
       displayName: "Portfolio User",
       emailVerified: true,
     };
-    const onboarding = createOnboardingServices(repository);
-    const created = await onboarding.createBusiness({ name: "Identity Books" }, identity);
+    const created = await createApprovedBusiness(repository, "Identity Books", identity);
 
     await expect(listUserBusinesses(identity, { tenancyRepository: repository })).resolves.toEqual([
       { id: created.id, name: "Identity Books", isActive: true, role: "owner_admin" },
@@ -138,9 +136,8 @@ describe("portfolio tenant boundary", () => {
     const repository = createInMemoryOnboardingRepository();
     const actorId = user("portfolio-user");
     const otherUser = user("other-user");
-    const onboarding = createOnboardingServices(repository);
-    const owned = await onboarding.createBusiness({ name: "Owned Books" }, actorId);
-    const other = await onboarding.createBusiness({ name: "Other Books" }, otherUser);
+    const owned = await createApprovedBusiness(repository, "Owned Books", actorId);
+    const other = await createApprovedBusiness(repository, "Other Books", otherUser);
     const documents = createDocumentRepository();
     const invoices = createInvoiceRepository();
 
@@ -170,7 +167,7 @@ describe("portfolio tenant boundary", () => {
       displayName: "Dashboard User",
       emailVerified: true,
     };
-    const business = await createOnboardingServices(repository).createBusiness({ name: "Identity Dashboard" }, identity);
+    const business = await createApprovedBusiness(repository, "Identity Dashboard", identity);
 
     await expect(getBusinessDashboard(business.id, identity, {
       tenancyRepository: repository,
@@ -183,7 +180,7 @@ describe("portfolio tenant boundary", () => {
     const actorId = user("portfolio-user");
     const otherUser = user("other-user");
     const { business: owned, repository } = await createBusiness("Owned Books", actorId);
-    const other = await createOnboardingServices(repository).createBusiness({ name: "Other Books" }, otherUser);
+    const other = await createApprovedBusiness(repository, "Other Books", otherUser);
     const documents = createDocumentRepository();
     const invoices = createInvoiceRepository();
 

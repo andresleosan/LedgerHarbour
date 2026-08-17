@@ -19,6 +19,7 @@ import {
   OnboardingError,
   type Business,
   type BusinessLifecycleUpdate,
+  validateBusinessStatusTransition,
   type BusinessSearchResult,
   type JoinRequest,
   type OnboardingRepository,
@@ -358,6 +359,17 @@ function createRepository(db: Database, transactionCount: { value: number }): On
 
     async updateBusinessLifecycle(businessId, input: BusinessLifecycleUpdate) {
       try {
+        const current = await repository.findBusiness(businessId);
+        if (!current) throw new OnboardingError(ONBOARDING_ERROR_CODES.MISSING_BUSINESS);
+        validateBusinessStatusTransition(current.status, input.status);
+        if (input.status === "active") {
+          const [owner] = await db.select({ id: memberships.id }).from(memberships).where(and(
+            eq(memberships.businessId, businessId),
+            eq(memberships.role, "owner_admin"),
+            eq(memberships.isActive, true),
+          )).limit(1);
+          if (!owner) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+        }
         const [row] = await db.update(businesses).set({
           status: input.status,
           isActive: input.status === "active",

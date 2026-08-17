@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createInMemoryOnboardingRepository,
-  createOnboardingServices,
 } from "../../../src/modules/tenancy/business-service";
 import {
   createMembershipService,
@@ -13,13 +12,13 @@ import {
 } from "../../../src/modules/tenancy/membership-service";
 import { requireBusinessOperational } from "../../../src/modules/tenancy/business-lifecycle-service";
 import type { UserId } from "../../../src/modules/tenancy/types";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 
 async function fixture() {
   const repository = createInMemoryOnboardingRepository();
-  const onboarding = createOnboardingServices(repository);
-  const created = await onboarding.createBusiness({ name: "Harbour Books Ltd" }, user("owner"));
+  const created = await createApprovedBusiness(repository, "Harbour Books Ltd", user("owner"));
   const general = await repository.createMembership({ membershipId: "membership-general", userId: user("general"), businessId: created.id, role: "general_admin", isActive: true });
   const administrator = await repository.createMembership({ membershipId: "membership-administrator", userId: user("administrator"), businessId: created.id, role: "administrator", isActive: true });
   return { repository, service: createMembershipService(repository), created, general, administrator };
@@ -51,8 +50,7 @@ describe("membership administration", () => {
 
   it("targets the internal membership id rather than the user id and audits that id", async () => {
     const repository = createInMemoryOnboardingRepository();
-    const onboarding = createOnboardingServices(repository);
-    const created = await onboarding.createBusiness({ name: "Internal Membership IDs" }, user("owner"));
+    const created = await createApprovedBusiness(repository, "Internal Membership IDs", user("owner"));
     const target = await repository.createMembership({
       membershipId: "membership-target",
       userId: user("provider-user-is-not-membership-id"),
@@ -151,7 +149,7 @@ describe("membership administration", () => {
 
   it("hides cross-business targets and protects the owner invariant", async () => {
     const { repository, service, created, administrator } = await fixture();
-    const second = await createOnboardingServices(repository).createBusiness({ name: "Second Books" }, user("owner-2"));
+    const second = await createApprovedBusiness(repository, "Second Books", user("owner-2"));
 
     await expect(service.setGeneralAdmin({ businessId: created.id, membershipId: "owner-2" }, user("owner")))
       .rejects.toMatchObject({ code: MEMBERSHIP_ERROR_CODES.MEMBER_NOT_FOUND });

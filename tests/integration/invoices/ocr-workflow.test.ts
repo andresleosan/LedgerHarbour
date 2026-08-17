@@ -33,6 +33,7 @@ import {
 } from "../../../src/modules/tenancy/business-service";
 import type { DocumentId, InvoiceId } from "../../../src/modules/invoices/ocr-provider";
 import type { UserId } from "../../../src/modules/tenancy/types";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 class MemoryStorage implements StorageAdapter {
@@ -81,8 +82,7 @@ describe("OCR workflow boundaries", () => {
     jobs = createJobRepository();
     invoices = createInvoiceRepository();
     storage = new MemoryStorage();
-    const onboarding = createOnboardingServices(tenancy);
-    ownerBusiness = await onboarding.createBusiness({ name: "OCR Books" }, user("owner"));
+    ownerBusiness = await createApprovedBusiness(tenancy, "OCR Books", user("owner"));
     await tenancy.createMembership({ membershipId: "membership-member", userId: user("member"), businessId: ownerBusiness.id, role: "administrator", isActive: true });
     const document = await createDocument(
       { businessId: ownerBusiness.id, upload: pdf },
@@ -783,8 +783,7 @@ async function setupDefaultRouteState(documentId = "route-document"): Promise<{ 
   defaultOnboardingRepository.auditEvents.splice(0);
   globalRepository<InMemoryJobRepository | undefined>("ledgerharbour.task8.inMemoryJobRepository")?.jobs.clear();
 
-  const onboarding = createOnboardingServices(defaultOnboardingRepository);
-  const business = await onboarding.createBusiness({ name: "Route OCR Books" }, identityFor("route-owner"));
+  const business = await createApprovedBusiness(defaultOnboardingRepository, "Route OCR Books", identityFor("route-owner"));
   const routeMemberId = await defaultOnboardingRepository.upsertUser(identityFor("route-member"));
   await defaultOnboardingRepository.createMembership({ membershipId: "membership-route-member", userId: routeMemberId, businessId: business.id, role: "administrator", isActive: true });
   const privateObjectKey = `business/${documentId}/private`;

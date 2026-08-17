@@ -1,12 +1,9 @@
-import { requireCapability } from "../permissions/authorize";
 import {
   defaultOnboardingRepository,
-  resolveOnboardingActor,
   type OnboardingActor,
   type OnboardingRepository,
 } from "./business-service";
-import { createTenantContext } from "./tenant-context";
-import type { BusinessId, UserId } from "./types";
+import type { BusinessId } from "./types";
 import type { Business } from "./business-service";
 
 export const LIFECYCLE_ERROR_CODES = {
@@ -17,6 +14,7 @@ export const LIFECYCLE_ERROR_CODES = {
   ACTIVE_BUSINESS: "ACTIVE_BUSINESS",
   CONFIRMATION_REQUIRED: "CONFIRMATION_REQUIRED",
   REPOSITORY_CONFLICT: "REPOSITORY_CONFLICT",
+  PLATFORM_ADMIN_REQUIRED: "PLATFORM_ADMIN_REQUIRED",
 } as const;
 
 export type LifecycleErrorCode = (typeof LIFECYCLE_ERROR_CODES)[keyof typeof LIFECYCLE_ERROR_CODES];
@@ -29,6 +27,7 @@ const publicMessages: Record<LifecycleErrorCode, string> = {
   ACTIVE_BUSINESS: "This business is already active.",
   CONFIRMATION_REQUIRED: "Enter the exact business name before changing lifecycle.",
   REPOSITORY_CONFLICT: "The business state changed elsewhere.",
+  PLATFORM_ADMIN_REQUIRED: "Only a platform administrator can change business lifecycle.",
 };
 
 export class BusinessLifecycleError extends Error {
@@ -37,35 +36,6 @@ export class BusinessLifecycleError extends Error {
   constructor(readonly code: LifecycleErrorCode) {
     super(publicMessages[code]);
   }
-}
-
-function requireActor(actorId: UserId): void {
-  if (typeof actorId !== "string" || !actorId.trim()) {
-    throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.INSUFFICIENT_CAPABILITY);
-  }
-}
-
-async function requireOwner(
-  repository: OnboardingRepository,
-  businessId: BusinessId,
-  actorId: UserId,
-  allowInactive: boolean,
-): Promise<Business> {
-  requireActor(actorId);
-  const business = allowInactive
-    ? await repository.findBusiness(businessId)
-    : await requireBusinessOperational(repository, businessId);
-  if (!business) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.BUSINESS_NOT_FOUND);
-  const membership = await createTenantContext(repository).getMembership(actorId, businessId);
-  try {
-    requireCapability(membership!, "deactivate_business");
-  } catch {
-    throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.INSUFFICIENT_CAPABILITY);
-  }
-  if (!membership || membership.role !== "owner_admin" || !membership.isActive) {
-    throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.INSUFFICIENT_CAPABILITY);
-  }
-  return business;
 }
 
 /**
@@ -82,43 +52,26 @@ export async function requireBusinessOperational(
   return business;
 }
 
-function validateConfirmationName(confirmationName: string, businessName: string): void {
-  if (typeof confirmationName !== "string" || confirmationName !== businessName) {
-    throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.CONFIRMATION_REQUIRED);
-  }
-}
-
 export interface BusinessLifecycleService {
   deactivateBusiness(businessId: BusinessId, actor: OnboardingActor, confirmationName: string): Promise<void>;
   reactivateBusiness(businessId: BusinessId, actor: OnboardingActor, confirmationName: string): Promise<void>;
 }
 
 export function createBusinessLifecycleService(repository: OnboardingRepository = defaultOnboardingRepository): BusinessLifecycleService {
+  void repository;
   return {
     async deactivateBusiness(businessId, actor, confirmationName) {
-      const actorId = await resolveOnboardingActor(repository, actor);
-      const business = await requireOwner(repository, businessId, actorId, false);
-      validateConfirmationName(confirmationName, business.name);
-      await repository.transaction(async (transaction) => {
-        const business = await transaction.findBusiness(businessId);
-        if (!business) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.BUSINESS_NOT_FOUND);
-         if (business.status !== "active" || !business.isActive) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.INACTIVE_BUSINESS);
-        await transaction.updateBusinessStatus(businessId, false);
-        await transaction.appendAuditEvent({ businessId, actorId, type: "business_deactivated", entityId: businessId });
-      });
+      void businessId;
+      void actor;
+      void confirmationName;
+      throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.PLATFORM_ADMIN_REQUIRED);
     },
 
     async reactivateBusiness(businessId, actor, confirmationName) {
-      const actorId = await resolveOnboardingActor(repository, actor);
-      const business = await requireOwner(repository, businessId, actorId, true);
-      validateConfirmationName(confirmationName, business.name);
-      await repository.transaction(async (transaction) => {
-        const business = await transaction.findBusiness(businessId);
-        if (!business) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.BUSINESS_NOT_FOUND);
-         if (business.status === "active" && business.isActive) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.ACTIVE_BUSINESS);
-        await transaction.updateBusinessStatus(businessId, true);
-        await transaction.appendAuditEvent({ businessId, actorId, type: "business_reactivated", entityId: businessId });
-      });
+      void businessId;
+      void actor;
+      void confirmationName;
+      throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.PLATFORM_ADMIN_REQUIRED);
     },
   };
 }

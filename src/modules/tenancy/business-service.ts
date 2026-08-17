@@ -1,5 +1,4 @@
 import { defaultCategorySeeds } from "../../db/seed/default-categories";
-import { randomUUID } from "node:crypto";
 import type { AuthIdentity } from "../auth/auth-provider";
 import { createJoinRequestService } from "./join-request-service";
 import type { TenantRepository } from "./tenant-context";
@@ -10,6 +9,7 @@ export const ONBOARDING_ERROR_CODES = {
   INVALID_BUSINESS_NAME: "INVALID_BUSINESS_NAME",
   INVALID_SEARCH_QUERY: "INVALID_SEARCH_QUERY",
   INVALID_REQUEST_ROLE: "INVALID_REQUEST_ROLE",
+  INVALID_BUSINESS_TRANSITION: "INVALID_BUSINESS_TRANSITION",
   INVALID_TRANSITION: "INVALID_JOIN_REQUEST_TRANSITION",
   INACTIVE_BUSINESS: "INACTIVE_BUSINESS",
   MISSING_BUSINESS: "BUSINESS_NOT_FOUND",
@@ -22,10 +22,24 @@ export const ONBOARDING_ERROR_CODES = {
 
 export type OnboardingErrorCode = (typeof ONBOARDING_ERROR_CODES)[keyof typeof ONBOARDING_ERROR_CODES];
 
+const businessTransitions: Record<BusinessStatus, readonly BusinessStatus[]> = {
+  pending: ["active", "rejected"],
+  active: ["suspended"],
+  suspended: ["active"],
+  rejected: [],
+};
+
+export function validateBusinessStatusTransition(current: BusinessStatus, next: BusinessStatus): void {
+  if (!businessTransitions[current].includes(next)) {
+    throw new OnboardingError(ONBOARDING_ERROR_CODES.INVALID_BUSINESS_TRANSITION);
+  }
+}
+
 const publicMessages: Record<OnboardingErrorCode, string> = {
   INVALID_BUSINESS_NAME: "Business name is required.",
   INVALID_SEARCH_QUERY: "Enter a business name to search.",
   INVALID_REQUEST_ROLE: "This membership role is not available.",
+  INVALID_BUSINESS_TRANSITION: "This business state transition is not available.",
   INVALID_JOIN_REQUEST_TRANSITION: "This join request cannot change state.",
   INACTIVE_BUSINESS: "This business is not available for joining.",
   BUSINESS_NOT_FOUND: "Business not found.",
@@ -346,6 +360,10 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
   async updateBusinessLifecycle(businessId: BusinessId, input: BusinessLifecycleUpdate): Promise<Business> {
     const business = this.businesses.get(businessId);
     if (!business) throw new OnboardingError(ONBOARDING_ERROR_CODES.MISSING_BUSINESS);
+    validateBusinessStatusTransition(business.status, input.status);
+    if (input.status === "active" && !this.memberships.some((membership) => membership.businessId === businessId && membership.role === "owner_admin" && membership.isActive)) {
+      throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+    }
     const updated = { ...business, ...input, isActive: input.status === "active" };
     this.businesses.set(businessId, updated);
     return { ...updated };
@@ -524,7 +542,7 @@ export async function createBusiness(
   actor: OnboardingActor,
   repository: OnboardingRepository = defaultOnboardingRepository,
 ): Promise<Business> {
-  return createBusinessWithStatus(input, actor, repository, "active", true);
+  return createBusinessRequest(input, actor, repository);
 }
 
 export async function createBusinessRequest(
@@ -532,15 +550,13 @@ export async function createBusinessRequest(
   actor: OnboardingActor,
   repository: OnboardingRepository = defaultOnboardingRepository,
 ): Promise<Business> {
-  return createBusinessWithStatus(input, actor, repository, "pending", false);
+  return createBusinessWithStatus(input, actor, repository);
 }
 
 async function createBusinessWithStatus(
   input: CreateBusinessInput,
   actor: OnboardingActor,
   repository: OnboardingRepository,
-  status: BusinessStatus,
-  provisionOwner: boolean,
 ): Promise<Business> {
   if (typeof actor === "string") requireActorId(actor);
   const name = typeof input?.name === "string" ? input.name.trim().replace(/\s+/g, " ") : "";
@@ -554,9 +570,9 @@ async function createBusinessWithStatus(
     const business = await transaction.createBusiness({
       name,
       normalizedName,
-       status,
-       isActive: status === "active",
-       activatedAt: status === "active" ? new Date().toISOString() : null,
+       status: "pending",
+       isActive: false,
+       activatedAt: null,
        serviceExpiresAt: null,
        suspendedAt: null,
        suspensionReason: null,
@@ -566,16 +582,6 @@ async function createBusinessWithStatus(
       createdBy: actorId,
     });
     await transaction.provisionDefaultCategories(business.id);
-    if (provisionOwner) {
-      await transaction.createMembership({
-        membershipId: randomUUID(),
-        userId: actorId,
-        businessId: business.id,
-        role: "owner_admin",
-        isActive: true,
-      });
-      await transaction.appendAuditEvent({ businessId: business.id, actorId, type: "business_created", entityId: business.id });
-    }
     return business;
   });
 }

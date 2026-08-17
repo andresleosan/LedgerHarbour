@@ -1,5 +1,7 @@
 BEGIN;
 
+DELETE FROM ledgerharbour_schema_migrations WHERE version = '0003_business_lifecycle';
+
 DROP TRIGGER IF EXISTS memberships_exactly_one_active_owner ON memberships;
 DROP TRIGGER IF EXISTS businesses_exactly_one_active_owner ON businesses;
 DROP FUNCTION IF EXISTS enforce_exactly_one_active_owner();

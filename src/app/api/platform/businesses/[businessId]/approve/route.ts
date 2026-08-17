@@ -6,7 +6,7 @@ import { createPlatformService, PlatformError, PLATFORM_ERROR_CODES, toPlatformB
 import { getPersistenceContext } from "../../../../../../modules/persistence/repository-factory";
 import type { BusinessId } from "../../../../../../modules/tenancy/types";
 
-const inputSchema = z.object({ serviceExpiresAt: z.string().trim().optional() }).strict();
+const inputSchema = z.object({ serviceExpiresAt: z.string().trim().min(1) }).strict();
 type RouteContext = { params: Promise<{ businessId: string }> };
 
 function responseFor(error: unknown): NextResponse {

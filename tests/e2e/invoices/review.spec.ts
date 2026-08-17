@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createApprovedBusiness } from "../helpers/business";
 
 async function signIn(page: import("@playwright/test").Page) {
   await page.goto("/login");
@@ -41,7 +42,7 @@ test.describe("invoice review workspace", () => {
     await expect(page.getByRole("button", { name: /create|crear/i })).toBeVisible();
   });
 
-  test("settings pages support real category and currency mutations with localized conflicts", async ({ page }) => {
+  test("settings pages support real category and currency mutations with localized conflicts", async ({ page, browser }) => {
     await signIn(page);
     const suffix = Date.now().toString();
     await page.goto("/login");
@@ -49,13 +50,9 @@ test.describe("invoice review workspace", () => {
     await page.getByRole("button", { name: /continue with email|continuar con correo/i }).click();
     await expect(page.getByRole("status")).toBeVisible();
 
-    await page.goto("/onboarding/create-business");
-    const businessResponse = page.waitForResponse((response) => response.url().endsWith("/api/businesses") && response.request().method() === "POST");
-    await page.getByLabel(/business name|nombre del negocio/i).fill(`Settings Books ${suffix}`);
-    await page.getByRole("button", { name: /create business|crear negocio/i }).click();
-    const createdBusiness = await (await businessResponse).json() as { id: string };
+    const createdBusinessId = await createApprovedBusiness(browser, page, `Settings Books ${suffix}`);
 
-    await page.goto(`/business/${createdBusiness.id}/settings/categories`);
+    await page.goto(`/business/${createdBusinessId}/settings/categories`);
     const categoryName = `E2E Category ${suffix}`;
     await page.getByLabel(/category name|nombre de categoría/i).fill(categoryName);
     await page.getByRole("button", { name: /create category|crear categoría/i }).click();
@@ -72,7 +69,7 @@ test.describe("invoice review workspace", () => {
     await renamedCategoryItem.getByRole("button", { name: /deactivate|desactivar/i }).click();
     await expect(renamedCategoryItem).toContainText(/inactive|inactiva/i);
 
-    await page.goto(`/business/${createdBusiness.id}/settings/currencies`);
+    await page.goto(`/business/${createdBusinessId}/settings/currencies`);
     const currencyName = `E2E Currency ${suffix}`;
     await page.getByLabel(/currency name|nombre de moneda/i).fill(currencyName);
     await page.getByLabel(/symbol|símbolo/i).fill("EC");

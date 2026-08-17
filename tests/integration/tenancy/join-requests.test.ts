@@ -18,6 +18,7 @@ import {
   type JoinRequest,
 } from "../../../src/modules/tenancy/business-service";
 import type { BusinessId, UserId } from "../../../src/modules/tenancy/types";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 const business = (value: string) => value as BusinessId;
@@ -49,7 +50,7 @@ describe("in-memory onboarding repository boundary", () => {
   it("supports create, request, approve, and rejects a second pending request", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const created = await services.createBusiness({ name: "Integration Books" }, user("owner"));
+    const created = await createApprovedBusiness(repository, "Integration Books", user("owner"));
 
     const request = await services.requestMembership(
       { businessId: created.id, requestedRole: "administrator" },
@@ -78,7 +79,7 @@ describe("in-memory onboarding repository boundary", () => {
   it("allows a rejected user to reapply and records reviewer metadata without membership", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const created = await services.createBusiness({ name: "Reapply Books" }, user("owner"));
+    const created = await createApprovedBusiness(repository, "Reapply Books", user("owner"));
 
     const first = await services.requestMembership(
       { businessId: created.id, requestedRole: "administrator" },
@@ -110,7 +111,7 @@ describe("in-memory onboarding repository boundary", () => {
   it("returns requester history chronologically even when repository rows are out of order", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const created = await services.createBusiness({ name: "Chronological Books" }, user("owner"));
+    const created = await createApprovedBusiness(repository, "Chronological Books", user("owner"));
     const first = await services.requestMembership(
       { businessId: created.id, requestedRole: "administrator" },
       user("member"),
@@ -139,8 +140,8 @@ describe("in-memory onboarding repository boundary", () => {
   it("denies administrators from listing requests and hides requests from another business", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const first = await services.createBusiness({ name: "First" }, user("owner-1"));
-    const second = await services.createBusiness({ name: "Second" }, user("owner-2"));
+    const first = await createApprovedBusiness(repository, "First", user("owner-1"));
+    const second = await createApprovedBusiness(repository, "Second", user("owner-2"));
     const request = await services.requestMembership(
       { businessId: first.id, requestedRole: "administrator" },
       user("member"),
@@ -172,7 +173,7 @@ describe("in-memory onboarding repository boundary", () => {
   it("rejects inactive targets without disclosing business details", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const created = await services.createBusiness({ name: "Inactive" }, user("owner"));
+    const created = await createApprovedBusiness(repository, "Inactive", user("owner"));
     repository.businesses.get(created.id)!.isActive = false;
 
     await expect(
@@ -186,7 +187,7 @@ describe("in-memory onboarding repository boundary", () => {
   it("allows General Admin to approve and reject Administrator requests", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const created = await services.createBusiness({ name: "General Admin Books" }, user("owner"));
+    const created = await createApprovedBusiness(repository, "General Admin Books", user("owner"));
     repository.memberships.push({
        membershipId: "membership-general-admin",
       userId: user("general-admin"),
@@ -220,8 +221,8 @@ describe("in-memory onboarding repository boundary", () => {
   it("denies a General Admin from reviewing another business", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const first = await services.createBusiness({ name: "General Admin First" }, user("owner-1"));
-    const second = await services.createBusiness({ name: "General Admin Second" }, user("owner-2"));
+    const first = await createApprovedBusiness(repository, "General Admin First", user("owner-1"));
+    const second = await createApprovedBusiness(repository, "General Admin Second", user("owner-2"));
     repository.memberships.push({
        membershipId: "membership-general-admin-first",
       userId: user("general-admin"),
@@ -245,7 +246,7 @@ describe("in-memory onboarding repository boundary", () => {
   it("serializes concurrent approvals with one success and one stable conflict", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const created = await services.createBusiness({ name: "Concurrent Books" }, user("owner"));
+    const created = await createApprovedBusiness(repository, "Concurrent Books", user("owner"));
     const request = await services.requestMembership(
       { businessId: created.id, requestedRole: "administrator" },
       user("concurrent-member"),
@@ -315,7 +316,7 @@ describe("in-memory onboarding repository boundary", () => {
       "Business name is required.",
     );
 
-    const created = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: "Route Contract Books" }, identity("route-owner"));
+    const created = await createApprovedBusiness(defaultOnboardingRepository, "Route Contract Books", identity("route-owner"));
     const duplicateMembership = await postJoinRequestRoute(
       jsonRequest(JSON.stringify({ requestedRole: "administrator" }), `http://localhost/api/businesses/${created.id}/join-requests`),
       contextFor(created.id),
@@ -422,7 +423,7 @@ describe("in-memory onboarding repository boundary", () => {
     });
 
     await setCurrentIdentity(identity("route-other-business-owner"));
-    const otherBusiness = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: "Other Route Books" }, identity("route-other-business-owner"));
+    const otherBusiness = await createApprovedBusiness(defaultOnboardingRepository, "Other Route Books", identity("route-other-business-owner"));
     const hidden = await patchJoinRequestsRoute(
       new Request("http://localhost", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ joinRequestId: pendingRequest.id, decision: "approved" }) }),
       contextFor(otherBusiness.id),
@@ -493,7 +494,7 @@ describe("in-memory onboarding repository boundary", () => {
     });
 
     await setCurrentIdentity(identity("matrix-owner"));
-    const created = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: "Matrix Books" }, identity("matrix-owner"));
+    const created = await createApprovedBusiness(defaultOnboardingRepository, "Matrix Books", identity("matrix-owner"));
 
     await setCurrentIdentity(identity("matrix-member"));
     const rejectedRequest = await postJoinRequestRoute(
@@ -574,7 +575,7 @@ describe("in-memory onboarding repository boundary", () => {
     });
 
     await setCurrentIdentity(identity);
-    const created = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: "Safe Search Books" }, user("search-contract-owner"));
+    const created = await createApprovedBusiness(defaultOnboardingRepository, "Safe Search Books", user("search-contract-owner"));
 
     const success = await searchBusinessesRoute(new Request("http://localhost/api/businesses/search?q=safe%20search"));
     expect(success.status).toBe(200);

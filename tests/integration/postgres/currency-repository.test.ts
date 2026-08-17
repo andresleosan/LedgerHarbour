@@ -8,8 +8,8 @@ import {
   type BusinessCurrency,
 } from "../../../src/modules/accounting/currency-service";
 import { createPostgresCurrencyRepository } from "../../../src/modules/accounting/postgres-currency-repository";
-import { createOnboardingServices } from "../../../src/modules/tenancy/business-service";
 import { createPostgresOnboardingRepository } from "../../../src/modules/tenancy/postgres-tenancy-repository";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const identity: AuthIdentity = {
   providerUserId: "currency-repository-owner",
@@ -39,10 +39,7 @@ describe("PostgreSQL currency repository contract", () => {
 
     try {
       const tenancyRepository = createPostgresOnboardingRepository(db);
-      const business = await createOnboardingServices(tenancyRepository).createBusiness(
-        { name: "Currency Repository Books" },
-        identity,
-      );
+      const business = await createApprovedBusiness(tenancyRepository, "Currency Repository Books", identity);
       const currencyRepository = createPostgresCurrencyRepository(db);
       const expected = currency(business.id);
 
@@ -67,10 +64,7 @@ describe("PostgreSQL currency repository contract", () => {
 
     try {
       const tenancyRepository = createPostgresOnboardingRepository(db);
-      const business = await createOnboardingServices(tenancyRepository).createBusiness(
-        { name: "Currency Transaction Books" },
-        identity,
-      );
+      const business = await createApprovedBusiness(tenancyRepository, "Currency Transaction Books", identity);
       const currencyRepository = createPostgresCurrencyRepository(db);
       const candidate = currency(business.id);
 
@@ -93,10 +87,7 @@ describe("PostgreSQL currency repository contract", () => {
 
     try {
       const tenancyRepository = createPostgresOnboardingRepository(db);
-      const business = await createOnboardingServices(tenancyRepository).createBusiness(
-        { name: "Currency Conflict Books" },
-        identity,
-      );
+      const business = await createApprovedBusiness(tenancyRepository, "Currency Conflict Books", identity);
       const currencyRepository = createPostgresCurrencyRepository(db);
       const candidate = currency(business.id);
 
@@ -120,9 +111,8 @@ describe("PostgreSQL currency repository contract", () => {
 
     try {
       const tenancyRepository = createPostgresOnboardingRepository(db);
-      const onboarding = createOnboardingServices(tenancyRepository);
-      const firstBusiness = await onboarding.createBusiness({ name: "First Currency Books" }, identity);
-      const secondBusiness = await onboarding.createBusiness({ name: "Second Currency Books" }, identity);
+      const firstBusiness = await createApprovedBusiness(tenancyRepository, "First Currency Books", identity);
+      const secondBusiness = await createApprovedBusiness(tenancyRepository, "Second Currency Books", identity);
       const currencyRepository = createPostgresCurrencyRepository(db);
       const expected = currency(firstBusiness.id, "currency-cross-tenant");
 

@@ -25,6 +25,8 @@ describe("PostgreSQL initial migration", () => {
         "jobs",
         "join_requests",
         "memberships",
+        "platform_audit_events",
+        "platform_members",
         "users",
       ]);
 
@@ -60,6 +62,7 @@ describe("PostgreSQL initial migration", () => {
         { typname: "membership_role", enumlabel: "owner_admin" },
         { typname: "membership_role", enumlabel: "general_admin" },
         { typname: "membership_role", enumlabel: "administrator" },
+        { typname: "platform_role", enumlabel: "platform_admin" },
         { typname: "verification_state", enumlabel: "unverified" },
         { typname: "verification_state", enumlabel: "verified" },
       ]);

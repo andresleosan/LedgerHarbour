@@ -8,12 +8,13 @@ import {
   type Business,
 } from "../../../src/modules/tenancy/business-service";
 import type { BusinessId, UserId } from "../../../src/modules/tenancy/types";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 const business = (value: string) => value as BusinessId;
 
 describe("business onboarding service", () => {
-  it("creates a GBP business with its owner, categories, and audit event in one transaction", async () => {
+  it("creates a pending GBP business request without operational membership", async () => {
     const repository = createInMemoryOnboardingRepository();
 
     const created = await createBusiness(
@@ -25,27 +26,15 @@ describe("business onboarding service", () => {
     expect(created).toMatchObject<Partial<Business>>({
       name: "Harbour Books",
       normalizedName: "harbour books",
-      isActive: true,
+      status: "pending",
+      isActive: false,
       baseCurrencyKind: "standard",
       baseCurrencyCode: "GBP",
       baseCurrencyId: null,
     });
-    expect(repository.memberships).toContainEqual(expect.objectContaining({
-      userId: user("owner-1"),
-      businessId: created.id,
-      role: "owner_admin",
-      isActive: true,
-    }));
-    expect(repository.memberships[0].membershipId).toEqual(expect.any(String));
-    expect(repository.memberships[0].membershipId).not.toBe(repository.memberships[0].userId);
+    expect(repository.memberships).toHaveLength(0);
     expect(repository.categories.filter((category) => category.businessId === created.id)).toHaveLength(5);
-    expect(repository.auditEvents).toContainEqual(
-      expect.objectContaining({
-        businessId: created.id,
-        actorId: user("owner-1"),
-        type: "business_created",
-      }),
-    );
+    expect(repository.auditEvents).toHaveLength(0);
     expect(repository.transactionCount).toBe(1);
   });
 
@@ -107,9 +96,9 @@ describe("business onboarding service", () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
 
-    const active = await services.createBusiness({ name: "North Star Ltd" }, user("owner-1"));
-    await services.createBusiness({ name: "North Star Services" }, user("owner-2"));
-    const inactive = await services.createBusiness({ name: "North Star Closed" }, user("owner-3"));
+    const active = await createApprovedBusiness(repository, "North Star Ltd", user("owner-1"));
+    await createApprovedBusiness(repository, "North Star Services", user("owner-2"));
+    const inactive = await createApprovedBusiness(repository, "North Star Closed", user("owner-3"));
     repository.businesses.get(inactive.id)!.isActive = false;
 
     await expect(services.searchBusinesses("  NORTH   STAR ", user("searcher"))).resolves.toEqual([
@@ -124,7 +113,7 @@ describe("business onboarding service", () => {
   it("does not expose inactive businesses in search", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const inactive = await services.createBusiness({ name: "Closed Books" }, user("owner-1"));
+    const inactive = await createApprovedBusiness(repository, "Closed Books", user("owner-1"));
     repository.businesses.get(inactive.id)!.isActive = false;
 
     await expect(services.searchBusinesses("closed", user("searcher"))).resolves.toEqual([]);
@@ -133,7 +122,7 @@ describe("business onboarding service", () => {
   it("uses the shared Task 3 tenant and permission boundary for review authorization", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const created = await services.createBusiness({ name: "Reviewable" }, user("owner-1"));
+    const created = await createApprovedBusiness(repository, "Reviewable", user("owner-1"));
     const request = await services.requestMembership(
       { businessId: created.id, requestedRole: "administrator" },
       user("requester"),
@@ -164,8 +153,8 @@ describe("business onboarding service", () => {
   it("denies cross-business review even when the reviewer knows the request ID", async () => {
     const repository = createInMemoryOnboardingRepository();
     const services = createOnboardingServices(repository);
-    const first = await services.createBusiness({ name: "First" }, user("owner-1"));
-    const second = await services.createBusiness({ name: "Second" }, user("owner-2"));
+    const first = await createApprovedBusiness(repository, "First", user("owner-1"));
+    const second = await createApprovedBusiness(repository, "Second", user("owner-2"));
     const request = await services.requestMembership(
       { businessId: first.id, requestedRole: "administrator" },
       user("requester"),

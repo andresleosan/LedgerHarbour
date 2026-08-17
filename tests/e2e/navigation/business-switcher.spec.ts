@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createApprovedBusiness, withPlatformAdmin } from "../helpers/business";
 
 async function signIn(page: import("@playwright/test").Page, email = "portfolio-shell@example.com") {
   await page.goto("/login");
@@ -7,30 +8,19 @@ async function signIn(page: import("@playwright/test").Page, email = "portfolio-
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
-async function createBusiness(page: import("@playwright/test").Page, name: string) {
-  await page.goto("/onboarding/create-business");
-  await page.getByLabel("Business name").fill(name);
-  await page.getByRole("button", { name: "Create business" }).click();
-  const status = page.getByRole("status");
-  await expect(status).toContainText(name);
-  const businessId = (await status.textContent())?.match(/business-[\w-]+/)?.[0];
-  expect(businessId).toBeTruthy();
-  return businessId as string;
-}
-
-test("authenticates, switches authorized businesses, preserves locale, and keeps inactive businesses non-selectable", async ({ page }) => {
+test("authenticates, switches authorized businesses, preserves locale, and keeps inactive businesses non-selectable", async ({ page, browser }) => {
   await signIn(page);
   const firstName = `Portfolio Books ${Date.now()}`;
   const secondName = `Portfolio Studio ${Date.now()}`;
   const inactiveName = `Portfolio Closed ${"LongBusinessName".repeat(12)} ${Date.now()}`;
-  const firstId = await createBusiness(page, firstName);
-  const secondId = await createBusiness(page, secondName);
-  const inactiveId = await createBusiness(page, inactiveName);
+  const firstId = await createApprovedBusiness(browser, page, firstName);
+  const secondId = await createApprovedBusiness(browser, page, secondName);
+  const inactiveId = await createApprovedBusiness(browser, page, inactiveName);
 
-  const lifecycleResponse = await page.request.patch(`/api/businesses/${inactiveId}/lifecycle`, {
-    data: { action: "deactivate", confirmationName: inactiveName },
-  });
-  expect(lifecycleResponse.ok()).toBeTruthy();
+  const lifecycleResponse = await withPlatformAdmin(browser, (admin) => admin.request.post(`/api/platform/businesses/${inactiveId}/suspend`, {
+    data: { reason: "E2E inactive business coverage" },
+  }));
+  expect(lifecycleResponse.status()).toBe(200);
 
   await page.goto("/portfolio");
   await expect(page.getByRole("heading", { name: "Portfolio", exact: true })).toBeVisible();

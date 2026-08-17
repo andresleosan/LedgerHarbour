@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
 
 import { createTestDatabase } from "../../../src/db/test-database";
@@ -11,11 +10,9 @@ import {
 
 describe("PostgreSQL business approval lifecycle", () => {
   it("keeps the request pending, then atomically grants owner access on approval", async () => {
-    const { db, close, execute } = await createTestDatabase();
+    const { db, close } = await createTestDatabase();
 
     try {
-      const platformMigration = await readFile(new URL("../../../src/db/migrations/0002_platform_control_plane.sql", import.meta.url), "utf8");
-      await execute(platformMigration.replace(/^\s*BEGIN;\s*/i, "").replace(/\s*COMMIT;\s*$/i, ""));
       const tenancy = createPostgresOnboardingRepository(db);
       const platform = createPostgresPlatformRepository(db);
       const onboarding = createOnboardingServices(tenancy);
@@ -36,8 +33,10 @@ describe("PostgreSQL business approval lifecycle", () => {
       await expect(tenancy.listMemberships(created.id)).resolves.toEqual([]);
       await platform.bootstrapMember("platform-admin-1", admin.email);
 
-      const approved = await createPlatformService({ tenancyRepository: tenancy, platformRepository: platform })
-        .approveBusiness(created.id, admin, {});
+      const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+      await service.claimPlatformMember(admin);
+      const approved = await service
+        .approveBusiness(created.id, admin, { serviceExpiresAt: "2026-09-16T00:00:00.000Z" });
 
       expect(approved.status).toBe("active");
       await expect(tenancy.listMemberships(created.id)).resolves.toEqual([

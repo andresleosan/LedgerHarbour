@@ -16,7 +16,7 @@ beforeEach(() => poolEnds.splice(0));
 
 import { createTestDatabase } from "../../../src/db/test-database";
 import { users } from "../../../src/db/schema";
-import { createBusiness, defaultOnboardingRepository } from "../../../src/modules/tenancy/business-service";
+import { defaultOnboardingRepository } from "../../../src/modules/tenancy/business-service";
 import { resolveDefaultDocumentRepository, resolveDefaultInvoiceRepository } from "../../../src/modules/invoices/invoice-service";
 import { resolveDefaultCurrencyRepository, setCurrency } from "../../../src/modules/accounting/currency-service";
 import { resolveDefaultJobRepository } from "../../../src/modules/jobs/job-service";
@@ -28,6 +28,7 @@ import {
   getPersistenceContext,
   resetPersistenceContextForTests,
 } from "../../../src/modules/persistence/repository-factory";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 function expectSafeConfigurationError(action: () => void, expectedMessage: string) {
   let caught: unknown;
@@ -191,7 +192,7 @@ describe("persistence mode factory", () => {
 
     try {
       const context = createPersistenceContext({ mode: "postgres", database: db });
-      const business = await createBusiness({ name: "Postgres Wiring Books" }, identity, context.tenancyRepository);
+      const business = await createApprovedBusiness(context.tenancyRepository, "Postgres Wiring Books", identity);
       const currency = await setCurrency(
         {
           businessId: business.id,
@@ -234,8 +235,8 @@ describe("persistence mode factory", () => {
     };
 
     try {
-      const businessA = await createBusiness({ name: "Isolation Books A" }, ownerA, context.tenancyRepository);
-      const businessB = await createBusiness({ name: "Isolation Books B" }, ownerB, context.tenancyRepository);
+      const businessA = await createApprovedBusiness(context.tenancyRepository, "Isolation Books A", ownerA);
+      const businessB = await createApprovedBusiness(context.tenancyRepository, "Isolation Books B", ownerB);
 
       await expect(listUserBusinesses(ownerA, { tenancyRepository: context.tenancyRepository })).resolves.toEqual([
         { id: businessA.id, name: businessA.name, isActive: true, role: "owner_admin" },

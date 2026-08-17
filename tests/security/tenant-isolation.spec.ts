@@ -24,6 +24,7 @@ import { getBusinessDashboard } from "../../src/modules/tenancy/portfolio-servic
 import type { StorageAdapter } from "../../src/modules/documents/storage-adapter";
 import type { BusinessId, UserId } from "../../src/modules/tenancy/types";
 import type { DocumentId, InvoiceId } from "../../src/modules/invoices/ocr-provider";
+import { createApprovedBusiness } from "../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 
@@ -113,9 +114,8 @@ describe("Task 11 tenant isolation matrix", () => {
     documents = createDocumentRepository();
     invoices = createInvoiceRepository();
     storage = new MemoryStorage();
-    const onboarding = createOnboardingServices(tenancy);
-    businessA = await onboarding.createBusiness({ name: "Business A" }, user("owner-a"));
-    businessB = await onboarding.createBusiness({ name: "Business B" }, user("owner-b"));
+    businessA = await createApprovedBusiness(tenancy, "Business A", user("owner-a"));
+    businessB = await createApprovedBusiness(tenancy, "Business B", user("owner-b"));
     const documentA = documentFor(businessA.id, "document-a");
     const documentB = documentFor(businessB.id, "document-b");
     documentB.uploaderId = user("owner-b");

@@ -18,6 +18,7 @@ import { createMembershipService } from "../../../src/modules/tenancy/membership
 import { listUserBusinesses } from "../../../src/modules/tenancy/portfolio-service";
 import { createPostgresOnboardingRepository } from "../../../src/modules/tenancy/postgres-tenancy-repository";
 import type { UserId } from "../../../src/modules/tenancy/types";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const identity = (providerUserId: string): AuthIdentity => ({
   providerUserId,
@@ -28,7 +29,7 @@ const identity = (providerUserId: string): AuthIdentity => ({
 
 const user = (value: string) => value as UserId;
 describe("PostgreSQL onboarding repository contract", () => {
-  it("upserts the AuthIdentity and creates one owner, seed categories, and audit atomically", async () => {
+  it("upserts the AuthIdentity and creates a pending request atomically", async () => {
     const { db, close } = await createTestDatabase();
 
     try {
@@ -36,7 +37,7 @@ describe("PostgreSQL onboarding repository contract", () => {
       const onboarding = createOnboardingServices(repository);
       const owner = identity("postgres-owner");
 
-      const created = await onboarding.createBusiness({ name: "  Harbour Books  " }, owner);
+      const created = await onboarding.createBusinessRequest({ name: "  Harbour Books  " }, owner);
       const userRows = await db.execute<{ provider_id: string; email: string; display_name: string; verification_state: string }>(
         sql`SELECT provider_id, email, display_name, verification_state FROM users`,
       );
@@ -53,7 +54,8 @@ describe("PostgreSQL onboarding repository contract", () => {
       expect(created).toMatchObject<Partial<Business>>({
         name: "Harbour Books",
         normalizedName: "harbour books",
-        isActive: true,
+        status: "pending",
+        isActive: false,
         baseCurrencyKind: "standard",
         baseCurrencyCode: "GBP",
         baseCurrencyId: null,
@@ -64,14 +66,9 @@ describe("PostgreSQL onboarding repository contract", () => {
         display_name: owner.displayName,
         verification_state: "verified",
       }]);
-      expect(memberships.rows).toEqual([{
-        user_id: created.createdBy,
-        business_id: created.id,
-        role: "owner_admin",
-        is_active: true,
-      }]);
+      expect(memberships.rows).toEqual([]);
       expect(categories.rows).toHaveLength(5);
-      expect(audit.rows).toEqual([{ action: "business_created", entity_type: "business", entity_id: created.id }]);
+      expect(audit.rows).toEqual([]);
       expect(created.createdBy).not.toBe(owner.providerUserId);
     } finally {
       await close();
@@ -117,8 +114,8 @@ describe("PostgreSQL onboarding repository contract", () => {
       const ownerB = identity("owner-b");
       const requester = identity("requester");
       const rejectedRequester = identity("rejected-requester");
-      const first = await onboarding.createBusiness({ name: "North   Star Ltd" }, ownerA);
-      const second = await onboarding.createBusiness({ name: "North Star Services" }, ownerB);
+      const first = await createApprovedBusiness(repository, "North   Star Ltd", ownerA);
+      const second = await createApprovedBusiness(repository, "North Star Services", ownerB);
 
       await expect(onboarding.searchBusinesses(" NORTH  STAR ", requester)).resolves.toEqual([
         { id: first.id, name: "North Star Ltd", isActive: true },
@@ -173,9 +170,8 @@ describe("PostgreSQL onboarding repository contract", () => {
 
     try {
       const repository = createPostgresOnboardingRepository(db);
-      const onboarding = createOnboardingServices(repository);
       const owner = identity("async-owner");
-      const created = await onboarding.createBusiness({ name: "Async Books" }, owner);
+      const created = await createApprovedBusiness(repository, "Async Books", owner);
 
        await expect(listUserBusinesses(owner, { tenancyRepository: repository })).resolves.toEqual([
         { id: created.id, name: "Async Books", isActive: true, role: "owner_admin" },
@@ -207,12 +203,14 @@ describe("PostgreSQL onboarding repository contract", () => {
       expect(transferAudit.rows).toEqual([{ entity_id: replacementMembership.membershipId }]);
       await expect(repository.findBusiness(created.id)).resolves.toMatchObject({ createdBy: originalCreator });
 
-      await createBusinessLifecycleService(repository).deactivateBusiness(created.id, replacement, "Async Books");
-      await expect(repository.findBusiness(created.id)).resolves.toMatchObject({
-        id: created.id,
-        createdBy: originalCreator,
-        isActive: false,
-      });
+       await expect(createBusinessLifecycleService(repository).deactivateBusiness(created.id, replacement, "Async Books"))
+         .rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.PLATFORM_ADMIN_REQUIRED });
+       await expect(repository.findBusiness(created.id)).resolves.toMatchObject({
+         id: created.id,
+         createdBy: originalCreator,
+         status: "active",
+         isActive: true,
+       });
     } finally {
       await close();
     }
@@ -238,7 +236,7 @@ describe("PostgreSQL onboarding repository contract", () => {
       const onboarding = createOnboardingServices(repository);
       const owner = identity("concurrent-owner");
       const requester = identity("concurrent-requester");
-      const business = await onboarding.createBusiness({ name: "Concurrent PostgreSQL Books" }, owner);
+      const business = await createApprovedBusiness(repository, "Concurrent PostgreSQL Books", owner);
       const pending = await onboarding.requestMembership(
         { businessId: business.id, requestedRole: "administrator" },
         requester,

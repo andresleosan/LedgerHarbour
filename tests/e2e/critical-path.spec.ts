@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createApprovedBusiness } from "./helpers/business";
 
 test.describe.configure({ mode: "serial" });
 
@@ -9,22 +10,11 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
-async function createBusiness(page: import("@playwright/test").Page, name: string) {
-  await page.goto("/onboarding/create-business");
-  await page.getByLabel("Business name").fill(name);
-  await page.getByRole("button", { name: "Create business" }).click();
-  const status = page.getByRole("status");
-  await expect(status).toContainText(name);
-  const businessId = (await status.textContent())?.match(/business-[\w-]+/)?.[0];
-  expect(businessId).toBeTruthy();
-  return businessId as string;
-}
-
 test("verifies the local MVP critical path and cross-tenant access block", async ({ browser }) => {
   const ownerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const owner = await ownerContext.newPage();
   await signIn(owner, "task11-owner@example.com");
-  const businessId = await createBusiness(owner, "Task Eleven Harbour");
+  const businessId = await createApprovedBusiness(browser, owner, "Task Eleven Harbour");
 
   await owner.goto(`/business/${businessId}?locale=en`);
   await expect(owner.getByRole("heading", { name: "Task Eleven Harbour" })).toBeVisible();
@@ -128,7 +118,7 @@ test("verifies the local MVP critical path and cross-tenant access block", async
   const otherContext = await browser.newContext();
   const other = await otherContext.newPage();
   await signIn(other, "task11-other@example.com");
-  const otherBusinessId = await createBusiness(other, "Task Eleven Other Harbour");
+  const otherBusinessId = await createApprovedBusiness(browser, other, "Task Eleven Other Harbour");
   await other.goto(`/business/${businessId}`);
   await expect(other).toHaveURL(/\/portfolio$/);
   const crossTenantReview = other.waitForResponse((response) => response.url().endsWith(`/api/invoices/${invoiceId}/review`) && response.request().method() === "GET");

@@ -31,6 +31,11 @@ export async function createTestDatabase(): Promise<{
       "utf8",
     );
     await applyMigration(client, migrationSql);
+    const platformMigration = await readFile(
+      new URL("./migrations/0002_platform_control_plane.sql", import.meta.url),
+      "utf8",
+    );
+    await applyMigration(client, platformMigration);
     const lifecycleMigration = await readFile(
       new URL("./migrations/0003_business_lifecycle.sql", import.meta.url),
       "utf8",

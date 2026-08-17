@@ -4,7 +4,6 @@ import { can, requireCapability } from "../../src/modules/permissions/authorize"
 import { createBusinessLifecycleService } from "../../src/modules/tenancy/business-lifecycle-service";
 import {
   createInMemoryOnboardingRepository,
-  createOnboardingServices,
 } from "../../src/modules/tenancy/business-service";
 import { createCategory } from "../../src/modules/accounting/category-service";
 import { createCurrencyRepository, setCurrency } from "../../src/modules/accounting/currency-service";
@@ -13,6 +12,7 @@ import { createDocumentRepository, type Document } from "../../src/modules/docum
 import { createMembershipService } from "../../src/modules/tenancy/membership-service";
 import type { BusinessId, Membership, UserId } from "../../src/modules/tenancy/types";
 import type { DocumentId, InvoiceId } from "../../src/modules/invoices/ocr-provider";
+import { createApprovedBusiness } from "../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 const business = (value: string) => value as BusinessId;
@@ -23,7 +23,7 @@ function membership(userId: string, businessId: BusinessId, role: Membership["ro
 
 async function fixture() {
   const repository = createInMemoryOnboardingRepository();
-  const business = await createOnboardingServices(repository).createBusiness({ name: "Permission Harbour" }, user("owner"));
+  const business = await createApprovedBusiness(repository, "Permission Harbour", user("owner"));
   const general = membership("general", business.id, "general_admin");
   const administrator = membership("administrator", business.id, "administrator");
   repository.memberships.push(general, administrator);
@@ -58,9 +58,9 @@ describe("Task 11 permission escalation matrix", () => {
     await expect(membershipService.transferOwnership({ businessId: business.id, targetMembershipId: administrator.membershipId, ...confirmation }, user("general")))
       .rejects.toMatchObject({ code: "INSUFFICIENT_CAPABILITY" });
     await expect(lifecycleService.deactivateBusiness(business.id, user("general"), business.name))
-      .rejects.toMatchObject({ code: "INSUFFICIENT_CAPABILITY" });
+      .rejects.toMatchObject({ code: "PLATFORM_ADMIN_REQUIRED" });
     await expect(lifecycleService.deactivateBusiness(business.id, user("administrator"), business.name))
-      .rejects.toMatchObject({ code: "INSUFFICIENT_CAPABILITY" });
+      .rejects.toMatchObject({ code: "PLATFORM_ADMIN_REQUIRED" });
 
     await membershipService.transferOwnership({ businessId: business.id, targetMembershipId: general.membershipId, ...confirmation }, user("owner"));
     expect(repository.memberships.find((candidate) => candidate.userId === user("general"))?.role).toBe("owner_admin");

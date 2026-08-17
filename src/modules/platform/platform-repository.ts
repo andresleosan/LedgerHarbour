@@ -28,7 +28,7 @@ export interface PlatformAuditEvent {
 export interface PlatformRepository {
   transaction?<T>(operation: (repository: PlatformRepository) => Promise<T>): Promise<T>;
   findActiveMemberByUserId(userId: UserId): Promise<PlatformMember | null>;
-  findActiveMemberByEmail(normalizedEmail: string): Promise<PlatformMember | null>;
+  findMemberForClaimByEmail(normalizedEmail: string): Promise<PlatformMember | null>;
   linkMemberToUser(memberId: string, userId: UserId): Promise<PlatformMember>;
   appendAuditEvent(event: Omit<PlatformAuditEvent, "id" | "createdAt">): Promise<PlatformAuditEvent>;
   listAuditEvents(targetId: string): Promise<PlatformAuditEvent[]>;
@@ -76,7 +76,7 @@ class MemoryPlatformRepository implements InMemoryPlatformRepository {
     return this.platformMembers.find((member) => member.userId === userId && member.isActive) ?? null;
   }
 
-  async findActiveMemberByEmail(normalizedEmail: string): Promise<PlatformMember | null> {
+  async findMemberForClaimByEmail(normalizedEmail: string): Promise<PlatformMember | null> {
     return this.platformMembers.find((member) => member.normalizedEmail === normalizeEmail(normalizedEmail) && member.isActive) ?? null;
   }
 
@@ -142,7 +142,7 @@ export function createPostgresPlatformRepository(db: Database): PlatformReposito
       return row ? mapMember(row) : null;
     },
 
-    async findActiveMemberByEmail(email) {
+    async findMemberForClaimByEmail(email) {
       const [row] = await databaseForOperation(db).select().from(platformMembers).where(and(
         eq(platformMembers.normalizedEmail, normalizeEmail(email)),
         eq(platformMembers.isActive, true),

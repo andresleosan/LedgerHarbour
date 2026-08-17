@@ -1,11 +1,10 @@
-import { readFile } from "node:fs/promises";
 import { Client } from "pg";
+import { readFile } from "node:fs/promises";
 
 import { describe, expect, it } from "vitest";
 
 import {
   bootstrapPlatformAdmins,
-  type PlatformBootstrapDatabase,
 } from "../../../src/db/platform-bootstrap";
 import {
   applyInitialMigration,
@@ -16,24 +15,11 @@ import {
 } from "../../../src/db/migration-runner";
 import { createTestDatabase } from "../../../src/db/test-database";
 
-async function applyPlatformMigration(
-  db: PlatformBootstrapDatabase,
-  executeMigration: (migrationSql: string) => Promise<unknown>,
-): Promise<void> {
-  const migrationSql = await readFile(
-    new URL("../../../src/db/migrations/0002_platform_control_plane.sql", import.meta.url),
-    "utf8",
-  );
-  await executeMigration(migrationSql);
-}
-
 describe("PostgreSQL platform control-plane migration", () => {
   it("creates the tables and enforces unique normalized emails and the fixed role", async () => {
-    const { db, close, execute } = await createTestDatabase();
+    const { db, close } = await createTestDatabase();
 
     try {
-      await applyPlatformMigration(db, execute);
-
       const tables = await db.execute<{ table_name: string }>(`
         SELECT table_name
         FROM information_schema.tables
@@ -64,11 +50,9 @@ describe("PostgreSQL platform control-plane migration", () => {
   }, 30_000);
 
   it("bootstraps explicit operators idempotently and keeps audit events append-only", async () => {
-    const { db, close, execute } = await createTestDatabase();
+    const { db, close } = await createTestDatabase();
 
     try {
-      await applyPlatformMigration(db, execute);
-
       await expect(bootstrapPlatformAdmins(db, [
         " Andres.San1404@GMAIL.COM ",
         "partner@example.com",
@@ -116,10 +100,9 @@ describe("PostgreSQL platform control-plane migration", () => {
   }, 30_000);
 
   it("fails the initial migration check when a required table is missing", async () => {
-    const { db, close, execute } = await createTestDatabase();
+    const { db, close } = await createTestDatabase();
 
     try {
-      await applyPlatformMigration(db, execute);
       await db.execute("DROP TABLE jobs");
       const tables = await db.execute<{ table_name: string }>(`
         SELECT table_name

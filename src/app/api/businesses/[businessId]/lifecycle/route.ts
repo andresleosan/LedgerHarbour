@@ -19,7 +19,7 @@ type RouteContext = { params: Promise<{ businessId: string }> };
 function responseForError(error: unknown): NextResponse {
   if (error instanceof BusinessLifecycleError) {
     const status = error.code === LIFECYCLE_ERROR_CODES.BUSINESS_NOT_FOUND ? 404 :
-      error.code === LIFECYCLE_ERROR_CODES.INSUFFICIENT_CAPABILITY ? 403 :
+      error.code === LIFECYCLE_ERROR_CODES.INSUFFICIENT_CAPABILITY || error.code === LIFECYCLE_ERROR_CODES.PLATFORM_ADMIN_REQUIRED ? 403 :
       error.code === LIFECYCLE_ERROR_CODES.INACTIVE_BUSINESS || error.code === LIFECYCLE_ERROR_CODES.ACTIVE_BUSINESS || error.code === LIFECYCLE_ERROR_CODES.REPOSITORY_CONFLICT ? 409 : 400;
     return NextResponse.json({ error: { code: error.code, message: error.message } }, { status });
   }

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import type { AuthIdentity } from "../auth/auth-provider";
 
 import {
   defaultOnboardingRepository,
@@ -58,7 +59,7 @@ export interface PlatformBusinessDto {
 }
 
 export interface ApproveBusinessInput {
-  serviceExpiresAt?: string;
+  serviceExpiresAt: string;
 }
 
 export interface ReasonInput {
@@ -70,10 +71,10 @@ function requireReason(reason: string | undefined): string {
   return reason.trim();
 }
 
-function optionalDate(value: string | undefined): string | null {
-  if (value === undefined) return null;
+function serviceExpirationDate(value: unknown): string {
+  if (typeof value !== "string" || !value.trim()) throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_DATE);
   const parsed = new Date(value);
-  if (!value.trim() || Number.isNaN(parsed.getTime())) throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_DATE);
+  if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_DATE);
   return parsed.toISOString();
 }
 
@@ -96,9 +97,7 @@ async function requirePlatformMember(
   platform: PlatformRepository,
 ): Promise<PlatformMember> {
   const userId = await resolveOnboardingActor(tenancy, actor);
-  const member = typeof actor === "string"
-    ? await platform.findActiveMemberByUserId(userId)
-    : await platform.findActiveMemberByEmail(actor.email);
+  const member = await platform.findActiveMemberByUserId(userId);
   if (!member || member.role !== "platform_admin" || !member.isActive) {
     throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
   }
@@ -112,6 +111,7 @@ export interface PlatformServiceDependencies {
 }
 
 export interface PlatformService {
+  claimPlatformMember(actor: AuthIdentity): Promise<PlatformMember>;
   listBusinesses(actor: OnboardingActor): Promise<PlatformBusinessDto[]>;
   approveBusiness(businessId: BusinessId, actor: OnboardingActor, input: ApproveBusinessInput): Promise<Business>;
   rejectBusiness(businessId: BusinessId, actor: OnboardingActor, input: ReasonInput): Promise<Business>;
@@ -157,9 +157,19 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
       return (await tenancy.listBusinesses()).map(toPlatformBusinessDto);
     },
 
+    async claimPlatformMember(actor) {
+      if (!actor.emailVerified) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
+      const userId = await resolveOnboardingActor(tenancy, actor);
+      const linked = await platform.findActiveMemberByUserId(userId);
+      if (linked) return linked;
+      const member = await platform.findMemberForClaimByEmail(actor.email);
+      if (!member || member.userId) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
+      return platform.linkMemberToUser(member.id, userId);
+    },
+
     async approveBusiness(businessId, actor, input) {
       const member = await requirePlatformMember(actor, tenancy, platform);
-      const serviceExpiresAt = optionalDate(input.serviceExpiresAt);
+      const serviceExpiresAt = serviceExpirationDate(input.serviceExpiresAt);
       const execute = async (transaction: OnboardingRepository, transactionPlatform: PlatformRepository): Promise<Business> => {
         const current = await transaction.findBusiness(businessId);
         if (!current) throw new PlatformError(PLATFORM_ERROR_CODES.BUSINESS_NOT_FOUND);
@@ -222,12 +232,32 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
   };
 }
 
-export const defaultPlatformRepository: InMemoryPlatformRepository = createInMemoryPlatformRepository();
-if ((process.env.NODE_ENV === "test" || process.env.LEDGERHARBOUR_TEST_MODE === "true") && process.env.PLATFORM_ADMIN_EMAILS) {
-  for (const [index, email] of process.env.PLATFORM_ADMIN_EMAILS.split(",").entries()) {
-    const normalizedEmail = email.trim().toLocaleLowerCase("en-US");
-    if (normalizedEmail) defaultPlatformRepository.addMember({ id: `test-platform-${index + 1}`, userId: null, normalizedEmail });
+const DEFAULT_PLATFORM_REPOSITORY_KEY = Symbol.for("ledgerharbour.platform.defaultRepository");
+
+function createDefaultPlatformRepository(): InMemoryPlatformRepository {
+  const shareAcrossBundles = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test" || process.env.LEDGERHARBOUR_TEST_MODE === "true";
+  const globalState = globalThis as typeof globalThis & { [key: symbol]: unknown };
+  const existing = globalState[DEFAULT_PLATFORM_REPOSITORY_KEY] as InMemoryPlatformRepository | undefined;
+  if (shareAcrossBundles && existing?.platformMembers && existing?.auditEvents) return existing;
+
+  const repository = createInMemoryPlatformRepository();
+  if (process.env.PLATFORM_ADMIN_EMAILS) {
+    for (const [index, email] of process.env.PLATFORM_ADMIN_EMAILS.split(",").entries()) {
+      const normalizedEmail = email.trim().toLocaleLowerCase("en-US");
+      if (normalizedEmail) repository.addMember({ id: `test-platform-${index + 1}`, userId: null, normalizedEmail });
+    }
   }
+  if (shareAcrossBundles) {
+    Object.defineProperty(globalState, DEFAULT_PLATFORM_REPOSITORY_KEY, {
+      configurable: false,
+      enumerable: false,
+      value: repository,
+      writable: false,
+    });
+  }
+  return repository;
 }
+
+export const defaultPlatformRepository: InMemoryPlatformRepository = createDefaultPlatformRepository();
 export const createDefaultPlatformService = (tenancyRepository: OnboardingRepository = defaultOnboardingRepository) =>
   createPlatformService({ tenancyRepository, platformRepository: defaultPlatformRepository });

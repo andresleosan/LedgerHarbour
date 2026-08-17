@@ -10,11 +10,11 @@ import {
   type CurrencyDependencies,
 } from "../../../src/modules/accounting/currency-service";
 import {
-  createBusiness,
   createInMemoryOnboardingRepository,
 } from "../../../src/modules/tenancy/business-service";
 import type { UserId } from "../../../src/modules/tenancy/types";
 import { createInvoiceRepository } from "../../../src/modules/invoices/invoice-service";
+import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 
@@ -22,7 +22,7 @@ describe("currency service", () => {
   async function context() {
     const tenancy = createInMemoryOnboardingRepository();
     const currencies = createCurrencyRepository();
-    const business = await createBusiness({ name: "Currency Books" }, user("owner"), tenancy);
+    const business = await createApprovedBusiness(tenancy, "Currency Books", user("owner"));
     return {
       business,
       dependencies: { tenancyRepository: tenancy, currencies } satisfies CurrencyDependencies,

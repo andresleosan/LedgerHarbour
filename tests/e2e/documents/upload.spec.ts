@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { createApprovedBusiness } from "../helpers/business";
 
 test.describe.configure({ mode: "serial" });
 
@@ -7,16 +8,6 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await page.getByLabel("Work email").fill(email);
   await page.getByRole("button", { name: "Continue with email" }).click();
   await expect(page.getByRole("status")).toContainText("Signed in as");
-}
-
-async function createBusiness(page: import("@playwright/test").Page, name: string) {
-  await page.goto("/onboarding/create-business");
-  await page.getByLabel("Business name").fill(name);
-  await page.getByRole("button", { name: "Create business" }).click();
-  const text = await page.getByRole("status").textContent();
-  const businessId = text?.match(/business-[\w-]+/)?.[0];
-  expect(businessId).toBeTruthy();
-  return businessId as string;
 }
 
 const validPdf = {
@@ -37,7 +28,7 @@ test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks a
   const ownerContext = await browser.newContext();
   const owner = await ownerContext.newPage();
   await signIn(owner, "documents-owner@example.com");
-  const businessId = await createBusiness(owner, "E2E Document Harbour");
+  const businessId = await createApprovedBusiness(browser, owner, "E2E Document Harbour");
   await owner.goto(`/business/${businessId}/upload`);
   await owner.locator('input[type="file"]').setInputFiles(validPdf);
   await owner.getByRole("button", { name: "Upload document" }).click();
@@ -55,7 +46,7 @@ test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks a
   const otherContext = await browser.newContext();
   const other = await otherContext.newPage();
   await signIn(other, "documents-other@example.com");
-  const otherBusinessId = await createBusiness(other, "E2E Other Document Harbour");
+  const otherBusinessId = await createApprovedBusiness(browser, other, "E2E Other Document Harbour");
   const documentId = (await owner.getByRole("link", { name: "Download invoice.pdf" }).getAttribute("href"))?.match(/documents\/([^/]+)\/download/)?.[1];
   expect(documentId).toBeTruthy();
   const forbidden = await other.request.get(`/api/documents/${documentId}/download`);
@@ -66,9 +57,9 @@ test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks a
   await otherContext.close();
 });
 
-test("shows invalid and oversized validation errors, including Spanish copy", async ({ page }) => {
+test("shows invalid and oversized validation errors, including Spanish copy", async ({ page, browser }) => {
   await signIn(page, "documents-validation@example.com");
-  const businessId = await createBusiness(page, "E2E Validation Harbour");
+  const businessId = await createApprovedBusiness(browser, page, "E2E Validation Harbour");
   await page.goto(`/business/${businessId}/upload`);
   await page.getByRole("link", { name: "Español" }).click();
   await page.locator('input[type="file"]').setInputFiles({ name: "bad.txt", mimeType: "text/plain", buffer: Buffer.from("not a document") });
@@ -79,9 +70,9 @@ test("shows invalid and oversized validation errors, including Spanish copy", as
   await expect(page.locator("p[role='alert']")).toContainText("10 MiB");
 });
 
-test("uploads and downloads a real progressive JPEG fixture", async ({ page }) => {
+test("uploads and downloads a real progressive JPEG fixture", async ({ page, browser }) => {
   await signIn(page, "documents-jpeg@example.com");
-  const businessId = await createBusiness(page, "E2E JPEG Harbour");
+  const businessId = await createApprovedBusiness(browser, page, "E2E JPEG Harbour");
   await page.goto(`/business/${businessId}/upload`);
   await page.locator('input[type="file"]').setInputFiles(validProgressiveJpeg);
   await page.getByRole("button", { name: "Upload document" }).click();
@@ -94,10 +85,10 @@ test("uploads and downloads a real progressive JPEG fixture", async ({ page }) =
   expect((await response.body()).length).toBe(validProgressiveJpeg.buffer.length);
 });
 
-test("keeps upload usable on mobile with keyboard focus and reduced motion", async ({ page }) => {
+test("keeps upload usable on mobile with keyboard focus and reduced motion", async ({ page, browser }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, "documents-accessibility@example.com");
-  const businessId = await createBusiness(page, "E2E Accessibility Harbour");
+  const businessId = await createApprovedBusiness(browser, page, "E2E Accessibility Harbour");
   await page.goto(`/business/${businessId}/upload`);
 
   await expect(page.locator("html")).toHaveJSProperty(
