@@ -12,6 +12,7 @@ import {
 } from "../../../src/modules/platform/platform-service";
 import { requireBusinessOperational } from "../../../src/modules/tenancy/business-lifecycle-service";
 import type { BusinessId, UserId } from "../../../src/modules/tenancy/types";
+import { testServiceExpiresAt } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
 const business = (value: string) => value as BusinessId;
@@ -33,11 +34,12 @@ describe("business approval lifecycle", () => {
     const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
     const created = await createBusinessRequest({ name: "Approved Harbour" }, user("requester"), tenancy);
     platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
+    const serviceExpiresAt = testServiceExpiresAt();
 
     const approved = await service.approveBusiness(
       created.id,
       user("platform-admin"),
-      { serviceExpiresAt: "2026-09-16T00:00:00.000Z" },
+      { serviceExpiresAt },
     );
 
     expect(approved).toMatchObject({
@@ -45,7 +47,7 @@ describe("business approval lifecycle", () => {
       status: "active",
       isActive: true,
       activatedAt: expect.any(String),
-      serviceExpiresAt: "2026-09-16T00:00:00.000Z",
+      serviceExpiresAt,
     });
     expect(tenancy.memberships).toContainEqual(expect.objectContaining({
       userId: user("requester"),
@@ -69,13 +71,13 @@ describe("business approval lifecycle", () => {
     const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
     const created = await createBusinessRequest({ name: "Protected Harbour" }, user("requester"), tenancy);
 
-    await expect(service.approveBusiness(created.id, user("requester"), { serviceExpiresAt: "2026-09-16T00:00:00.000Z" })).rejects.toMatchObject({
+    await expect(service.approveBusiness(created.id, user("requester"), { serviceExpiresAt: testServiceExpiresAt() })).rejects.toMatchObject({
       code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED,
     });
 
     platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
     await service.rejectBusiness(created.id, user("platform-admin"), { reason: "Incomplete request" });
-    await expect(service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: "2026-09-16T00:00:00.000Z" })).rejects.toMatchObject({
+    await expect(service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt() })).rejects.toMatchObject({
       code: PLATFORM_ERROR_CODES.INVALID_TRANSITION,
     });
   });
@@ -86,7 +88,7 @@ describe("business approval lifecycle", () => {
     const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
     const created = await createBusinessRequest({ name: "Service Harbour" }, user("requester"), tenancy);
     platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
-    await service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: "2026-09-16T00:00:00.000Z" });
+    await service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt() });
 
     await service.suspendBusiness(created.id, user("platform-admin"), { reason: "Subscription unpaid" });
     await expect(tenancy.findBusinessStatus(created.id)).resolves.toBe("suspended");
@@ -122,6 +124,54 @@ describe("business approval lifecycle", () => {
       displayName: "Verified Admin",
       emailVerified: true,
     })).resolves.toEqual([]);
+  });
+
+  it("keeps the first platform claim when a second identity claims the same member", async () => {
+    const tenancy = createInMemoryOnboardingRepository();
+    const platform = createInMemoryPlatformRepository();
+    const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+    platform.addMember({ id: "platform-1", userId: null, normalizedEmail: "admin@example.com" });
+    const first = { providerUserId: "first-provider", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
+    const second = { providerUserId: "second-provider", email: "admin@example.com", displayName: "Second", emailVerified: true } as const;
+
+    const linked = await service.claimPlatformMember(first);
+
+    await expect(service.claimPlatformMember(second)).rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT });
+    expect(platform.platformMembers[0]).toMatchObject({ id: "platform-1", userId: linked.userId });
+  });
+
+  it("allows only one concurrent in-memory platform claim", async () => {
+    const tenancy = createInMemoryOnboardingRepository();
+    const platform = createInMemoryPlatformRepository();
+    const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+    platform.addMember({ id: "platform-1", userId: null, normalizedEmail: "admin@example.com" });
+    const first = { providerUserId: "first-provider", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
+    const second = { providerUserId: "second-provider", email: "admin@example.com", displayName: "Second", emailVerified: true } as const;
+
+    const results = await Promise.allSettled([
+      service.claimPlatformMember(first),
+      service.claimPlatformMember(second),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    const winner = results.find((result) => result.status === "fulfilled")!;
+    expect(platform.platformMembers[0].userId).toBe((winner as PromiseFulfilledResult<{ userId: string }>).value.userId);
+  });
+
+  it("rejects repository creation attempts that provide an active status", async () => {
+    const tenancy = createInMemoryOnboardingRepository();
+
+    await expect(tenancy.createBusiness({
+      name: "Active Bypass",
+      normalizedName: "active bypass",
+      isActive: true,
+      status: "active",
+      baseCurrencyKind: "standard",
+      baseCurrencyCode: "GBP",
+      baseCurrencyId: null,
+      createdBy: user("requester"),
+    } as never)).rejects.toMatchObject({ code: "INVALID_BUSINESS_TRANSITION" });
   });
 
   it("requires a future service expiration date to approve", async () => {

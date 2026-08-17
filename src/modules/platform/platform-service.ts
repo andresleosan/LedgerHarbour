@@ -101,7 +101,6 @@ async function requirePlatformMember(
   if (!member || member.role !== "platform_admin" || !member.isActive) {
     throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
   }
-  if (!member.userId) await platform.linkMemberToUser(member.id, userId);
   return member;
 }
 
@@ -159,12 +158,15 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
 
     async claimPlatformMember(actor) {
       if (!actor.emailVerified) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
+      const member = await platform.findMemberForClaimByEmail(actor.email);
+      if (!member) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
+      if (member.userId) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
       const userId = await resolveOnboardingActor(tenancy, actor);
       const linked = await platform.findActiveMemberByUserId(userId);
-      if (linked) return linked;
-      const member = await platform.findMemberForClaimByEmail(actor.email);
-      if (!member || member.userId) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
-      return platform.linkMemberToUser(member.id, userId);
+      if (linked) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+      const linkedMember = await platform.linkMemberToUser(member.id, userId);
+      if (!linkedMember) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+      return linkedMember;
     },
 
     async approveBusiness(businessId, actor, input) {
@@ -242,9 +244,21 @@ function createDefaultPlatformRepository(): InMemoryPlatformRepository {
 
   const repository = createInMemoryPlatformRepository();
   if (process.env.PLATFORM_ADMIN_EMAILS) {
+    const configuredUserIds = process.env.PLATFORM_ADMIN_USER_IDS?.split(",") ?? [];
     for (const [index, email] of process.env.PLATFORM_ADMIN_EMAILS.split(",").entries()) {
       const normalizedEmail = email.trim().toLocaleLowerCase("en-US");
-      if (normalizedEmail) repository.addMember({ id: `test-platform-${index + 1}`, userId: null, normalizedEmail });
+      const userIds = configuredUserIds.length === process.env.PLATFORM_ADMIN_EMAILS.split(",").length
+        ? [configuredUserIds[index]]
+        : configuredUserIds;
+      if (normalizedEmail) {
+        for (const [userIndex, configuredUserId] of userIds.entries()) {
+          repository.addMember({
+            id: `test-platform-${index + 1}-${userIndex + 1}`,
+            userId: configuredUserId?.trim() ? configuredUserId.trim() as UserId : null,
+            normalizedEmail,
+          });
+        }
+      }
     }
   }
   if (shareAcrossBundles) {

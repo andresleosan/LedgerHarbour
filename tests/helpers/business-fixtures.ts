@@ -9,7 +9,9 @@ import {
 import { createInMemoryPlatformRepository, createPlatformService } from "../../src/modules/platform/platform-service";
 import type { UserId } from "../../src/modules/tenancy/types";
 
-export const TEST_SERVICE_EXPIRES_AT = "2026-09-16T00:00:00.000Z";
+export function testServiceExpiresAt(days = 30): string {
+  return new Date(Date.now() + days * 24 * 60 * 60 * 1000).toISOString();
+}
 export const TEST_PLATFORM_ADMIN = "test-platform-admin" as UserId;
 
 export async function createApprovedBusiness(
@@ -25,7 +27,7 @@ export async function createApprovedBusiness(
     normalizedEmail: "test-platform-admin@example.com",
   });
   return createPlatformService({ tenancyRepository: repository, platformRepository: platform })
-    .approveBusiness(requested.id, TEST_PLATFORM_ADMIN, { serviceExpiresAt: TEST_SERVICE_EXPIRES_AT });
+    .approveBusiness(requested.id, TEST_PLATFORM_ADMIN, { serviceExpiresAt: testServiceExpiresAt() });
 }
 
 export async function createApprovedMemoryBusiness(

@@ -7,6 +7,7 @@ import {
   createPlatformService,
   createPostgresPlatformRepository,
 } from "../../../src/modules/platform/platform-service";
+import { testServiceExpiresAt } from "../../helpers/business-fixtures";
 
 describe("PostgreSQL business approval lifecycle", () => {
   it("keeps the request pending, then atomically grants owner access on approval", async () => {
@@ -36,7 +37,7 @@ describe("PostgreSQL business approval lifecycle", () => {
       const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
       await service.claimPlatformMember(admin);
       const approved = await service
-        .approveBusiness(created.id, admin, { serviceExpiresAt: "2026-09-16T00:00:00.000Z" });
+        .approveBusiness(created.id, admin, { serviceExpiresAt: testServiceExpiresAt() });
 
       expect(approved.status).toBe("active");
       await expect(tenancy.listMemberships(created.id)).resolves.toEqual([
@@ -45,6 +46,73 @@ describe("PostgreSQL business approval lifecycle", () => {
       await expect(platform.listAuditEvents(created.id)).resolves.toEqual([
         expect.objectContaining({ action: "business_approved", targetId: created.id }),
       ]);
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
+  it("keeps the first PostgreSQL platform claim and rejects the second claim", async () => {
+    const { db, close } = await createTestDatabase();
+
+    try {
+      const tenancy = createPostgresOnboardingRepository(db);
+      const platform = createPostgresPlatformRepository(db);
+      const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+      const first = { providerUserId: "postgres-first", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
+      await platform.bootstrapMember("platform-admin-1", first.email);
+
+      const linked = await service.claimPlatformMember(first);
+
+      await expect(service.claimPlatformMember({ ...first, providerUserId: "postgres-second", displayName: "Second" })).rejects.toMatchObject({ code: "PLATFORM_REPOSITORY_CONFLICT" });
+      const linkedUserId = linked.userId;
+      expect(linkedUserId).not.toBeNull();
+      await expect(platform.findActiveMemberByUserId(linkedUserId as never)).resolves.toMatchObject({ id: "platform-admin-1", userId: linkedUserId });
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
+  it("allows only one concurrent PostgreSQL platform claim", async () => {
+    const { db, close } = await createTestDatabase();
+
+    try {
+      const tenancy = createPostgresOnboardingRepository(db);
+      const platform = createPostgresPlatformRepository(db);
+      const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+      const first = { providerUserId: "postgres-first", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
+      const second = first;
+      await platform.bootstrapMember("platform-admin-1", first.email);
+
+      const results = await Promise.allSettled([
+        service.claimPlatformMember(first),
+        service.claimPlatformMember(second),
+      ]);
+
+      expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+      expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+      const winner = results.find((result) => result.status === "fulfilled")!;
+      await expect(platform.findActiveMemberByUserId((winner as PromiseFulfilledResult<{ userId: string }>).value.userId as never)).resolves.toMatchObject({ id: "platform-admin-1" });
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
+  it("rejects PostgreSQL repository creation attempts that provide an active status", async () => {
+    const { db, close } = await createTestDatabase();
+
+    try {
+      const tenancy = createPostgresOnboardingRepository(db);
+
+      await expect(tenancy.createBusiness({
+        name: "Active Bypass",
+        normalizedName: "active bypass",
+        isActive: true,
+        status: "active",
+        baseCurrencyKind: "standard",
+        baseCurrencyCode: "GBP",
+        baseCurrencyId: null,
+        createdBy: "requester",
+      } as never)).rejects.toMatchObject({ code: "INVALID_BUSINESS_TRANSITION" });
     } finally {
       await close();
     }

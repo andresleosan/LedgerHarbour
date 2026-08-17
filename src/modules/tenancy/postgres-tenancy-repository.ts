@@ -17,7 +17,9 @@ import type { AuthIdentity } from "../auth/auth-provider";
 import {
   ONBOARDING_ERROR_CODES,
   OnboardingError,
+  assertPendingBusinessCreationInput,
   type Business,
+  type BusinessCreateInput,
   type BusinessLifecycleUpdate,
   validateBusinessStatusTransition,
   type BusinessSearchResult,
@@ -196,8 +198,9 @@ function createRepository(db: Database, transactionCount: { value: number }): On
       return business?.status ?? null;
     },
 
-    async createBusiness(input) {
+    async createBusiness(input: BusinessCreateInput) {
       try {
+        assertPendingBusinessCreationInput(input);
         const [row] = await db.insert(businesses).values({
           name: input.name,
           normalizedSearchName: input.normalizedName,
@@ -205,12 +208,12 @@ function createRepository(db: Database, transactionCount: { value: number }): On
           baseCurrencyCode: input.baseCurrencyCode,
           baseCurrencyId: input.baseCurrencyId,
           createdBy: input.createdBy,
-          status: input.status ?? (input.isActive ? "active" : "suspended"),
-          isActive: input.status ? input.status === "active" : input.isActive,
-          activatedAt: input.activatedAt ? new Date(input.activatedAt) : null,
-          serviceExpiresAt: input.serviceExpiresAt ? new Date(input.serviceExpiresAt) : null,
-          suspendedAt: input.suspendedAt ? new Date(input.suspendedAt) : null,
-          suspensionReason: input.suspensionReason ?? null,
+          status: "pending",
+          isActive: false,
+          activatedAt: null,
+          serviceExpiresAt: null,
+          suspendedAt: null,
+          suspensionReason: null,
         }).returning();
         if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
         return mapBusiness(row, input.createdBy);

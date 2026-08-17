@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, isNull } from "drizzle-orm";
 
 import type { Database } from "../../db/client";
 import { databaseForOperation, transactionWithDatabase } from "../../db/transaction-scope";
@@ -29,7 +29,7 @@ export interface PlatformRepository {
   transaction?<T>(operation: (repository: PlatformRepository) => Promise<T>): Promise<T>;
   findActiveMemberByUserId(userId: UserId): Promise<PlatformMember | null>;
   findMemberForClaimByEmail(normalizedEmail: string): Promise<PlatformMember | null>;
-  linkMemberToUser(memberId: string, userId: UserId): Promise<PlatformMember>;
+  linkMemberToUser(memberId: string, userId: UserId): Promise<PlatformMember | null>;
   appendAuditEvent(event: Omit<PlatformAuditEvent, "id" | "createdAt">): Promise<PlatformAuditEvent>;
   listAuditEvents(targetId: string): Promise<PlatformAuditEvent[]>;
 }
@@ -80,9 +80,9 @@ class MemoryPlatformRepository implements InMemoryPlatformRepository {
     return this.platformMembers.find((member) => member.normalizedEmail === normalizeEmail(normalizedEmail) && member.isActive) ?? null;
   }
 
-  async linkMemberToUser(memberId: string, userId: UserId): Promise<PlatformMember> {
-    const member = this.platformMembers.find((candidate) => candidate.id === memberId && candidate.isActive);
-    if (!member) throw new Error("Platform member not found");
+  async linkMemberToUser(memberId: string, userId: UserId): Promise<PlatformMember | null> {
+    const member = this.platformMembers.find((candidate) => candidate.id === memberId && candidate.isActive && candidate.userId === null);
+    if (!member) return null;
     member.userId = userId;
     return { ...member };
   }
@@ -153,10 +153,9 @@ export function createPostgresPlatformRepository(db: Database): PlatformReposito
     async linkMemberToUser(memberId, userId) {
       const [row] = await databaseForOperation(db).update(platformMembers)
         .set({ userId, updatedAt: new Date() })
-        .where(and(eq(platformMembers.id, memberId), eq(platformMembers.isActive, true)))
+        .where(and(eq(platformMembers.id, memberId), eq(platformMembers.isActive, true), isNull(platformMembers.userId)))
         .returning();
-      if (!row) throw new Error("Platform member not found");
-      return mapMember(row);
+      return row ? mapMember(row) : null;
     },
 
     async appendAuditEvent(input) {

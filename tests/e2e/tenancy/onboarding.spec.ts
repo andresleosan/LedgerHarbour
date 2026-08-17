@@ -77,8 +77,6 @@ test("searches, requests access, approves, rejects, and reapplies", async ({ bro
   const businessId = text?.match(/business-[\w-]+/)?.[0];
   expect(businessId).toBeTruthy();
   await withPlatformAdmin(browser, async (admin) => {
-    const claim = await admin.request.post("/api/platform/claim");
-    expect(claim.status()).toBe(200);
     const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     });
@@ -168,8 +166,6 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
    const businessId = (await createdStatus.textContent())?.match(/business-[\w-]+/)?.[0];
    expect(businessId).toBeTruthy();
    await withPlatformAdmin(browser, async (admin) => {
-     const claim = await admin.request.post("/api/platform/claim");
-     expect(claim.status()).toBe(200);
      const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
        data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
      });

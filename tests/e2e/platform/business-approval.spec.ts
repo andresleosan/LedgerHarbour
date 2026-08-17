@@ -27,8 +27,6 @@ test("submits a business request and requires platform approval before operation
 
   const admin = await browser.newPage();
   await signIn(admin, "platform-admin@example.com");
-  const claim = await admin.request.post("/api/platform/claim");
-  expect(claim.status()).toBe(200);
   const pending = await admin.evaluate(async () => {
     const response = await fetch("/api/platform/businesses");
     return { status: response.status, body: await response.json() } as { status: number; body: { businesses?: Array<{ id: string; status: string }> } };
@@ -40,7 +38,7 @@ test("submits a business request and requires platform approval before operation
     const response = await fetch(`/api/platform/businesses/${id}/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serviceExpiresAt: "2026-09-16T00:00:00.000Z" }),
+      body: JSON.stringify({ serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }),
     });
     return { status: response.status, body: await response.json() };
   }, businessId);

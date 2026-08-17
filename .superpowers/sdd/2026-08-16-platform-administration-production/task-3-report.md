@@ -32,9 +32,21 @@ Task 3 implementada directamente sobre `main`, sin worktree, rama ni delegación
 - El repositorio platform en memoria comparte singleton entre bundles de Next durante test/dev, preservando el claim entre rutas.
 - Helpers unitarios, integración, Postgres y E2E fueron migrados a solicitud + aprobación real.
 
+## Fix Round 2
+
+- Claim atómico: memory conserva el primer vínculo; Postgres usa `UPDATE ... WHERE id = ? AND user_id IS NULL` y devuelve conflicto si no afecta filas.
+- Añadidas pruebas de segundo claim y claims concurrentes en memory/Postgres; el vínculo ganador permanece.
+- Eliminado `src/app/api/platform/claim/route.ts` y retiradas sus llamadas E2E. El claim queda como operación interna del servicio.
+- `OnboardingRepository.createBusiness` ya no acepta `status`, `isActive` ni campos de lifecycle; ambos repositorios fuerzan `pending` y rechazan payloads runtime con esos campos.
+- Fechas de fixtures y pruebas derivadas dinámicamente de `Date.now()`.
+- El bootstrap platform de E2E usa miembros presembrados por IDs locales; no reintroduce un endpoint público ni fallback de autorización por email.
+
 ## Pruebas
 
-- `corepack pnpm exec vitest run`: **47 files passed, 1 skipped; 397 passed, 2 skipped**.
+- Fix Round 1 baseline: **47 files passed, 1 skipped; 397 passed, 2 skipped**.
+- Fix Round 2 RED: **4 tests failed** en los casos nuevos de claim/creación activa.
+- Fix Round 2 GREEN focalizado: **2 files passed; 16 passed**.
+- `corepack pnpm exec vitest run`: **47 files passed, 1 skipped; 403 passed, 2 skipped**.
 - `corepack pnpm exec playwright test --workers=1`: **25 passed**.
 - `corepack pnpm lint`: **passed**.
 - `corepack pnpm exec tsc --noEmit`: **passed**.

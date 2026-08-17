@@ -7,6 +7,7 @@ import {
   PLATFORM_ERROR_CODES,
 } from "../../src/modules/platform/platform-service";
 import type { UserId } from "../../src/modules/tenancy/types";
+import { testServiceExpiresAt } from "../helpers/business-fixtures";
 
 vi.mock("../../src/modules/auth/session", () => ({
   getCurrentIdentity: vi.fn(async () => ({
@@ -29,7 +30,7 @@ describe("platform administration authorization", () => {
     await expect(service.listBusinesses(user("requester"))).rejects.toMatchObject({
       code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED,
     });
-    await expect(service.approveBusiness(business.id, user("requester"), { serviceExpiresAt: "2026-09-16T00:00:00.000Z" })).rejects.toMatchObject({
+    await expect(service.approveBusiness(business.id, user("requester"), { serviceExpiresAt: testServiceExpiresAt() })).rejects.toMatchObject({
       code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED,
     });
   });

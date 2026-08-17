@@ -17,8 +17,6 @@ export async function createApprovedBusiness(browser: Browser, page: Page, name:
   expect(businessId).toBeTruthy();
 
   await withPlatformAdmin(browser, async (admin) => {
-    const claim = await admin.request.post("/api/platform/claim");
-    expect(claim.status()).toBe(200);
     const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     });

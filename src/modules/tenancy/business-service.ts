@@ -103,6 +103,16 @@ export interface CreateBusinessInput {
   name: string;
 }
 
+export type BusinessCreateInput = Omit<Business, "id" | "status" | "isActive" | "activatedAt" | "serviceExpiresAt" | "suspendedAt" | "suspensionReason">;
+
+const lifecycleCreationFields = ["status", "isActive", "activatedAt", "serviceExpiresAt", "suspendedAt", "suspensionReason"] as const;
+
+export function assertPendingBusinessCreationInput(input: unknown): asserts input is BusinessCreateInput {
+  if (!input || typeof input !== "object" || lifecycleCreationFields.some((field) => Object.prototype.hasOwnProperty.call(input, field))) {
+    throw new OnboardingError(ONBOARDING_ERROR_CODES.INVALID_BUSINESS_TRANSITION);
+  }
+}
+
 export interface BusinessLifecycleUpdate {
   status: BusinessStatus;
   activatedAt?: string | null;
@@ -143,7 +153,7 @@ export interface OnboardingRepository extends TenantRepository {
   readonly transactionCount: number;
   transaction<T>(operation: (repository: OnboardingRepository) => Promise<T>): Promise<T>;
   upsertUser(identity: AuthIdentity): Promise<UserId>;
-  createBusiness(input: Omit<Business, "id" | "status" | "activatedAt" | "serviceExpiresAt" | "suspendedAt" | "suspensionReason"> & Partial<Pick<Business, "status" | "activatedAt" | "serviceExpiresAt" | "suspendedAt" | "suspensionReason">>): Promise<Business>;
+  createBusiness(input: BusinessCreateInput): Promise<Business>;
   provisionDefaultCategories(businessId: BusinessId): Promise<void>;
   createMembership(membership: Membership): Promise<Membership>;
   updateMembership(membership: Membership): Promise<Membership>;
@@ -272,16 +282,16 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
     return business.status === "active" && business.isActive ? "active" : business.status === "active" ? "suspended" : business.status;
   }
 
-  async createBusiness(input: Omit<Business, "id" | "status" | "activatedAt" | "serviceExpiresAt" | "suspendedAt" | "suspensionReason"> & Partial<Pick<Business, "status" | "activatedAt" | "serviceExpiresAt" | "suspendedAt" | "suspensionReason">>): Promise<Business> {
-    const status = input.status ?? (input.isActive ? "active" : "suspended");
+  async createBusiness(input: BusinessCreateInput): Promise<Business> {
+    assertPendingBusinessCreationInput(input);
     const business = {
       ...input,
-      status,
-      isActive: status === "active",
-      activatedAt: input.activatedAt ?? null,
-      serviceExpiresAt: input.serviceExpiresAt ?? null,
-      suspendedAt: input.suspendedAt ?? null,
-      suspensionReason: input.suspensionReason ?? null,
+      status: "pending" as const,
+      isActive: false,
+      activatedAt: null,
+      serviceExpiresAt: null,
+      suspendedAt: null,
+      suspensionReason: null,
       id: idFor<BusinessId>(`business-${this.nextBusinessId++}`),
     };
     this.businesses.set(business.id, business);
@@ -570,12 +580,6 @@ async function createBusinessWithStatus(
     const business = await transaction.createBusiness({
       name,
       normalizedName,
-       status: "pending",
-       isActive: false,
-       activatedAt: null,
-       serviceExpiresAt: null,
-       suspendedAt: null,
-       suspensionReason: null,
       baseCurrencyKind: "standard",
       baseCurrencyCode: "GBP",
       baseCurrencyId: null,

@@ -274,7 +274,6 @@ describe("PostgreSQL onboarding repository contract", () => {
         const created = await transaction.createBusiness({
           name: "Rollback Books",
           normalizedName: "rollback books",
-          isActive: true,
           baseCurrencyKind: "standard",
           baseCurrencyCode: "GBP",
           baseCurrencyId: null,

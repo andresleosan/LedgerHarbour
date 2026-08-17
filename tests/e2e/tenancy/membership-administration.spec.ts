@@ -28,8 +28,6 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   const businessId = (await owner.getByRole("status").textContent())?.match(/business-[\w-]+/)?.[0];
   if (!businessId) throw new Error("Business creation did not return an id");
   await withPlatformAdmin(browser, async (admin) => {
-    const claim = await admin.request.post("/api/platform/claim");
-    expect(claim.status()).toBe(200);
     const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     });
@@ -170,8 +168,6 @@ test("inactive business blocks join and review operations and preserves member s
   const businessId = (await page.getByRole("status").textContent())?.match(/business-[\w-]+/)?.[0];
   if (!businessId) throw new Error("Business creation did not return an id");
   await withPlatformAdmin(browser, async (admin) => {
-    const claim = await admin.request.post("/api/platform/claim");
-    expect(claim.status()).toBe(200);
     const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     });
