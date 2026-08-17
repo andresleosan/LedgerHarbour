@@ -247,15 +247,13 @@ describe("development authentication provider", () => {
   it("rejects a valid development cookie after NODE_ENV changes to production", async () => {
     const provider = new DevAuthProvider();
     const identity = await provider.signInWithEmail({ email: "member@example.com" });
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
 
     try {
       expect(getCurrentIdentitySync()).toBeNull();
       await expect(getCurrentIdentity()).resolves.toBeNull();
     } finally {
-      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-      else process.env.NODE_ENV = previousNodeEnv;
+      vi.unstubAllEnvs();
       expect(identity.email).toBe("member@example.com");
     }
   });
@@ -298,8 +296,7 @@ describe("development authentication provider", () => {
   });
 
   it("fails closed in production even when development auth is selected", () => {
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     process.env.AUTH_MODE = "development";
 
     try {
@@ -310,8 +307,7 @@ describe("development authentication provider", () => {
         }),
       );
     } finally {
-      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-      else process.env.NODE_ENV = previousNodeEnv;
+      vi.unstubAllEnvs();
     }
   });
 

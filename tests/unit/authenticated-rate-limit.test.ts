@@ -64,8 +64,7 @@ describe("authenticated endpoint rate limit", () => {
   });
 
   it("uses edge-unknown in production instead of client-controlled fallback headers", async () => {
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
 
     try {
       await enforceAuthenticatedRateLimit("upload", "firebase-user-3", new Headers({
@@ -76,8 +75,7 @@ describe("authenticated endpoint rate limit", () => {
       expect(limit).toHaveBeenCalledWith("authenticated:upload:firebase-user-3:edge-unknown");
       expect(aggregateLimit).toHaveBeenCalledWith("authenticated:upload:address:edge-unknown");
     } finally {
-      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-      else process.env.NODE_ENV = previousNodeEnv;
+      vi.unstubAllEnvs();
     }
   });
 });

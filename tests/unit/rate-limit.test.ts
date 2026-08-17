@@ -38,15 +38,13 @@ describe("InMemoryRateLimiter", () => {
   });
 
   it("requires Upstash instead of memory in production", () => {
-    const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     process.env.RATE_LIMIT_MODE = "memory";
 
     try {
       expect(() => createAuthenticatedRateLimiter("upload")).toThrow("Upstash rate limiting is required");
     } finally {
-      if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
-      else process.env.NODE_ENV = previousNodeEnv;
+      vi.unstubAllEnvs();
       vi.unstubAllEnvs();
     }
   });
