@@ -25,6 +25,7 @@ export type EffectiveBusinessAccess =
 export interface TenantRepository {
   findMembership(userId: UserId, businessId: BusinessId): Promise<Membership | null>;
   findBusinessStatus(businessId: BusinessId): Promise<BusinessStatus | "inactive" | null>;
+  findUserById?(userId: UserId): Promise<{ email: string } | null>;
 }
 
 export interface TenantContext {
@@ -93,7 +94,8 @@ function isMembershipForRequest(
     membership.userId === userId &&
     membership.businessId === businessId &&
     MembershipRole.includes(membership.role) &&
-    typeof membership.isActive === "boolean"
+    typeof membership.isActive === "boolean" &&
+    (membership.status === undefined || (membership.status === "active") === membership.isActive)
   );
 }
 
@@ -174,7 +176,7 @@ async function effectiveBusinessAccessFrom(
   if (!isMembershipForRequest(membership, userId, businessId)) {
     return { allowed: false, membership: null, reason: BUSINESS_ACCESS_DENIAL_REASONS.MEMBERSHIP_REQUIRED };
   }
-  if (!membership.isActive) {
+  if (membership.status !== "active" || !membership.isActive) {
     return { allowed: false, membership: null, reason: BUSINESS_ACCESS_DENIAL_REASONS.MEMBERSHIP_INACTIVE };
   }
   return { allowed: true, membership, reason: null };

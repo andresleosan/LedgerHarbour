@@ -194,6 +194,15 @@ function createRepository(db: Database, transactionCount: { value: number }): On
       }
     },
 
+    async findUserById(userId) {
+      try {
+        const [row] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId)).limit(1);
+        return row ?? null;
+      } catch (error) {
+        return preserveOrMap(error);
+      }
+    },
+
     async findBusinessStatus(businessId) {
       const business = await repository.findBusiness(businessId);
       if (!business) return null;

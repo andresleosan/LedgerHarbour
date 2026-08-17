@@ -77,8 +77,16 @@ function requireActor(actorId: UserId): void {
 
 async function activeOwners(repository: OnboardingRepository, businessId: BusinessId): Promise<Membership[]> {
   return (await repository.listMemberships(businessId)).filter(
-    (membership) => membership.businessId === businessId && membership.isActive && membership.role === "owner_admin",
+    (membership) => membership.businessId === businessId && membership.isActive && membership.status === "active" && membership.role === "owner_admin",
   );
+}
+
+function expectedMembershipState(membership: Membership): Pick<Membership, "isActive" | "role" | "status"> {
+  return {
+    isActive: membership.isActive,
+    role: membership.role,
+    ...(membership.status === undefined ? {} : { status: membership.status }),
+  };
 }
 
 async function ensureOwnerInvariant(repository: OnboardingRepository, businessId: BusinessId): Promise<void> {
@@ -196,8 +204,9 @@ export function createMembershipService(repository: OnboardingRepository = defau
         if (current.role !== "administrator" || !current.isActive) {
           throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.REPOSITORY_CONFLICT);
         }
+        const expected = expectedMembershipState(current);
         current.role = "general_admin";
-        await transaction.updateMembership(current);
+        await transaction.updateMembership(current, expected);
         await transaction.appendAuditEvent({ businessId: input.businessId, actorId, type: "membership_role_changed", entityId: current.membershipId });
         return { ...current };
       });
@@ -237,7 +246,7 @@ export function createMembershipService(repository: OnboardingRepository = defau
         if (current.role === "general_admin" && currentActor.role !== "owner_admin") {
           throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.INSUFFICIENT_CAPABILITY);
         }
-        await transaction.deleteMembership(current.membershipId);
+        await transaction.deleteMembership(current.membershipId, expectedMembershipState(current));
         await transaction.appendAuditEvent({ businessId: input.businessId, actorId, type: "membership_removed", entityId: current.membershipId });
       });
     },
@@ -266,10 +275,12 @@ export function createMembershipService(repository: OnboardingRepository = defau
         if (!owner || owner.role !== "owner_admin" || !owner.isActive || !currentTarget.isActive || currentTarget.role === "owner_admin") {
           throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.REPOSITORY_CONFLICT);
         }
+        const ownerExpected = expectedMembershipState(owner);
+        const targetExpected = expectedMembershipState(currentTarget);
         owner.role = "administrator";
         currentTarget.role = "owner_admin";
-        await transaction.updateMembership(owner);
-        await transaction.updateMembership(currentTarget);
+        await transaction.updateMembership(owner, ownerExpected);
+        await transaction.updateMembership(currentTarget, targetExpected);
         await ensureOwnerInvariant(transaction, input.businessId);
         await transaction.appendAuditEvent({ businessId: input.businessId, actorId, type: "ownership_transferred", entityId: currentTarget.membershipId });
       });

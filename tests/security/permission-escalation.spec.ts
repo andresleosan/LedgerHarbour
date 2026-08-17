@@ -18,7 +18,7 @@ const user = (value: string) => value as UserId;
 const business = (value: string) => value as BusinessId;
 
 function membership(userId: string, businessId: BusinessId, role: Membership["role"]): Membership {
-  return { membershipId: `membership-${userId}`, userId: user(userId), businessId, role, isActive: true };
+  return { membershipId: `membership-${userId}`, userId: user(userId), businessId, role, isActive: true, status: "active" };
 }
 
 async function fixture() {

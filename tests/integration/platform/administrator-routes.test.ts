@@ -20,6 +20,9 @@ vi.mock("../../../src/modules/auth/session", () => ({
 import { GET as listAdministrators } from "../../../src/app/api/platform/administrators/route";
 import { POST as approveAdministrator } from "../../../src/app/api/platform/administrators/[membershipId]/approve/route";
 import { POST as suspendAdministrator } from "../../../src/app/api/platform/administrators/[membershipId]/suspend/route";
+import { POST as rejectBusiness } from "../../../src/app/api/platform/businesses/[businessId]/reject/route";
+import { POST as suspendBusiness } from "../../../src/app/api/platform/businesses/[businessId]/suspend/route";
+import { POST as reactivateBusiness } from "../../../src/app/api/platform/businesses/[businessId]/reactivate/route";
 
 const mockedIdentity = vi.mocked(getCurrentIdentity);
 const platformIdentity: AuthIdentity = {
@@ -140,5 +143,23 @@ describe("platform administrator HTTP contracts", () => {
     resetRateLimitersForTests();
     vi.stubEnv("RATE_LIMIT_MODE", "invalid");
     await expect(listAdministrators(request(undefined, "GET"))).resolves.toMatchObject({ status: 503 });
+  });
+
+  it("covers platform business reject, suspend, and reactivate HTTP transitions", async () => {
+    mockedIdentity.mockResolvedValue(platformIdentity);
+    const activeMembership = await setupAdministrator(true);
+    const businessContext = { params: Promise.resolve({ businessId: activeMembership.businessId }) };
+
+    const suspended = await suspendBusiness(request({ reason: "HTTP suspension" }), businessContext);
+    expect(suspended.status).toBe(200);
+    const reactivated = await reactivateBusiness(request({}, "POST"), businessContext);
+    expect(reactivated.status).toBe(200);
+
+    const pending = await createBusinessRequest({ name: "HTTP Reject Harbour" }, "route-pending-owner" as UserId, defaultOnboardingRepository);
+    const missingReason = await rejectBusiness(request({}, "POST"), { params: Promise.resolve({ businessId: pending.id }) });
+    expect(missingReason.status).toBe(400);
+    const rejected = await rejectBusiness(request({ reason: "HTTP rejection" }), { params: Promise.resolve({ businessId: pending.id }) });
+    expect(rejected.status).toBe(200);
+    await expect(rejected.json()).resolves.toMatchObject({ business: { id: pending.id, status: "rejected" } });
   });
 });

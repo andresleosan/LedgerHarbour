@@ -50,8 +50,9 @@ describe("administrator approval integration", () => {
       membershipId: "membership-general-1",
       userId: user("general-1"),
       businessId: first.id,
-      role: "general_admin",
-      isActive: true,
+       role: "general_admin",
+       isActive: true,
+       status: "active",
     });
     const request = await services.requestMembership({ businessId: second.id, requestedRole: "administrator" }, user("requester"));
 

@@ -191,6 +191,71 @@ describe("membership administration routes and business lifecycle", () => {
     expect(repository.memberships).toContainEqual(expect.objectContaining({ membershipId: "membership-member", userId: user("member"), businessId: created.id, role: "administrator", isActive: true }));
   });
 
+  it("passes CAS expectations for every membership mutation", async () => {
+    const enforceCas = (repository: ReturnType<typeof createInMemoryOnboardingRepository>) => {
+      let wrapped!: typeof repository;
+      wrapped = new Proxy(repository, {
+        get(target, property, receiver) {
+          if (property === "transaction") {
+            return (operation: (transaction: typeof repository) => Promise<unknown>) =>
+              target.transaction(() => operation(wrapped));
+          }
+          if (property === "updateMembership" || property === "deleteMembership") {
+            return (...args: [unknown, unknown?]) => {
+              if (args[1] === undefined) throw new Error("membership CAS expectation missing");
+              return (target[property] as (...values: unknown[]) => unknown)(...args);
+            };
+          }
+          return Reflect.get(target, property, receiver);
+        },
+      });
+      return wrapped;
+    };
+
+    const createScenario = async () => {
+      const baseRepository = createInMemoryOnboardingRepository();
+      const created = await createApprovedBusiness(baseRepository, "CAS Harbour", identity("cas-owner"));
+      const targetId = await baseRepository.upsertUser(identity("cas-target"));
+      const target = await baseRepository.createMembership({
+        membershipId: "cas-target-membership",
+        userId: targetId,
+        businessId: created.id,
+        role: "administrator",
+        isActive: true,
+      });
+      const ownerId = baseRepository.memberships.find((membership) => membership.role === "owner_admin")!.userId;
+      return { repository: enforceCas(baseRepository), created, target, ownerId };
+    };
+
+    const setScenario = await createScenario();
+    expect(setScenario.repository.memberships.find((membership) => membership.role === "owner_admin")).toMatchObject({
+      userId: setScenario.ownerId,
+      isActive: true,
+      status: "active",
+    });
+    await createMembershipService(setScenario.repository).setGeneralAdmin(
+      { businessId: setScenario.created.id, membershipId: setScenario.target.membershipId },
+      setScenario.ownerId,
+    );
+
+    const removeScenario = await createScenario();
+    await createMembershipService(removeScenario.repository).removeAdministrator(
+      { businessId: removeScenario.created.id, membershipId: removeScenario.target.membershipId },
+      removeScenario.ownerId,
+    );
+
+    const transferScenario = await createScenario();
+    await createMembershipService(transferScenario.repository).transferOwnership(
+      {
+        businessId: transferScenario.created.id,
+        targetMembershipId: transferScenario.target.membershipId,
+        confirmationName: "CAS Harbour",
+        reauthenticatedAt: new Date().toISOString(),
+      },
+      transferScenario.ownerId,
+    );
+  });
+
   it("blocks inactive join requests and reviews while preserving pending state", async () => {
     const repository = createInMemoryOnboardingRepository();
     const onboarding = createOnboardingServices(repository);

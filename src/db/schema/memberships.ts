@@ -37,6 +37,10 @@ export const memberships = pgTable(
     index("memberships_business_active_idx").on(table.businessId, table.isActive),
     index("memberships_status_idx").on(table.status),
     check("memberships_status_check", sql`${table.status} IN ('pending', 'active', 'suspended', 'revoked')`),
+    check(
+      "memberships_status_activity_consistency_check",
+      sql`(${table.status} = 'active' AND ${table.isActive} = true) OR (${table.status} <> 'active' AND ${table.isActive} = false)`,
+    ),
   ],
 );
 

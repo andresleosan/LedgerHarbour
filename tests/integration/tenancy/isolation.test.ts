@@ -41,6 +41,7 @@ const membership = (userId: UserId, businessId: BusinessId, role: Membership["ro
   businessId,
   role,
   isActive,
+  status: isActive ? "active" : "pending",
 });
 
 class MemoryTenantRepository implements TenantRepository {
@@ -173,6 +174,10 @@ describe("tenant isolation boundary", () => {
     {
       description: "a malformed active flag",
       candidate: { ...membership(userA, businessA, "owner_admin"), isActive: "true" as unknown as boolean },
+    },
+    {
+      description: "an inconsistent lifecycle status",
+      candidate: { ...membership(userA, businessA, "owner_admin"), status: "suspended" as const, isActive: true },
     },
   ])("fails closed for $description returned by a defective repository", async ({ candidate }) => {
     const context = createTenantContext(repositoryFor(candidate));

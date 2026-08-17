@@ -57,10 +57,10 @@ test("platform approval and suspension gates business administrator access", asy
 
   const administrators = await platformAdmin.evaluate(async () => {
     const response = await fetch("/api/platform/administrators");
-    return { status: response.status, body: await response.json() } as { status: number; body: { administrators: Array<{ membershipId: string; userId: string }> } };
+    return { status: response.status, body: await response.json() } as { status: number; body: { administrators: Array<{ membershipId: string; userId: string; email: string | null }> } };
   });
   expect(administrators.status).toBe(200);
-  const target = administrators.body.administrators.find((item) => item.userId.startsWith("user-"));
+  const target = administrators.body.administrators.find((item) => item.email === "task4-member@example.com");
   expect(target).toBeTruthy();
 
   const suspended = await platformAdmin.evaluate(async (membershipId) => {

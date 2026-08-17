@@ -74,6 +74,7 @@ export interface PlatformAdministratorDto {
   membershipId: string;
   businessId: BusinessId;
   userId: UserId;
+  email: string | null;
   role: "general_admin" | "administrator";
   isActive: boolean;
   status: MembershipStatus;
@@ -157,6 +158,7 @@ function requirePlatformCapability(
 type AdministratorEntry = {
   membership: Awaited<ReturnType<OnboardingRepository["listMemberships"]>>[number];
   business: Business;
+  email?: string | null;
 };
 
 async function listAdministratorEntries(repository: OnboardingRepository): Promise<AdministratorEntry[]> {
@@ -165,9 +167,13 @@ async function listAdministratorEntries(repository: OnboardingRepository): Promi
     business,
     memberships: await repository.listMemberships(business.id),
   })));
-  return entries.flatMap(({ business, memberships }) => memberships
+  const administratorEntries = entries.flatMap(({ business, memberships }) => memberships
     .filter((membership) => membership.role === "administrator" || membership.role === "general_admin")
     .map((membership) => ({ membership, business })));
+  return Promise.all(administratorEntries.map(async (entry) => ({
+    ...entry,
+    email: (await repository.findUserById?.(entry.membership.userId))?.email ?? null,
+  })));
 }
 
 async function findAdministratorEntry(repository: OnboardingRepository, membershipId: string): Promise<AdministratorEntry | null> {
@@ -180,6 +186,7 @@ function toPlatformAdministratorDto(entry: AdministratorEntry): PlatformAdminist
     membershipId: entry.membership.membershipId,
     businessId: entry.membership.businessId,
     userId: entry.membership.userId,
+    email: entry.email ?? null,
     role: entry.membership.role === "general_admin" ? "general_admin" : "administrator",
     isActive: entry.membership.isActive,
     status: entry.membership.status ?? (entry.membership.isActive ? "active" : "pending"),
@@ -358,7 +365,7 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
           afterStatus: "active",
           reason,
         });
-        return toPlatformAdministratorDto({ membership: updated, business: current.business });
+        return toPlatformAdministratorDto({ membership: updated, business: current.business, email: before.email });
       };
       if (platform.transaction) return platform.transaction((transactionPlatform) => tenancy.transaction((transaction) => execute(transaction, transactionPlatform)));
       return tenancy.transaction((transaction) => execute(transaction, platform));
@@ -405,6 +412,7 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
             status: input.action === "revoke" ? "revoked" : "suspended",
           },
           business: current.business,
+          email: before.email,
         });
       };
       if (platform.transaction) return platform.transaction((transactionPlatform) => tenancy.transaction((transaction) => execute(transaction, transactionPlatform)));

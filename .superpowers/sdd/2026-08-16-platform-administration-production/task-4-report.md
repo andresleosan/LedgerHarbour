@@ -14,7 +14,7 @@ Implementado directamente sobre `main`. No se crearon ramas ni worktrees.
   - `POST /api/platform/administrators/[membershipId]/approve`
   - `POST /api/platform/administrators/[membershipId]/suspend`
 - `suspend` exige `action` explícita (`suspend` o `revoke`) y `reason`; todas las acciones globales generan auditoría append-only.
-- Los DTOs globales no exponen email normalizado, repositorios ni datos internos.
+- Los DTOs globales exponen sólo el email del administrador a un caller ya autorizado; no exponen repositorios ni datos internos y el email no participa en autorización.
 - La suspensión de negocio conserva memberships y datos, pero el gate bloquea acceso efectivo en APIs tenant.
 - Se añadió rate limiting autenticado para endpoints globales: 30 solicitudes/5 minutos por identidad y 60/5 minutos por dirección; producción exige Upstash.
 
@@ -74,3 +74,27 @@ Implementado directamente sobre `main`. No se crearon ramas ni worktrees.
 ### Nota De Verificación
 
 - Una corrida inicial paralela de build y E2E corrompió temporalmente el `.next` compartido y produjo errores de React Client Manifest. Al repetir secuencialmente, build y los 2 E2E pasaron; no quedó un fallo funcional reproducible.
+
+## Fix Round 2
+
+### Correcciones
+
+- Todas las mutaciones de membresía tenant (`setGeneralAdmin`, `removeAdministrator` y ambas escrituras de `transferOwnership`) pasan expectativas CAS de `isActive`, `role` y `status`.
+- `requireCapability` y `effectiveBusinessAccess` exigen `status = active` junto con `isActive = true`; el contexto tenant rechaza estados inconsistentes.
+- El esquema y la migración 0004 agregan un CHECK que obliga `status = active` exactamente cuando `is_active = true`; el rollback elimina primero el CHECK y luego la columna.
+- Se corrigieron fixtures Postgres para usar FK válidas y probar realmente los CHECK de status, y se agregó cobertura de apply/ledger/rollback de 0004.
+- Se agregaron contratos HTTP para reject, suspend y reactivate de negocios platform.
+- El DTO de administradores incluye el email normalizado únicamente para permitir que E2E seleccione exactamente `task4-member@example.com`; la autorización continúa resolviéndose exclusivamente por `platform_members.user_id`.
+- Se actualizaron fixtures de membresías directas para declarar explícitamente `status: active`.
+
+### RED/GREEN y verificación
+
+- RED Fix Round 2: regresiones de estados inconsistentes, CHECK Postgres y expectativas CAS reproducidas antes de la corrección.
+- Focal Fix Round 2: 73 passed.
+- Suite completa: 439 passed, 2 skipped.
+- `corepack pnpm exec playwright test tests/e2e/platform/administrator-approval.spec.ts`: 1 passed.
+- `corepack pnpm exec tsc --noEmit`: passed.
+- `corepack pnpm lint`: passed.
+- `corepack pnpm build`: passed.
+- `corepack pnpm audit`: no known vulnerabilities.
+- `git diff --check`: passed.

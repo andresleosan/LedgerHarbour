@@ -59,7 +59,7 @@ export function can(role: AuthorizationRole, capability: Capability): boolean {
 }
 
 export function requireCapability(membership: Membership, capability: Capability): void {
-  if (!membership || !membership.isActive) {
+  if (!membership || membership.status !== "active" || !membership.isActive) {
     throw new AuthorizationError(
       AUTHORIZATION_ERROR_CODES.MEMBERSHIP_REQUIRED,
       "Business access denied",

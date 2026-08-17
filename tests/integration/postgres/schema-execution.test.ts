@@ -214,7 +214,7 @@ describe("PostgreSQL initial migration", () => {
       await expect(
         db.transaction(async (transaction) => {
           await transaction.execute(
-            `UPDATE memberships SET is_active = false
+            `UPDATE memberships SET is_active = false, status = 'suspended'
              WHERE id = 'membership-1'`,
           );
         }),
@@ -258,9 +258,21 @@ describe("PostgreSQL initial migration", () => {
         WHERE table_name = 'memberships' AND column_name = 'status'
       `);
       expect(columns.rows).toEqual([{ column_name: "status" }]);
+      await db.execute(`
+        INSERT INTO users (id, provider_id, email, normalized_email, display_name)
+        VALUES ('status-user', 'status-provider', 'status@example.com', 'status@example.com', 'Status User')
+      `);
+      await db.execute(`
+        INSERT INTO businesses (id, name, normalized_search_name, base_currency_kind, base_currency_code, base_currency_id, created_by, status, is_active)
+        VALUES ('status-business', 'Status Harbour', 'status harbour', 'standard', 'GBP', NULL, 'status-user', 'pending', false)
+      `);
       await expect(db.execute(`
         INSERT INTO memberships (id, user_id, business_id, role, is_active, status)
-        VALUES ('membership-invalid-status', 'missing-user', 'missing-business', 'administrator', false, 'invalid')
+        VALUES ('membership-invalid-status', 'status-user', 'status-business', 'administrator', false, 'invalid')
+      `)).rejects.toThrow();
+      await expect(db.execute(`
+        INSERT INTO memberships (id, user_id, business_id, role, is_active, status)
+        VALUES ('membership-inconsistent-status', 'status-user', 'status-business', 'administrator', true, 'suspended')
       `)).rejects.toThrow();
     } finally {
       await close();

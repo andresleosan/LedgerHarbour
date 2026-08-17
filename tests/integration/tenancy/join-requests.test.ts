@@ -192,8 +192,9 @@ describe("in-memory onboarding repository boundary", () => {
        membershipId: "membership-general-admin",
       userId: user("general-admin"),
       businessId: created.id,
-      role: "general_admin",
-      isActive: true,
+       role: "general_admin",
+       isActive: true,
+       status: "active",
     });
     const approvedRequest = await services.requestMembership(
       { businessId: created.id, requestedRole: "administrator" },
@@ -227,8 +228,9 @@ describe("in-memory onboarding repository boundary", () => {
        membershipId: "membership-general-admin-first",
       userId: user("general-admin"),
       businessId: first.id,
-      role: "general_admin",
-      isActive: true,
+       role: "general_admin",
+       isActive: true,
+       status: "active",
     });
     const request = await services.requestMembership(
       { businessId: second.id, requestedRole: "administrator" },

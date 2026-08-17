@@ -20,6 +20,7 @@ const membershipFor = (role: MembershipRole, isActive = true): Membership => ({
   businessId,
   role,
   isActive,
+  status: isActive ? "active" : "pending",
 });
 
 const capabilities: Capability[] = [
@@ -82,6 +83,15 @@ describe("authorization capability policy", () => {
       expect.objectContaining({
         code: AUTHORIZATION_ERROR_CODES.MEMBERSHIP_REQUIRED,
       }),
+    );
+  });
+
+  it.each([
+    { status: "suspended" as const, isActive: true },
+    { status: "active" as const, isActive: false },
+  ])("rejects inconsistent lifecycle state $status/$isActive", ({ status, isActive }) => {
+    expect(() => requireCapability({ ...membershipFor("owner_admin"), status, isActive }, "read_finance")).toThrowError(
+      expect.objectContaining({ code: AUTHORIZATION_ERROR_CODES.MEMBERSHIP_REQUIRED }),
     );
   });
 
