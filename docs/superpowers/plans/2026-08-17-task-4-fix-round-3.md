@@ -63,4 +63,4 @@
 - [x] **Step 1: Run focused RED/GREEN evidence, full suite, E2E, typecheck, lint, build, audit, and diff checks sequentially.**
 - [x] **Step 2: Record Fix Round 3 results and honest native Postgres skip status.**
 - [x] **Step 3: Review staged files, excluding the pre-existing native schema test.**
-- [ ] **Step 4: Commit with a concise Fix Round 3 message.**
+- [x] **Step 4: Commit with a concise Fix Round 3 message.**
