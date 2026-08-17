@@ -26,17 +26,14 @@ export default defineConfig({
     env: {
       ...process.env,
       NODE_ENV: "test",
-      LEDGERHARBOUR_TEST_MODE: "true",
-      AUTH_MODE: "development",
+      AUTH_MODE: "firebase",
       OCR_PROVIDER: "fake",
       NEXT_PUBLIC_FIREBASE_API_KEY: "playwright-public-api-key",
       NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "playwright.firebaseapp.com",
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: "playwright-project",
       NEXT_PUBLIC_FIREBASE_APP_ID: "playwright-app-id",
-      // This value is only a disposable test fixture; production must provide an environment secret.
-      DEV_SESSION_SECRET: process.env.DEV_SESSION_SECRET ?? "ledgerharbour-e2e-test-only",
+      NEXT_PUBLIC_FIREBASE_TEST_ADAPTER: "true",
       PLATFORM_ADMIN_EMAILS: "platform-admin@example.com",
-      PLATFORM_ADMIN_USER_IDS: Array.from({ length: 256 }, (_, index) => `user-${index + 1}`).join(","),
     },
   },
 });

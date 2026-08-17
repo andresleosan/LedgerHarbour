@@ -18,12 +18,13 @@ test("submits a business request and requires platform approval before operation
   const businessId = (await requestStatus.textContent())?.match(/business-[\w-]+/)?.[0];
   expect(businessId).toBeTruthy();
 
-  const beforeApproval = await requester.context().request.post(`/api/businesses/${businessId}/documents`, {
-    multipart: {
-      file: { name: "pending.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\nstartxref\n0\n%%EOF\n") },
-    },
-  });
-  expect(beforeApproval.status()).toBe(403);
+  const beforeApproval = await requester.evaluate(async (id) => {
+    const form = new FormData();
+    form.append("file", new File(["%PDF-1.7\n1 0 obj\n<<>>\nendobj\nstartxref\n0\n%%EOF\n"], "pending.pdf", { type: "application/pdf" }));
+    const response = await fetch(`/api/businesses/${id}/documents`, { method: "POST", body: form });
+    return response.status;
+  }, businessId);
+  expect(beforeApproval).toBe(403);
 
   const admin = await browser.newPage();
   await signIn(admin, "platform-admin@example.com");

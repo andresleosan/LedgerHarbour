@@ -40,14 +40,14 @@ corepack pnpm test
 corepack pnpm lint
 corepack pnpm exec tsc --noEmit
 corepack pnpm build
-$env:AUTH_MODE='development'; corepack pnpm test:e2e tests/e2e/critical-path.spec.ts
-$env:AUTH_MODE='development'; corepack pnpm test:e2e
+corepack pnpm test:e2e tests/e2e/critical-path.spec.ts
+corepack pnpm test:e2e
 powershell -ExecutionPolicy Bypass -File tests/performance/baseline.ps1
 ```
 
 Las matrices de seguridad viven en `tests/security/`; cubren servicios y rutas HTTP reales, incluyendo multipart/DTO seguro, currency mutation y mutaciones de miembros. El flujo browser crítico está en `tests/e2e/critical-path.spec.ts` y cubre upload real, review, corrección, aprobación, estado aprobado, inmutabilidad y navegación cross-tenant. El reporte de performance está en `docs/verification/ledgerharbour-mvp-performance.md`.
 
-El baseline PowerShell no sigue redirects automáticamente: las rutas públicas se validan como `200` con contenido esperado y las rutas privadas se registran explícitamente como `307` a `/login` sin sesión. No debe interpretarse como medición autenticada de pantallas privadas.
+El harness Playwright usa `NODE_ENV=test`, `AUTH_MODE=firebase` y el adapter Firebase determinista; no necesita credenciales Firebase reales. El baseline PowerShell no sigue redirects automáticamente: las rutas públicas se validan como `200` con contenido esperado y las rutas privadas se registran explícitamente como `307` a `/login` sin sesión. No debe interpretarse como medición autenticada de pantallas privadas.
 
 ## Límites
 

@@ -63,6 +63,7 @@ function decodeSession(value: string): StoredSession | null {
 
     if (
       !identity ||
+      (identity.provider !== undefined && identity.provider !== "firebase" && identity.provider !== "development") ||
       typeof identity.providerUserId !== "string" ||
       typeof identity.email !== "string" ||
       typeof identity.displayName !== "string" ||

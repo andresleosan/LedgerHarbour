@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createApprovedBusiness, withPlatformAdmin } from "../helpers/business";
+import { browserApiRequest } from "../helpers/browser-api";
 
 async function signIn(page: import("@playwright/test").Page, email = "portfolio-shell@example.com") {
   await page.goto("/login");
@@ -17,10 +18,11 @@ test("authenticates, switches authorized businesses, preserves locale, and keeps
   const secondId = await createApprovedBusiness(browser, page, secondName);
   const inactiveId = await createApprovedBusiness(browser, page, inactiveName);
 
-  const lifecycleResponse = await withPlatformAdmin(browser, (admin) => admin.request.post(`/api/platform/businesses/${inactiveId}/suspend`, {
+  const lifecycleResponse = await withPlatformAdmin(browser, (admin) => browserApiRequest(admin, `/api/platform/businesses/${inactiveId}/suspend`, {
+    method: "POST",
     data: { reason: "E2E inactive business coverage" },
   }));
-  expect(lifecycleResponse.status()).toBe(200);
+  expect(lifecycleResponse.status).toBe(200);
 
   await page.goto("/portfolio");
   await expect(page.getByRole("heading", { name: "Portfolio", exact: true })).toBeVisible();

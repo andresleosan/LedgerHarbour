@@ -18,12 +18,14 @@ describe("PostgreSQL business approval lifecycle", () => {
       const platform = createPostgresPlatformRepository(db);
       const onboarding = createOnboardingServices(tenancy);
       const requester = {
+        provider: "firebase",
         providerUserId: "postgres-requester",
         email: "requester@example.com",
         displayName: "Requester",
         emailVerified: true,
       } as const;
       const admin = {
+        provider: "firebase",
         providerUserId: "postgres-admin",
         email: "admin@example.com",
         displayName: "Platform Admin",
@@ -58,7 +60,7 @@ describe("PostgreSQL business approval lifecycle", () => {
       const tenancy = createPostgresOnboardingRepository(db);
       const platform = createPostgresPlatformRepository(db);
       const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
-      const first = { providerUserId: "postgres-first", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
+       const first = { provider: "firebase", providerUserId: "postgres-first", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
       await platform.bootstrapMember("platform-admin-1", first.email);
 
       const linked = await service.claimPlatformMember(first);
@@ -79,7 +81,7 @@ describe("PostgreSQL business approval lifecycle", () => {
       const tenancy = createPostgresOnboardingRepository(db);
       const platform = createPostgresPlatformRepository(db);
       const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
-      const first = { providerUserId: "postgres-first", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
+       const first = { provider: "firebase", providerUserId: "postgres-first", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
       const second = first;
       await platform.bootstrapMember("platform-admin-1", first.email);
 

@@ -213,16 +213,31 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
   private transactions = 0;
   private transactionTail: Promise<void> = Promise.resolve();
   private readonly userIdsByProvider = new Map<string, UserId>();
+  private readonly normalizedEmailsByProvider = new Map<string, string>();
+  private readonly userIdsByNormalizedEmail = new Map<string, UserId>();
 
   get transactionCount(): number {
     return this.transactions;
   }
 
   async upsertUser(identity: AuthIdentity): Promise<UserId> {
+    const normalizedEmail = identity.email.trim().toLocaleLowerCase("en-US");
     const existing = this.userIdsByProvider.get(identity.providerUserId);
-    if (existing) return existing;
+    const emailOwner = this.userIdsByNormalizedEmail.get(normalizedEmail);
+    if (emailOwner && emailOwner !== existing) {
+      throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+    }
+    if (existing) {
+      const previousEmail = this.normalizedEmailsByProvider.get(identity.providerUserId);
+      if (previousEmail && previousEmail !== normalizedEmail) this.userIdsByNormalizedEmail.delete(previousEmail);
+      this.normalizedEmailsByProvider.set(identity.providerUserId, normalizedEmail);
+      this.userIdsByNormalizedEmail.set(normalizedEmail, existing);
+      return existing;
+    }
     const localId = idFor<UserId>(`user-${this.nextUserId++}`);
     this.userIdsByProvider.set(identity.providerUserId, localId);
+    this.normalizedEmailsByProvider.set(identity.providerUserId, normalizedEmail);
+    this.userIdsByNormalizedEmail.set(normalizedEmail, localId);
     return localId;
   }
 
@@ -246,6 +261,8 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
       nextAuditId: this.nextAuditId,
       nextUserId: this.nextUserId,
       userIdsByProvider: new Map(this.userIdsByProvider),
+      normalizedEmailsByProvider: new Map(this.normalizedEmailsByProvider),
+      userIdsByNormalizedEmail: new Map(this.userIdsByNormalizedEmail),
     };
 
     try {
@@ -264,6 +281,10 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
       this.nextUserId = snapshot.nextUserId;
       this.userIdsByProvider.clear();
       snapshot.userIdsByProvider.forEach((id, provider) => this.userIdsByProvider.set(provider, id));
+      this.normalizedEmailsByProvider.clear();
+      snapshot.normalizedEmailsByProvider.forEach((email, provider) => this.normalizedEmailsByProvider.set(provider, email));
+      this.userIdsByNormalizedEmail.clear();
+      snapshot.userIdsByNormalizedEmail.forEach((id, email) => this.userIdsByNormalizedEmail.set(email, id));
       throw error;
     } finally {
       release();

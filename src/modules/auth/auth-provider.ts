@@ -1,4 +1,7 @@
+export type AuthProviderKind = "firebase" | "development";
+
 export interface AuthIdentity {
+  readonly provider?: AuthProviderKind;
   readonly providerUserId: string;
   readonly email: string;
   readonly displayName: string;

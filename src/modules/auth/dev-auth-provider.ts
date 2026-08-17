@@ -52,6 +52,7 @@ class InMemoryDevAuthProvider implements AuthProvider {
     }
 
     const identity: AuthIdentity = {
+      provider: "development",
       providerUserId: `dev-${hashEmail(email)}`,
       email,
       displayName: displayNameFor(email),
@@ -64,6 +65,7 @@ class InMemoryDevAuthProvider implements AuthProvider {
 
   async signInWithGoogle(): Promise<AuthIdentity> {
     const identity: AuthIdentity = {
+      provider: "development",
       providerUserId: "dev-google-user",
       email: "google-user@development.ledgerharbour.local",
       displayName: "Development Google User",

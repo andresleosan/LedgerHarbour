@@ -58,6 +58,25 @@ describe("business onboarding service", () => {
     expect(first).not.toBe("provider-user");
   });
 
+  it("rejects a second provider for an occupied normalized email", async () => {
+    const repository = createInMemoryOnboardingRepository();
+    await repository.upsertUser({
+      provider: "firebase",
+      providerUserId: "provider-first",
+      email: "Owner@Example.com",
+      displayName: "First",
+      emailVerified: true,
+    });
+
+    await expect(repository.upsertUser({
+      provider: "firebase",
+      providerUserId: "provider-second",
+      email: " owner@example.com ",
+      displayName: "Second",
+      emailVerified: true,
+    })).rejects.toMatchObject({ code: ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT });
+  });
+
   it("resolves an AuthIdentity to the repository local user id exactly at the boundary", async () => {
     const repository = createInMemoryOnboardingRepository();
     const identity = {

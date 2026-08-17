@@ -29,6 +29,7 @@ export interface PlatformRepository {
   transaction?<T>(operation: (repository: PlatformRepository) => Promise<T>): Promise<T>;
   findActiveMemberByUserId(userId: UserId): Promise<PlatformMember | null>;
   findMemberForClaimByEmail(normalizedEmail: string): Promise<PlatformMember | null>;
+  claimMemberByEmail(normalizedEmail: string, userId: UserId): Promise<PlatformMember | null>;
   linkMemberToUser(memberId: string, userId: UserId): Promise<PlatformMember | null>;
   appendAuditEvent(event: Omit<PlatformAuditEvent, "id" | "createdAt">): Promise<PlatformAuditEvent>;
   listAuditEvents(targetId: string): Promise<PlatformAuditEvent[]>;
@@ -78,6 +79,17 @@ class MemoryPlatformRepository implements InMemoryPlatformRepository {
 
   async findMemberForClaimByEmail(normalizedEmail: string): Promise<PlatformMember | null> {
     return this.platformMembers.find((member) => member.normalizedEmail === normalizeEmail(normalizedEmail) && member.isActive) ?? null;
+  }
+
+  async claimMemberByEmail(normalizedEmail: string, userId: UserId): Promise<PlatformMember | null> {
+    const member = this.platformMembers.find((candidate) =>
+      candidate.normalizedEmail === normalizeEmail(normalizedEmail)
+      && candidate.isActive
+      && candidate.userId === null,
+    );
+    if (!member) return null;
+    member.userId = userId;
+    return { ...member };
   }
 
   async linkMemberToUser(memberId: string, userId: UserId): Promise<PlatformMember | null> {
@@ -147,6 +159,18 @@ export function createPostgresPlatformRepository(db: Database): PlatformReposito
         eq(platformMembers.normalizedEmail, normalizeEmail(email)),
         eq(platformMembers.isActive, true),
       )).limit(1);
+      return row ? mapMember(row) : null;
+    },
+
+    async claimMemberByEmail(email, userId) {
+      const [row] = await databaseForOperation(db).update(platformMembers)
+        .set({ userId, updatedAt: new Date() })
+        .where(and(
+          eq(platformMembers.normalizedEmail, normalizeEmail(email)),
+          eq(platformMembers.isActive, true),
+          isNull(platformMembers.userId),
+        ))
+        .returning();
       return row ? mapMember(row) : null;
     },
 

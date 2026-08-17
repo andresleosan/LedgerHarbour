@@ -9,3 +9,7 @@ export function isDeterministicTestEnvironment(environment: NodeJS.ProcessEnv): 
 export function isDeterministicTestRuntime(): boolean {
   return isDeterministicTestEnvironment(env);
 }
+
+export function isTestEnvironment(): boolean {
+  return env.NODE_ENV === "test";
+}

@@ -17,7 +17,7 @@ test("renders the English login and completes the test email flow without demo c
   await expect(page.getByRole("status")).toContainText("Signed in as");
   await expect.poll(async () => {
     const sessionCookie = (await context.cookies()).find(
-      ({ name }) => name === "ledgerharbour_dev_session",
+      ({ name }) => name === "ledgerharbour_firebase_session",
     );
     return sessionCookie
       ? {
@@ -53,7 +53,7 @@ test("keeps the login usable without horizontal overflow on mobile", async ({ br
   await context.close();
 });
 
-test("renders register without demo status and generic auth failure states", async ({ browser }) => {
+test("renders register without demo status", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
 
@@ -61,15 +61,6 @@ test("renders register without demo status and generic auth failure states", asy
   await expect(page.getByRole("heading", { name: "Start with a clear workspace." })).toBeVisible();
   await expect(page.getByText("Development mode only. No production account will be created.")).toHaveCount(0);
   await expect(page.getByLabel("Work email")).toBeVisible();
-
-  await page.goto("/login");
-  await page.getByLabel("Work email").fill("missing@development.ledgerharbour.local");
-  await page.getByRole("button", { name: "Continue with email" }).click();
-  await expect(page.locator("#auth-error")).toContainText("We could not find an active identity.");
-
-  await page.getByLabel("Work email").fill("failure@development.ledgerharbour.local");
-  await page.getByRole("button", { name: "Continue with email" }).click();
-  await expect(page.locator("#auth-error")).toContainText("Authentication is temporarily unavailable.");
 
   await context.close();
 });

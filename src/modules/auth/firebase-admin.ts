@@ -1,7 +1,11 @@
 import { cert, getApps, initializeApp } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
+import { isTestEnvironment } from "./runtime-mode";
+import { createDeterministicFirebaseAdminAuth } from "./firebase-test-adapter";
 
-export function createFirebaseAdminAuth(): Auth {
+export function createFirebaseAdminAuth(): Auth | ReturnType<typeof createDeterministicFirebaseAdminAuth> {
+  if (isTestEnvironment()) return createDeterministicFirebaseAdminAuth();
+
   const projectId = process.env.FIREBASE_PROJECT_ID?.trim();
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL?.trim();
   const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n");

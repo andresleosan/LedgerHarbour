@@ -104,6 +104,31 @@ describe("PostgreSQL onboarding repository contract", () => {
     }
   }, 30_000);
 
+  it("enforces unique normalized emails across providers", async () => {
+    const { db, close } = await createTestDatabase();
+
+    try {
+      const repository = createPostgresOnboardingRepository(db);
+      await repository.upsertUser({
+        provider: "firebase",
+        providerUserId: "normalized-email-first",
+        email: "normalized-email@example.com",
+        displayName: "First",
+        emailVerified: true,
+      });
+
+      await expect(repository.upsertUser({
+        provider: "firebase",
+        providerUserId: "normalized-email-second",
+        email: " NORMALIZED-EMAIL@EXAMPLE.COM ",
+        displayName: "Second",
+        emailVerified: true,
+      })).rejects.toMatchObject({ code: ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT });
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
   it("supports normalized search, request, approval, rejection, and tenant isolation", async () => {
     const { db, close } = await createTestDatabase();
 

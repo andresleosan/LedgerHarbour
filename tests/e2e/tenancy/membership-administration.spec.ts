@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { withPlatformAdmin } from "../helpers/business";
+import { browserApiRequest } from "../helpers/browser-api";
 
 test.describe.configure({ mode: "serial" });
 
@@ -13,9 +14,9 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
 type E2EMember = { membershipId: string; userId: string; role: string; capabilities: string[] };
 
 async function readMembers(page: import("@playwright/test").Page, businessId: string): Promise<E2EMember[]> {
-  const response = await page.request.get(`/api/businesses/${businessId}/members/list`);
-  expect(response.ok()).toBeTruthy();
-  return await response.json() as E2EMember[];
+  const response = await browserApiRequest(page, `/api/businesses/${businessId}/members/list`);
+  expect(response.status).toBe(200);
+  return JSON.parse(response.body) as E2EMember[];
 }
 
 test("owner and General Admin manage roles, transfer ownership, and localize member settings", async ({ browser }) => {
@@ -28,10 +29,11 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   const businessId = (await owner.getByRole("status").textContent())?.match(/business-[\w-]+/)?.[0];
   if (!businessId) throw new Error("Business creation did not return an id");
   await withPlatformAdmin(browser, async (admin) => {
-    const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
+    const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
+      method: "POST",
       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     });
-    expect(approval.status()).toBe(200);
+    expect(approval.status).toBe(200);
   });
 
   const memberContext = await browser.newContext();
@@ -96,15 +98,16 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   const ownerViewAfterRoleChanges = await readMembers(owner, businessId);
   const transferTargetId = ownerViewAfterRoleChanges.find((candidate) => candidate.role === "general_admin")?.userId;
   if (!transferTargetId) throw new Error("General Admin target was not returned by the safe member DTO");
-  const staleTransfer = await owner.request.post(`/api/businesses/${businessId}/ownership/transfer`, {
+  const staleTransfer = await browserApiRequest(owner, `/api/businesses/${businessId}/ownership/transfer`, {
+    method: "POST",
     data: {
       targetMembershipId: transferTargetId,
       confirmationName: "Task Six Harbour",
       reauthenticatedAt: new Date(Date.now() - 6 * 60 * 1000).toISOString(),
     },
   });
-  expect(staleTransfer.status()).toBe(400);
-  await expect(staleTransfer.json()).resolves.toMatchObject({ error: { code: "CONFIRMATION_REQUIRED" } });
+  expect(staleTransfer.status).toBe(400);
+  expect(JSON.parse(staleTransfer.body)).toMatchObject({ error: { code: "CONFIRMATION_REQUIRED" } });
 
   await signIn(secondMember, "task6-second-member@example.com");
   await secondMember.goto(`/business/${businessId}/settings/members`);
@@ -115,16 +118,18 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   const ownerMember = generalAdminMembers.find((candidate) => candidate.role === "owner_admin");
   const generalAdmin = generalAdminMembers.find((candidate) => candidate.role === "general_admin");
   if (!ownerMember || !generalAdmin) throw new Error("Expected Owner and General Admin memberships");
-  const blockedOwnerChange = await secondMember.request.patch(`/api/businesses/${businessId}/members/${ownerMember.membershipId}`, {
+  const blockedOwnerChange = await browserApiRequest(secondMember, `/api/businesses/${businessId}/members/${ownerMember.membershipId}`, {
+    method: "PATCH",
     data: { action: "remove_administrator" },
   });
-  expect(blockedOwnerChange.status()).toBe(400);
-  await expect(blockedOwnerChange.json()).resolves.toMatchObject({ error: { code: "OWNER_PROTECTED" } });
-  const blockedGeneralAdminChange = await secondMember.request.patch(`/api/businesses/${businessId}/members/${generalAdmin.membershipId}`, {
+  expect(blockedOwnerChange.status).toBe(400);
+  expect(JSON.parse(blockedOwnerChange.body)).toMatchObject({ error: { code: "OWNER_PROTECTED" } });
+  const blockedGeneralAdminChange = await browserApiRequest(secondMember, `/api/businesses/${businessId}/members/${generalAdmin.membershipId}`, {
+    method: "PATCH",
     data: { action: "remove_general_admin" },
   });
-  expect(blockedGeneralAdminChange.status()).toBe(403);
-  await expect(blockedGeneralAdminChange.json()).resolves.toMatchObject({ error: { code: "INSUFFICIENT_CAPABILITY" } });
+  expect(blockedGeneralAdminChange.status).toBe(403);
+  expect(JSON.parse(blockedGeneralAdminChange.body)).toMatchObject({ error: { code: "INSUFFICIENT_CAPABILITY" } });
   await secondMember.getByRole("button", { name: "Remove Administrator" }).click();
   await expect(secondMember.getByText("Administrator", { exact: true })).toHaveCount(0);
 
@@ -168,10 +173,11 @@ test("inactive business blocks join and review operations and preserves member s
   const businessId = (await page.getByRole("status").textContent())?.match(/business-[\w-]+/)?.[0];
   if (!businessId) throw new Error("Business creation did not return an id");
   await withPlatformAdmin(browser, async (admin) => {
-    const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
+    const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
+      method: "POST",
       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     });
-    expect(approval.status()).toBe(200);
+    expect(approval.status).toBe(200);
   });
 
   const memberContext = await browser.newContext();
@@ -189,47 +195,53 @@ test("inactive business blocks join and review operations and preserves member s
   const pendingContext = await browser.newContext();
   const pendingPage = await pendingContext.newPage();
   await signIn(pendingPage, "task6-pending-member@example.com");
-  const pendingResponse = await pendingPage.request.post(`/api/businesses/${businessId}/join-requests`, {
+  const pendingResponse = await browserApiRequest(pendingPage, `/api/businesses/${businessId}/join-requests`, {
+    method: "POST",
     data: { requestedRole: "administrator" },
   });
-  expect(pendingResponse.status()).toBe(201);
-  const pending = await pendingResponse.json() as { id: string };
+  expect(pendingResponse.status).toBe(201);
+  const pending = JSON.parse(pendingResponse.body) as { id: string };
 
-  const suspended = await withPlatformAdmin(browser, (admin) => admin.request.post(`/api/platform/businesses/${businessId}/suspend`, {
+  const suspended = await withPlatformAdmin(browser, (admin) => browserApiRequest(admin, `/api/platform/businesses/${businessId}/suspend`, {
+    method: "POST",
     data: { reason: "E2E inactive business coverage" },
   }));
-  expect(suspended.status()).toBe(200);
+  expect(suspended.status).toBe(200);
 
   const blockedContext = await browser.newContext();
   const blockedPage = await blockedContext.newPage();
   await signIn(blockedPage, "task6-inactive-new@example.com");
-  const blockedJoin = await blockedPage.request.post(`/api/businesses/${businessId}/join-requests`, {
+  const blockedJoin = await browserApiRequest(blockedPage, `/api/businesses/${businessId}/join-requests`, {
+    method: "POST",
     data: { requestedRole: "administrator" },
   });
-  const blockedJoinPayload = await blockedJoin.json();
+  const blockedJoinPayload = JSON.parse(blockedJoin.body);
   expect(blockedJoinPayload).toMatchObject({ error: { code: "INACTIVE_BUSINESS" } });
-  expect(blockedJoin.status()).toBe(400);
-  const blockedReview = await page.request.get(`/api/businesses/${businessId}/join-requests`);
-  expect(blockedReview.status()).toBe(403);
-  await expect(blockedReview.json()).resolves.toMatchObject({ error: { code: "INSUFFICIENT_CAPABILITY" } });
-  const blockedReviewMutation = await page.request.patch(`/api/businesses/${businessId}/join-requests`, {
+  expect(blockedJoin.status).toBe(400);
+  const blockedReview = await browserApiRequest(page, `/api/businesses/${businessId}/join-requests`);
+  expect(blockedReview.status).toBe(403);
+  expect(JSON.parse(blockedReview.body)).toMatchObject({ error: { code: "INSUFFICIENT_CAPABILITY" } });
+  const blockedReviewMutation = await browserApiRequest(page, `/api/businesses/${businessId}/join-requests`, {
+    method: "PATCH",
     data: { joinRequestId: pending.id, decision: "approved" },
   });
-  expect(blockedReviewMutation.status()).toBe(403);
+  expect(blockedReviewMutation.status).toBe(403);
 
-  const reactivated = await withPlatformAdmin(browser, (admin) => admin.request.post(`/api/platform/businesses/${businessId}/reactivate`, {
+  const reactivated = await withPlatformAdmin(browser, (admin) => browserApiRequest(admin, `/api/platform/businesses/${businessId}/reactivate`, {
+    method: "POST",
     data: { reason: "E2E lifecycle restoration" },
   }));
-  expect(reactivated.status()).toBe(200);
+  expect(reactivated.status).toBe(200);
   const preservedMembers = await readMembers(page, businessId);
   expect(preservedMembers).toEqual(expect.arrayContaining([
     expect.objectContaining({ role: "owner_admin" }),
     expect.objectContaining({ role: "administrator" }),
   ]));
-  const reviewed = await page.request.patch(`/api/businesses/${businessId}/join-requests`, {
+  const reviewed = await browserApiRequest(page, `/api/businesses/${businessId}/join-requests`, {
+    method: "PATCH",
     data: { joinRequestId: pending.id, decision: "approved" },
   });
-  expect(reviewed.status()).toBe(200);
+  expect(reviewed.status).toBe(200);
 
   await ownerContext.close();
   await memberContext.close();

@@ -13,6 +13,7 @@ import {
 } from "firebase/auth";
 import type { AuthIdentity, GoogleSignInInput } from "./auth-provider";
 import type { FirebaseClientConfig } from "./firebase-config";
+import { AUTH_ERROR_CODES, AuthError } from "./auth-errors";
 
 export type { FirebaseClientConfig } from "./firebase-config";
 
@@ -24,7 +25,23 @@ const googleRedirectResults = new Map<string, Promise<UserCredential | null>>();
 
 export interface FirebaseGoogleCredential {
   readonly user: {
+    readonly email?: string | null;
     getIdToken(): Promise<string>;
+  };
+}
+
+const testEmailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const isTestEnvironment = () => process.env.NEXT_PUBLIC_FIREBASE_TEST_ADAPTER === "true";
+const testToken = (email: string) => `ledgerharbour-test-firebase:${encodeURIComponent(email.trim().toLowerCase())}`;
+
+function deterministicCredential(email: string): FirebaseGoogleCredential {
+  const normalized = email.trim().toLowerCase();
+  if (!testEmailPattern.test(normalized)) throw new AuthError(AUTH_ERROR_CODES.INVALID_EMAIL);
+  return {
+    user: {
+      email: normalized,
+      getIdToken: async () => testToken(normalized),
+    },
   };
 }
 
@@ -33,16 +50,19 @@ function firebaseConfigKey(config: FirebaseClientConfig): string {
 }
 
 export async function signInWithFirebaseEmail(config: FirebaseClientConfig, email: string, password: string, register: boolean): Promise<UserCredential> {
+  if (isTestEnvironment()) return deterministicCredential(email) as UserCredential;
   const auth = getAuth(firebaseApp(config));
   return register ? createUserWithEmailAndPassword(auth, email, password) : signInWithEmailAndPassword(auth, email, password);
 }
 
 export async function signInWithFirebaseGoogle(config: FirebaseClientConfig): Promise<UserCredential> {
+  if (isTestEnvironment()) return deterministicCredential("test-google@example.com") as UserCredential;
   const auth = getAuth(firebaseApp(config));
   return signInWithPopup(auth, new GoogleAuthProvider());
 }
 
 export async function getFirebaseGoogleRedirectResult(config: FirebaseClientConfig): Promise<UserCredential | null> {
+  if (isTestEnvironment()) return null;
   const auth = getAuth(firebaseApp(config));
   const key = firebaseConfigKey(config);
   const existingResult = googleRedirectResults.get(key);
@@ -61,6 +81,7 @@ export async function signInWithFirebaseCredential(
 }
 
 export async function signOutFirebaseUser(config?: FirebaseClientConfig): Promise<void> {
+  if (isTestEnvironment()) return;
   const app = getApps()[0] ?? (config ? firebaseApp(config) : null);
   if (!app) return;
   await signOut(getAuth(app));

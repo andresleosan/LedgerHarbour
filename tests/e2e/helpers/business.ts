@@ -1,4 +1,5 @@
 import { expect, type Browser, type Page } from "@playwright/test";
+import { browserApiRequest } from "./browser-api";
 
 async function signIn(page: Page, email: string) {
   await page.goto("/login");
@@ -17,10 +18,11 @@ export async function createApprovedBusiness(browser: Browser, page: Page, name:
   expect(businessId).toBeTruthy();
 
   await withPlatformAdmin(browser, async (admin) => {
-    const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
+    const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
+      method: "POST",
       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     });
-    expect(approval.status(), await approval.text()).toBe(200);
+    expect(approval.status, approval.body).toBe(200);
   });
 
   return businessId as string;

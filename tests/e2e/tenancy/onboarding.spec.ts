@@ -1,5 +1,6 @@
 import { expect, test, type Locator } from "@playwright/test";
 import { withPlatformAdmin } from "../helpers/business";
+import { browserApiRequest } from "../helpers/browser-api";
 
 test.describe.configure({ mode: "serial" });
 
@@ -77,10 +78,11 @@ test("searches, requests access, approves, rejects, and reapplies", async ({ bro
   const businessId = text?.match(/business-[\w-]+/)?.[0];
   expect(businessId).toBeTruthy();
   await withPlatformAdmin(browser, async (admin) => {
-    const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
+    const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
+      method: "POST",
       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
     });
-    expect(approval.status()).toBe(200);
+    expect(approval.status).toBe(200);
   });
 
   const memberContext = await browser.newContext();
@@ -164,12 +166,13 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
    const createdStatus = page.getByRole("status");
    await expect(createdStatus).toContainText("Mobile Harbour Books");
    const businessId = (await createdStatus.textContent())?.match(/business-[\w-]+/)?.[0];
-   expect(businessId).toBeTruthy();
-   await withPlatformAdmin(browser, async (admin) => {
-     const approval = await admin.request.post(`/api/platform/businesses/${businessId}/approve`, {
-       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
-     });
-     expect(approval.status()).toBe(200);
+    expect(businessId).toBeTruthy();
+    await withPlatformAdmin(browser, async (admin) => {
+      const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
+        method: "POST",
+        data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+      });
+      expect(approval.status).toBe(200);
    });
 
    await page.goto("/onboarding/join-business");

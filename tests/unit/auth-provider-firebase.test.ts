@@ -42,6 +42,7 @@ describe("FirebaseAuthProvider", () => {
     const provider = new FirebaseAuthProvider({ auth, sessions });
 
     await expect(provider.signInWithEmail({ email: "user@example.com", idToken: "id-token" })).resolves.toEqual({
+      provider: "firebase",
       providerUserId: "firebase-user-1",
       email: "user@example.com",
       displayName: "Example User",

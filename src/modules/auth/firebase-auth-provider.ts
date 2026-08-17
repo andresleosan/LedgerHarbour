@@ -23,6 +23,7 @@ function identityFromToken(token: FirebaseDecodedToken): AuthIdentity {
     throw new AuthError(AUTH_ERROR_CODES.MISSING_IDENTITY);
   }
   return {
+    provider: "firebase",
     providerUserId: token.uid,
     email: token.email.toLowerCase(),
     displayName: token.name?.trim() || token.email.split("@", 1)[0],

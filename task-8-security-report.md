@@ -95,3 +95,29 @@ Alcance: autenticación, upload, OCR process, review financiero y controles de a
 
 - Upstash/Redis real no se ejercitó en este entorno; sí se verificaron ambos buckets memory y el fail-closed de production.
 - La garantía de que `x-vercel-forwarded-for` sea sobrescrito por Vercel/edge requiere configuración operativa fuera del repositorio y no puede probarse localmente.
+
+### Cierre de Fix Round 3: autenticación Firebase determinista y claim de plataforma
+
+#### Findings corregidos
+
+- **Crítico, claim global:** el claim interno ahora exige `provider: "firebase"` y `emailVerified`; `DevAuthProvider` (`provider: "development"`) y `LEDGERHARBOUR_TEST_MODE` quedan denegados.
+- **Alto, harness de test:** Playwright usa `AUTH_MODE=firebase`, un adapter determinista exclusivo del harness y bootstrap por email; se eliminaron `PLATFORM_ADMIN_USER_IDS`, rangos de IDs y el endpoint público de claim.
+- **Alto, carrera de enlace:** el enlace del bootstrap se realiza con `UPDATE ... WHERE user_id IS NULL RETURNING` en PostgreSQL y operación equivalente serializada en memoria; la autorización posterior sólo usa `user_id` enlazado.
+- **Medio, identidad duplicada:** memoria y PostgreSQL aplican unicidad de `normalized_email`.
+
+#### Evidencia
+
+- RED/GREEN focalizado: `corepack pnpm exec vitest run tests/unit/auth tests/unit/platform tests/unit/tenancy/business-service.test.ts tests/security/platform-authorization.test.ts tests/integration/tenancy/business-approval.test.ts tests/integration/postgres/tenancy-repository.test.ts` - 12 archivos, 94 tests pasan.
+- Regresión completa: `corepack pnpm test` - 48 archivos pasan, 1 skipped; 409 tests pasan, 2 skipped.
+- E2E focalizado: `corepack pnpm exec playwright test tests/e2e/auth/login.spec.ts tests/e2e/platform/business-approval.spec.ts` - 4/4 pasan.
+- E2E completo: `corepack pnpm exec playwright test` - 25/25 pasan en 2.3 minutos.
+- Typecheck: `corepack pnpm exec tsc --noEmit` - exit 0.
+- Lint: `corepack pnpm lint` - exit 0, sin errores.
+- Build: `corepack pnpm build` - exit 0; Next genera 10 páginas estáticas y las rutas dinámicas.
+- Audit: `corepack pnpm audit --json` - 0 info, 0 low, 0 moderate, 0 high, 0 critical; 556 dependencias.
+
+#### Pruebas avanzadas
+
+- Contrato: tests unitarios, integración PostgreSQL/PGlite y E2E ejercitan el mismo flujo Firebase -> usuario local -> claim -> autorización.
+- Concurrencia: claims simultáneos de memoria y PostgreSQL conservan un único ganador.
+- Casos límite de seguridad: provider development, provider ausente, email Firebase no verificado, flag legacy y usuario/email ya enlazado son rechazados sin fallback por email o ID.

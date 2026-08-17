@@ -13,6 +13,6 @@ test("logs out from onboarding, clears the session, and redirects to login", asy
   await expect(page).toHaveURL(/\/login(?:\?|$)/);
   await expect(page.getByRole("heading", { name: "Bring clarity to every ledger." })).toBeVisible();
   await expect.poll(async () =>
-    (await context.cookies()).some(({ name }) => name === "ledgerharbour_dev_session"),
+    (await context.cookies()).some(({ name }) => name === "ledgerharbour_firebase_session"),
   ).toBe(false);
 });

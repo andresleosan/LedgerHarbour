@@ -54,6 +54,7 @@ import {
 } from "../../../src/i18n/config";
 
 const identityFor = (identity: AuthIdentity) => ({
+  provider: identity.provider,
   providerUserId: identity.providerUserId,
   email: identity.email,
   displayName: identity.displayName,
@@ -84,6 +85,7 @@ describe("development authentication provider", () => {
     await expect(provider.signInWithEmail({ email: "  ADMIN@ADMIN.COM  " })).resolves.toSatisfy(
       (identity: AuthIdentity) => {
         expect(identityFor(identity)).toEqual({
+          provider: "development",
           providerUserId: expect.stringMatching(/^dev-[a-f0-9]{8}$/),
           email: "admin@admin.com",
            displayName: "Admin",
@@ -122,6 +124,7 @@ describe("development authentication provider", () => {
     const provider = new DevAuthProvider();
 
     await expect(provider.signInWithGoogle()).resolves.toEqual({
+      provider: "development",
       providerUserId: "dev-google-user",
       email: "google-user@development.ledgerharbour.local",
       displayName: "Development Google User",

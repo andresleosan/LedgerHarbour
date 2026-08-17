@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   createBusiness,
@@ -113,12 +113,14 @@ describe("business approval lifecycle", () => {
     })).rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED });
 
     await expect(service.claimPlatformMember({
+      provider: "firebase",
       providerUserId: "different-provider",
       email: "admin@example.com",
       displayName: "Verified Admin",
       emailVerified: true,
     })).resolves.toMatchObject({ id: "platform-1", userId: expect.stringMatching(/^user-/) });
     await expect(service.listBusinesses({
+      provider: "firebase",
       providerUserId: "different-provider",
       email: "admin@example.com",
       displayName: "Verified Admin",
@@ -126,13 +128,49 @@ describe("business approval lifecycle", () => {
     })).resolves.toEqual([]);
   });
 
+  it("rejects a development provider claim even when its email is bootstrapped", async () => {
+    const tenancy = createInMemoryOnboardingRepository();
+    const platform = createInMemoryPlatformRepository();
+    const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+    platform.addMember({ id: "platform-1", userId: null, normalizedEmail: "admin@example.com" });
+
+    await expect(service.claimPlatformMember({
+      provider: "development",
+      providerUserId: "dev-admin",
+      email: "admin@example.com",
+      displayName: "Development Admin",
+      emailVerified: true,
+    })).rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED });
+    expect(platform.platformMembers[0]?.userId).toBeNull();
+  });
+
+  it("rejects a claim when the legacy test mode flag is enabled", async () => {
+    vi.stubEnv("LEDGERHARBOUR_TEST_MODE", "true");
+    const tenancy = createInMemoryOnboardingRepository();
+    const platform = createInMemoryPlatformRepository();
+    const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+    platform.addMember({ id: "platform-1", userId: null, normalizedEmail: "admin@example.com" });
+
+    try {
+      await expect(service.claimPlatformMember({
+        provider: "firebase",
+        providerUserId: "firebase-admin",
+        email: "admin@example.com",
+        displayName: "Firebase Admin",
+        emailVerified: true,
+      })).rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED });
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("keeps the first platform claim when a second identity claims the same member", async () => {
     const tenancy = createInMemoryOnboardingRepository();
     const platform = createInMemoryPlatformRepository();
     const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
     platform.addMember({ id: "platform-1", userId: null, normalizedEmail: "admin@example.com" });
-    const first = { providerUserId: "first-provider", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
-    const second = { providerUserId: "second-provider", email: "admin@example.com", displayName: "Second", emailVerified: true } as const;
+    const first = { provider: "firebase", providerUserId: "first-provider", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
+    const second = { provider: "firebase", providerUserId: "second-provider", email: "admin@example.com", displayName: "Second", emailVerified: true } as const;
 
     const linked = await service.claimPlatformMember(first);
 
@@ -145,8 +183,8 @@ describe("business approval lifecycle", () => {
     const platform = createInMemoryPlatformRepository();
     const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
     platform.addMember({ id: "platform-1", userId: null, normalizedEmail: "admin@example.com" });
-    const first = { providerUserId: "first-provider", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
-    const second = { providerUserId: "second-provider", email: "admin@example.com", displayName: "Second", emailVerified: true } as const;
+    const first = { provider: "firebase", providerUserId: "first-provider", email: "admin@example.com", displayName: "First", emailVerified: true } as const;
+    const second = { provider: "firebase", providerUserId: "second-provider", email: "admin@example.com", displayName: "Second", emailVerified: true } as const;
 
     const results = await Promise.allSettled([
       service.claimPlatformMember(first),

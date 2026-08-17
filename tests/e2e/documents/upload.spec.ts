@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { createApprovedBusiness } from "../helpers/business";
+import { browserApiRequest } from "../helpers/browser-api";
 
 test.describe.configure({ mode: "serial" });
 
@@ -37,11 +38,10 @@ test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks a
   await expect(downloadLink).toBeVisible();
   const downloadHref = await downloadLink.getAttribute("href");
   expect(downloadHref).toBeTruthy();
-  const downloaded = await owner.request.get(downloadHref as string);
-  const downloadBody = await downloaded.text();
-  expect(downloaded.status(), downloadBody).toBe(200);
-  expect(downloaded.headers()["content-disposition"]).toContain("invoice.pdf");
-  expect(downloadBody).toContain("%PDF-1.7");
+  const downloaded = await browserApiRequest(owner, downloadHref as string);
+  expect(downloaded.status, downloaded.body).toBe(200);
+  expect(downloaded.headers["content-disposition"]).toContain("invoice.pdf");
+  expect(downloaded.body).toContain("%PDF-1.7");
 
   const otherContext = await browser.newContext();
   const other = await otherContext.newPage();
@@ -49,8 +49,8 @@ test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks a
   const otherBusinessId = await createApprovedBusiness(browser, other, "E2E Other Document Harbour");
   const documentId = (await owner.getByRole("link", { name: "Download invoice.pdf" }).getAttribute("href"))?.match(/documents\/([^/]+)\/download/)?.[1];
   expect(documentId).toBeTruthy();
-  const forbidden = await other.request.get(`/api/documents/${documentId}/download`);
-  expect(forbidden.status()).toBe(403);
+  const forbidden = await browserApiRequest(other, `/api/documents/${documentId}/download`);
+  expect(forbidden.status).toBe(403);
   expect(otherBusinessId).not.toBe(businessId);
 
   await ownerContext.close();
@@ -79,10 +79,19 @@ test("uploads and downloads a real progressive JPEG fixture", async ({ page, bro
   await expect(page.getByRole("status")).toContainText("uploaded");
   const link = page.getByRole("link", { name: "Download invoice.jpeg" });
   await expect(link).toBeVisible();
-  const response = await page.request.get((await link.getAttribute("href")) as string);
-  expect(response.status()).toBe(200);
-  expect(response.headers()["content-type"]).toBe("image/jpeg");
-  expect((await response.body()).length).toBe(validProgressiveJpeg.buffer.length);
+  const jpegHref = await link.getAttribute("href");
+  if (!jpegHref) throw new Error("JPEG download link did not return an href");
+  const response = await page.evaluate(async (href) => {
+    const result = await fetch(href);
+    return {
+      status: result.status,
+      contentType: result.headers.get("content-type"),
+      length: (await result.arrayBuffer()).byteLength,
+    };
+  }, jpegHref);
+  expect(response.status).toBe(200);
+  expect(response.contentType).toBe("image/jpeg");
+  expect(response.length).toBe(validProgressiveJpeg.buffer.length);
 });
 
 test("keeps upload usable on mobile with keyboard focus and reduced motion", async ({ page, browser }) => {

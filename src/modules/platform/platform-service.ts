@@ -78,6 +78,25 @@ function serviceExpirationDate(value: unknown): string {
   return parsed.toISOString();
 }
 
+async function claimPlatformMemberForActor(
+  actor: AuthIdentity,
+  tenancy: OnboardingRepository,
+  platform: PlatformRepository,
+): Promise<PlatformMember> {
+  if (process.env.LEDGERHARBOUR_TEST_MODE === "true" || actor.provider !== "firebase" || !actor.emailVerified) {
+    throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
+  }
+  const member = await platform.findMemberForClaimByEmail(actor.email);
+  if (!member) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
+  if (member.userId) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+  const userId = await resolveOnboardingActor(tenancy, actor);
+  const linked = await platform.findActiveMemberByUserId(userId);
+  if (linked) return linked;
+  const linkedMember = await platform.claimMemberByEmail(actor.email, userId);
+  if (!linkedMember) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+  return linkedMember;
+}
+
 export function toPlatformBusinessDto(business: Business): PlatformBusinessDto {
   return {
     id: business.id,
@@ -97,8 +116,12 @@ async function requirePlatformMember(
   platform: PlatformRepository,
 ): Promise<PlatformMember> {
   const userId = await resolveOnboardingActor(tenancy, actor);
-  const member = await platform.findActiveMemberByUserId(userId);
-  if (!member || member.role !== "platform_admin" || !member.isActive) {
+  let member = await platform.findActiveMemberByUserId(userId);
+  if (!member && typeof actor !== "string" && actor.provider === "firebase" && actor.emailVerified) {
+    await claimPlatformMemberForActor(actor, tenancy, platform);
+    member = await platform.findActiveMemberByUserId(userId);
+  }
+  if (!member || member.role !== "platform_admin" || !member.isActive || member.userId !== userId) {
     throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
   }
   return member;
@@ -157,16 +180,7 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
     },
 
     async claimPlatformMember(actor) {
-      if (!actor.emailVerified) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
-      const member = await platform.findMemberForClaimByEmail(actor.email);
-      if (!member) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
-      if (member.userId) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
-      const userId = await resolveOnboardingActor(tenancy, actor);
-      const linked = await platform.findActiveMemberByUserId(userId);
-      if (linked) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
-      const linkedMember = await platform.linkMemberToUser(member.id, userId);
-      if (!linkedMember) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
-      return linkedMember;
+      return claimPlatformMemberForActor(actor, tenancy, platform);
     },
 
     async approveBusiness(businessId, actor, input) {
@@ -237,27 +251,17 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
 const DEFAULT_PLATFORM_REPOSITORY_KEY = Symbol.for("ledgerharbour.platform.defaultRepository");
 
 function createDefaultPlatformRepository(): InMemoryPlatformRepository {
-  const shareAcrossBundles = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test" || process.env.LEDGERHARBOUR_TEST_MODE === "true";
+  const shareAcrossBundles = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
   const globalState = globalThis as typeof globalThis & { [key: symbol]: unknown };
   const existing = globalState[DEFAULT_PLATFORM_REPOSITORY_KEY] as InMemoryPlatformRepository | undefined;
   if (shareAcrossBundles && existing?.platformMembers && existing?.auditEvents) return existing;
 
   const repository = createInMemoryPlatformRepository();
   if (process.env.PLATFORM_ADMIN_EMAILS) {
-    const configuredUserIds = process.env.PLATFORM_ADMIN_USER_IDS?.split(",") ?? [];
     for (const [index, email] of process.env.PLATFORM_ADMIN_EMAILS.split(",").entries()) {
       const normalizedEmail = email.trim().toLocaleLowerCase("en-US");
-      const userIds = configuredUserIds.length === process.env.PLATFORM_ADMIN_EMAILS.split(",").length
-        ? [configuredUserIds[index]]
-        : configuredUserIds;
       if (normalizedEmail) {
-        for (const [userIndex, configuredUserId] of userIds.entries()) {
-          repository.addMember({
-            id: `test-platform-${index + 1}-${userIndex + 1}`,
-            userId: configuredUserId?.trim() ? configuredUserId.trim() as UserId : null,
-            normalizedEmail,
-          });
-        }
+        repository.addMember({ id: `test-platform-${index + 1}`, userId: null, normalizedEmail });
       }
     }
   }
