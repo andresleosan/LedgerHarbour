@@ -2,11 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const signInWithPopup = vi.hoisted(() => vi.fn());
 const getRedirectResult = vi.hoisted(() => vi.fn());
+const getApps = vi.hoisted(() => vi.fn(() => [{ name: "app" }]));
 const getAuth = vi.hoisted(() => vi.fn(() => "auth"));
 const signOut = vi.hoisted(() => vi.fn());
 
 vi.mock("firebase/app", () => ({
-  getApps: vi.fn(() => [{ name: "app" }]),
+  getApps,
   initializeApp: vi.fn(),
 }));
 
@@ -26,6 +27,7 @@ import {
   signInWithFirebaseGoogle,
   signOutFirebaseUser,
 } from "../../src/modules/auth/firebase-client";
+import { getFirebaseClientConfig } from "../../src/modules/auth/firebase-config";
 
 const config = {
   apiKey: "api-key",
@@ -33,6 +35,8 @@ const config = {
   projectId: "example",
   appId: "app-id",
 };
+
+const runtimeEnv = (values: Record<string, string>) => values as NodeJS.ProcessEnv;
 
 describe("Firebase Google authentication", () => {
   beforeEach(() => {
@@ -76,5 +80,32 @@ describe("Firebase Google authentication", () => {
     await signOutFirebaseUser(config);
 
     expect(signOut).toHaveBeenCalledWith("auth");
+  });
+
+  it("does not try to clear Firebase when no client app or config exists", async () => {
+    getApps.mockReturnValueOnce([]);
+
+    await expect(signOutFirebaseUser()).resolves.toBeUndefined();
+
+    expect(signOut).not.toHaveBeenCalled();
+  });
+
+  it("derives a complete Firebase client config from server-provided public values", () => {
+    expect(getFirebaseClientConfig(runtimeEnv({
+      AUTH_MODE: "firebase",
+      NEXT_PUBLIC_FIREBASE_API_KEY: config.apiKey,
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: config.authDomain,
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: config.projectId,
+      NEXT_PUBLIC_FIREBASE_APP_ID: config.appId,
+    }))).toEqual(config);
+  });
+
+  it("returns no Firebase client config when a public value is missing", () => {
+    expect(getFirebaseClientConfig(runtimeEnv({
+      AUTH_MODE: "firebase",
+      NEXT_PUBLIC_FIREBASE_API_KEY: config.apiKey,
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: config.authDomain,
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: config.projectId,
+    }))).toBeUndefined();
   });
 });

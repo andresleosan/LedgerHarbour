@@ -1,10 +1,11 @@
 "use client";
 
 import { signOutAction } from "@/app/onboarding/actions";
-import { firebaseClientConfigFromEnv, signOutFirebaseUser } from "@/modules/auth/firebase-client";
+import { signOutFirebaseUser } from "@/modules/auth/firebase-client";
+import { useOnboardingFirebaseConfig } from "@/ui/OnboardingFirebaseConfigProvider";
 
 export default function OnboardingSignOut({ label }: { label: string }) {
-  const firebaseConfig = firebaseClientConfigFromEnv();
+  const firebaseConfig = useOnboardingFirebaseConfig();
 
   return (
     <form

@@ -18,6 +18,18 @@ describe("production authentication boundary", () => {
     }
   });
 
+  it("rejects the development provider when production wins over the test marker", () => {
+    vi.stubEnv("AUTH_MODE", "development");
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("LEDGERHARBOUR_TEST_MODE", "true");
+
+    try {
+      expect(createAuthProvider()).toBeNull();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("keeps production auth pages on Firebase instead of development mode", () => {
     expect(source("app/(auth)/login/page.tsx")).toContain("FirebaseAuthProvider");
     expect(source("app/(auth)/register/page.tsx")).toContain("FirebaseAuthProvider");

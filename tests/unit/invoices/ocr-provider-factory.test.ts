@@ -58,6 +58,16 @@ describe("OCR provider factory", () => {
     ).toThrowError(OcrConfigurationError);
   });
 
+  it("rejects the fake provider when production wins over the test marker", () => {
+    expect(() =>
+      createOcrProvider(runtimeEnv({
+        OCR_PROVIDER: "fake",
+        NODE_ENV: "production",
+        LEDGERHARBOUR_TEST_MODE: "true",
+      })),
+    ).toThrowError(OcrConfigurationError);
+  });
+
   it("rejects the fake provider outside the explicit test harness", () => {
     expect(() =>
       createOcrProvider(runtimeEnv({ OCR_PROVIDER: "fake", NODE_ENV: "development" })),
