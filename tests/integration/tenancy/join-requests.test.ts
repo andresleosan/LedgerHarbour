@@ -315,9 +315,7 @@ describe("in-memory onboarding repository boundary", () => {
       "Business name is required.",
     );
 
-    const createdResponse = await createBusinessRoute(jsonRequest(JSON.stringify({ name: "Route Contract Books" })));
-    expect(createdResponse.status).toBe(201);
-    const created = await createdResponse.json() as { id: string };
+    const created = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: "Route Contract Books" }, identity("route-owner"));
     const duplicateMembership = await postJoinRequestRoute(
       jsonRequest(JSON.stringify({ requestedRole: "administrator" }), `http://localhost/api/businesses/${created.id}/join-requests`),
       contextFor(created.id),
@@ -424,8 +422,7 @@ describe("in-memory onboarding repository boundary", () => {
     });
 
     await setCurrentIdentity(identity("route-other-business-owner"));
-    const other = await createBusinessRoute(jsonRequest(JSON.stringify({ name: "Other Route Books" })));
-    const otherBusiness = await other.json() as { id: string };
+    const otherBusiness = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: "Other Route Books" }, identity("route-other-business-owner"));
     const hidden = await patchJoinRequestsRoute(
       new Request("http://localhost", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ joinRequestId: pendingRequest.id, decision: "approved" }) }),
       contextFor(otherBusiness.id),
@@ -496,8 +493,7 @@ describe("in-memory onboarding repository boundary", () => {
     });
 
     await setCurrentIdentity(identity("matrix-owner"));
-    const createdResponse = await createBusinessRoute(requestFor(JSON.stringify({ name: "Matrix Books" })));
-    const created = await createdResponse.json() as { id: string };
+    const created = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: "Matrix Books" }, identity("matrix-owner"));
 
     await setCurrentIdentity(identity("matrix-member"));
     const rejectedRequest = await postJoinRequestRoute(
@@ -578,9 +574,7 @@ describe("in-memory onboarding repository boundary", () => {
     });
 
     await setCurrentIdentity(identity);
-    const createdResponse = await createBusinessRoute(requestFor(JSON.stringify({ name: "Safe Search Books" })));
-    expect(createdResponse.status).toBe(201);
-    const created = await createdResponse.json() as { id: string; name: string };
+    const created = await createOnboardingServices(defaultOnboardingRepository).createBusiness({ name: "Safe Search Books" }, user("search-contract-owner"));
 
     const success = await searchBusinessesRoute(new Request("http://localhost/api/businesses/search?q=safe%20search"));
     expect(success.status).toBe(200);

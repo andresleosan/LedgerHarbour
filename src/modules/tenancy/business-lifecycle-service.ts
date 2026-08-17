@@ -78,7 +78,7 @@ export async function requireBusinessOperational(
 ): Promise<Business> {
   const business = await repository.findBusiness(businessId);
   if (!business) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.BUSINESS_NOT_FOUND);
-  if (!business.isActive) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.INACTIVE_BUSINESS);
+   if (business.status !== "active" || !business.isActive) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.INACTIVE_BUSINESS);
   return business;
 }
 
@@ -102,7 +102,7 @@ export function createBusinessLifecycleService(repository: OnboardingRepository 
       await repository.transaction(async (transaction) => {
         const business = await transaction.findBusiness(businessId);
         if (!business) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.BUSINESS_NOT_FOUND);
-        if (!business.isActive) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.INACTIVE_BUSINESS);
+         if (business.status !== "active" || !business.isActive) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.INACTIVE_BUSINESS);
         await transaction.updateBusinessStatus(businessId, false);
         await transaction.appendAuditEvent({ businessId, actorId, type: "business_deactivated", entityId: businessId });
       });
@@ -115,7 +115,7 @@ export function createBusinessLifecycleService(repository: OnboardingRepository 
       await repository.transaction(async (transaction) => {
         const business = await transaction.findBusiness(businessId);
         if (!business) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.BUSINESS_NOT_FOUND);
-        if (business.isActive) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.ACTIVE_BUSINESS);
+         if (business.status === "active" && business.isActive) throw new BusinessLifecycleError(LIFECYCLE_ERROR_CODES.ACTIVE_BUSINESS);
         await transaction.updateBusinessStatus(businessId, true);
         await transaction.appendAuditEvent({ businessId, actorId, type: "business_reactivated", entityId: businessId });
       });

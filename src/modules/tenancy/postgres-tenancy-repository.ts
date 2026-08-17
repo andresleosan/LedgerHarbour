@@ -18,6 +18,7 @@ import {
   ONBOARDING_ERROR_CODES,
   OnboardingError,
   type Business,
+  type BusinessLifecycleUpdate,
   type BusinessSearchResult,
   type JoinRequest,
   type OnboardingRepository,
@@ -114,7 +115,12 @@ function mapBusiness(row: typeof businesses.$inferSelect, createdBy: UserId): Bu
     id: id<BusinessId>(row.id),
     name: row.name,
     normalizedName: row.normalizedSearchName,
-    isActive: row.isActive,
+    status: row.status as Business["status"],
+    isActive: row.status === "active",
+    activatedAt: row.activatedAt?.toISOString() ?? null,
+    serviceExpiresAt: row.serviceExpiresAt?.toISOString() ?? null,
+    suspendedAt: row.suspendedAt?.toISOString() ?? null,
+    suspensionReason: row.suspensionReason,
     baseCurrencyKind: "standard",
     baseCurrencyCode: "GBP",
     baseCurrencyId: null,
@@ -186,7 +192,7 @@ function createRepository(db: Database, transactionCount: { value: number }): On
 
     async findBusinessStatus(businessId) {
       const business = await repository.findBusiness(businessId);
-      return business ? (business.isActive ? "active" : "inactive") : null;
+      return business?.status ?? null;
     },
 
     async createBusiness(input) {
@@ -197,7 +203,13 @@ function createRepository(db: Database, transactionCount: { value: number }): On
           baseCurrencyKind: input.baseCurrencyKind,
           baseCurrencyCode: input.baseCurrencyCode,
           baseCurrencyId: input.baseCurrencyId,
-          isActive: input.isActive,
+          createdBy: input.createdBy,
+          status: input.status ?? (input.isActive ? "active" : "suspended"),
+          isActive: input.status ? input.status === "active" : input.isActive,
+          activatedAt: input.activatedAt ? new Date(input.activatedAt) : null,
+          serviceExpiresAt: input.serviceExpiresAt ? new Date(input.serviceExpiresAt) : null,
+          suspendedAt: input.suspendedAt ? new Date(input.suspendedAt) : null,
+          suspensionReason: input.suspensionReason ?? null,
         }).returning();
         if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
         return mapBusiness(row, input.createdBy);
@@ -273,12 +285,11 @@ function createRepository(db: Database, transactionCount: { value: number }): On
           .where(and(eq(memberships.userId, userId), eq(memberships.isActive, true)));
         const result: Array<{ business: Business; membership: Membership }> = [];
         for (const row of rows) {
-          const events = await db.select({ actorId: auditEvents.actorId }).from(auditEvents).where(and(
+          const creator = row.business.createdBy ?? (await db.select({ actorId: auditEvents.actorId }).from(auditEvents).where(and(
             eq(auditEvents.businessId, row.business.id),
             eq(auditEvents.action, "business_created"),
             eq(auditEvents.entityId, row.business.id),
-          )).limit(1);
-          const creator = events[0]?.actorId;
+          )).limit(1))[0]?.actorId;
           if (!creator) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
           result.push({ business: mapBusiness(row.business, id<UserId>(creator)), membership: mapMembership(row.membership) });
         }
@@ -325,25 +336,49 @@ function createRepository(db: Database, transactionCount: { value: number }): On
       try {
         const [row] = await db.select().from(businesses).where(eq(businesses.id, businessId)).limit(1);
         if (!row) return null;
-        const [event] = await db.select({ actorId: auditEvents.actorId }).from(auditEvents).where(and(
+        const creator = row.createdBy ?? (await db.select({ actorId: auditEvents.actorId }).from(auditEvents).where(and(
           eq(auditEvents.businessId, businessId),
           eq(auditEvents.action, "business_created"),
           eq(auditEvents.entityId, businessId),
-        )).limit(1);
-        if (!event?.actorId) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
-        return mapBusiness(row, id<UserId>(event.actorId));
+        )).limit(1))[0]?.actorId;
+        if (!creator) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+        return mapBusiness(row, id<UserId>(creator));
       } catch (error) {
         return preserveOrMap(error);
       }
     },
 
     async updateBusinessStatus(businessId, isActive) {
+      return repository.updateBusinessLifecycle(businessId, {
+        status: isActive ? "active" : "suspended",
+        suspendedAt: isActive ? null : new Date().toISOString(),
+        suspensionReason: isActive ? null : "Business deactivated",
+      });
+    },
+
+    async updateBusinessLifecycle(businessId, input: BusinessLifecycleUpdate) {
       try {
-        const [row] = await db.update(businesses).set({ isActive, updatedAt: new Date() }).where(eq(businesses.id, businessId)).returning();
+        const [row] = await db.update(businesses).set({
+          status: input.status,
+          isActive: input.status === "active",
+          activatedAt: input.activatedAt === undefined ? undefined : input.activatedAt ? new Date(input.activatedAt) : null,
+          serviceExpiresAt: input.serviceExpiresAt === undefined ? undefined : input.serviceExpiresAt ? new Date(input.serviceExpiresAt) : null,
+          suspendedAt: input.suspendedAt === undefined ? undefined : input.suspendedAt ? new Date(input.suspendedAt) : null,
+          suspensionReason: input.suspensionReason,
+          updatedAt: new Date(),
+        }).where(eq(businesses.id, businessId)).returning();
         if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.MISSING_BUSINESS);
-        const business = await repository.findBusiness(businessId);
-        if (!business) throw new OnboardingError(ONBOARDING_ERROR_CODES.MISSING_BUSINESS);
-        return business;
+        if (!row.createdBy) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+        return mapBusiness(row, id<UserId>(row.createdBy));
+      } catch (error) {
+        return preserveOrMap(error);
+      }
+    },
+
+    async listBusinesses() {
+      try {
+        const rows = await db.select().from(businesses).orderBy(asc(businesses.createdAt), asc(businesses.id));
+        return rows.flatMap((row) => row.createdBy ? [mapBusiness(row, id<UserId>(row.createdBy))] : []);
       } catch (error) {
         return preserveOrMap(error);
       }
@@ -351,11 +386,11 @@ function createRepository(db: Database, transactionCount: { value: number }): On
 
     async searchBusinesses(normalizedQuery): Promise<BusinessSearchResult[]> {
       try {
-        const rows = await db.select({ id: businesses.id, name: businesses.name, isActive: businesses.isActive }).from(businesses).where(and(
-          eq(businesses.isActive, true),
+        const rows = await db.select({ id: businesses.id, name: businesses.name, status: businesses.status }).from(businesses).where(and(
+          eq(businesses.status, "active"),
           like(businesses.normalizedSearchName, `%${normalizedQuery}%`),
         )).orderBy(asc(businesses.name));
-        return rows.map((row) => ({ id: id<BusinessId>(row.id), name: row.name, isActive: true }));
+        return rows.map((row) => ({ id: id<BusinessId>(row.id), name: row.name, isActive: true as const }));
       } catch (error) {
         return preserveOrMap(error);
       }

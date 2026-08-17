@@ -11,6 +11,8 @@ import { createPostgresDocumentRepository } from "../documents/postgres-document
 import { resolveDefaultStorage } from "../invoices/invoice-service";
 import { createPostgresOnboardingRepository } from "../tenancy/postgres-tenancy-repository";
 import { defaultOnboardingRepository, type OnboardingRepository } from "../tenancy/business-service";
+import { createPostgresPlatformRepository, defaultPlatformRepository } from "../platform/platform-service";
+import type { PlatformRepository } from "../platform/platform-repository";
 import type { DocumentRepository } from "../documents/document-service";
 import type { InvoiceRepository } from "../invoices/invoice-service";
 import type { JobRepository } from "../jobs/job-service";
@@ -22,6 +24,7 @@ export type PersistenceMode = "memory" | "postgres";
 export type PersistenceContext = {
   mode: PersistenceMode;
   tenancyRepository: OnboardingRepository;
+  platformRepository: PlatformRepository;
   documentRepository: DocumentRepository;
   invoiceRepository: InvoiceRepository;
   jobRepository: JobRepository;
@@ -71,6 +74,7 @@ export function createPersistenceContext(input: PersistenceInput = {}): Persiste
     return {
       mode,
       tenancyRepository: defaultOnboardingRepository,
+      platformRepository: defaultPlatformRepository,
       documentRepository: resolveDefaultDocumentRepository(),
       invoiceRepository: resolveDefaultInvoiceRepository(),
       jobRepository: resolveDefaultJobRepository(),
@@ -98,6 +102,7 @@ function postgresContext(database: Database, pool: Pool | undefined, storage: St
   return {
     mode: "postgres",
     tenancyRepository: createPostgresOnboardingRepository(database),
+    platformRepository: createPostgresPlatformRepository(database),
     documentRepository: createPostgresDocumentRepository(database),
     invoiceRepository: createPostgresInvoiceRepository(database),
     jobRepository: createPostgresJobRepository(database),

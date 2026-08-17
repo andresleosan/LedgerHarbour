@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { getCurrentIdentity } from "../../../modules/auth/session";
 import {
-  createBusiness,
+  createBusinessRequest,
   OnboardingError,
   ONBOARDING_ERROR_CODES,
   type CreateBusinessInput,
@@ -43,8 +43,12 @@ export async function POST(request: Request) {
 
   try {
     const persistence = getPersistenceContext();
-    const business = await createBusiness(input, identity, persistence.tenancyRepository);
-    return NextResponse.json(business, { status: 201 });
+    const business = await createBusinessRequest(input, identity, persistence.tenancyRepository);
+    return NextResponse.json({
+      id: business.id,
+      name: business.name,
+      status: business.status,
+    }, { status: 201 });
   } catch (error) {
     return errorResponse(error);
   }

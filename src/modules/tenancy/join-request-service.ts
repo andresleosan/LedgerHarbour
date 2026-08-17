@@ -43,7 +43,7 @@ export function createJoinRequestService(repository: OnboardingRepository): Join
       if (!business) {
         throw new OnboardingError(ONBOARDING_ERROR_CODES.MISSING_BUSINESS);
       }
-      if (!business.isActive) {
+       if (business.status !== "active" || !business.isActive) {
         throw new OnboardingError(ONBOARDING_ERROR_CODES.INACTIVE_BUSINESS);
       }
 
@@ -83,7 +83,7 @@ export function createJoinRequestService(repository: OnboardingRepository): Join
       if (!business) {
         throw new OnboardingError(ONBOARDING_ERROR_CODES.MISSING_BUSINESS);
       }
-      if (!business.isActive) {
+       if (business.status !== "active" || !business.isActive) {
         throw new OnboardingError(ONBOARDING_ERROR_CODES.INACTIVE_BUSINESS);
       }
       const requests = await repository.listUserJoinRequests(businessId, resolvedActorId);

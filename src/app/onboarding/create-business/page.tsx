@@ -6,7 +6,7 @@ import { useState } from "react";
 import { messages, type SupportedLocale } from "@/i18n/config";
 import OnboardingSignOut from "@/ui/OnboardingSignOut";
 
-type BusinessResponse = { id: string; name: string };
+type BusinessResponse = { id: string; name: string; status: "pending" | "active" | "suspended" | "rejected" };
 type ErrorPayload = { error?: { code?: string } };
 
 function messageForError(code: string | undefined, copy: typeof messages.en.onboarding): string {

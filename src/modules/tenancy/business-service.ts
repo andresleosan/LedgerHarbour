@@ -4,7 +4,7 @@ import type { AuthIdentity } from "../auth/auth-provider";
 import { createJoinRequestService } from "./join-request-service";
 import type { TenantRepository } from "./tenant-context";
 import { createTenantContext } from "./tenant-context";
-import type { BusinessId, Membership, UserId } from "./types";
+import type { BusinessId, BusinessStatus, Membership, UserId } from "./types";
 
 export const ONBOARDING_ERROR_CODES = {
   INVALID_BUSINESS_NAME: "INVALID_BUSINESS_NAME",
@@ -50,7 +50,13 @@ export interface Business {
   id: BusinessId;
   name: string;
   normalizedName: string;
+  status: BusinessStatus;
+  /** @deprecated Use status. Kept while existing clients migrate. */
   isActive: boolean;
+  activatedAt: string | null;
+  serviceExpiresAt: string | null;
+  suspendedAt: string | null;
+  suspensionReason: string | null;
   baseCurrencyKind: BaseCurrencyKind;
   baseCurrencyCode: "GBP";
   baseCurrencyId: null;
@@ -81,6 +87,14 @@ export interface BusinessSearchResult {
 
 export interface CreateBusinessInput {
   name: string;
+}
+
+export interface BusinessLifecycleUpdate {
+  status: BusinessStatus;
+  activatedAt?: string | null;
+  serviceExpiresAt?: string | null;
+  suspendedAt?: string | null;
+  suspensionReason?: string | null;
 }
 
 export type OnboardingActor = UserId | AuthIdentity;
@@ -115,7 +129,7 @@ export interface OnboardingRepository extends TenantRepository {
   readonly transactionCount: number;
   transaction<T>(operation: (repository: OnboardingRepository) => Promise<T>): Promise<T>;
   upsertUser(identity: AuthIdentity): Promise<UserId>;
-  createBusiness(input: Omit<Business, "id">): Promise<Business>;
+  createBusiness(input: Omit<Business, "id" | "status" | "activatedAt" | "serviceExpiresAt" | "suspendedAt" | "suspensionReason"> & Partial<Pick<Business, "status" | "activatedAt" | "serviceExpiresAt" | "suspendedAt" | "suspensionReason">>): Promise<Business>;
   provisionDefaultCategories(businessId: BusinessId): Promise<void>;
   createMembership(membership: Membership): Promise<Membership>;
   updateMembership(membership: Membership): Promise<Membership>;
@@ -125,6 +139,8 @@ export interface OnboardingRepository extends TenantRepository {
   appendAuditEvent(event: Omit<AuditEvent, "id" | "createdAt">): Promise<AuditEvent>;
   listAuditEvents(businessId: BusinessId): Promise<AuditEvent[]>;
   updateBusinessStatus(businessId: BusinessId, isActive: boolean): Promise<Business>;
+  updateBusinessLifecycle(businessId: BusinessId, input: BusinessLifecycleUpdate): Promise<Business>;
+  listBusinesses(): Promise<Business[]>;
   listCategories(businessId: BusinessId): Promise<Category[]>;
   findCategory(businessId: BusinessId, categoryId: string): Promise<Category | null>;
   findCategoryByName(businessId: BusinessId, normalizedName: string, ignoredId?: string): Promise<Category | null>;
@@ -236,13 +252,24 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
     ) ?? null;
   }
 
-  async findBusinessStatus(businessId: BusinessId): Promise<"active" | "inactive" | null> {
+  async findBusinessStatus(businessId: BusinessId): Promise<BusinessStatus | null> {
     const business = this.businesses.get(businessId);
-    return business ? (business.isActive ? "active" : "inactive") : null;
+    if (!business) return null;
+    return business.status === "active" && business.isActive ? "active" : business.status === "active" ? "suspended" : business.status;
   }
 
-  async createBusiness(input: Omit<Business, "id">): Promise<Business> {
-    const business = { ...input, id: idFor<BusinessId>(`business-${this.nextBusinessId++}`) };
+  async createBusiness(input: Omit<Business, "id" | "status" | "activatedAt" | "serviceExpiresAt" | "suspendedAt" | "suspensionReason"> & Partial<Pick<Business, "status" | "activatedAt" | "serviceExpiresAt" | "suspendedAt" | "suspensionReason">>): Promise<Business> {
+    const status = input.status ?? (input.isActive ? "active" : "suspended");
+    const business = {
+      ...input,
+      status,
+      isActive: status === "active",
+      activatedAt: input.activatedAt ?? null,
+      serviceExpiresAt: input.serviceExpiresAt ?? null,
+      suspendedAt: input.suspendedAt ?? null,
+      suspensionReason: input.suspensionReason ?? null,
+      id: idFor<BusinessId>(`business-${this.nextBusinessId++}`),
+    };
     this.businesses.set(business.id, business);
     return business;
   }
@@ -294,7 +321,7 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
       .filter((membership) => membership.userId === userId && membership.isActive)
       .flatMap((membership) => {
         const business = this.businesses.get(membership.businessId);
-        return business ? [{ business: { ...business }, membership: { ...membership } }] : [];
+        return business ? [{ business: { ...business, isActive: business.status === "active" && business.isActive }, membership: { ...membership } }] : [];
       });
   }
 
@@ -309,10 +336,23 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
   }
 
   async updateBusinessStatus(businessId: BusinessId, isActive: boolean): Promise<Business> {
+    return this.updateBusinessLifecycle(businessId, {
+      status: isActive ? "active" : "suspended",
+      suspendedAt: isActive ? null : new Date().toISOString(),
+      suspensionReason: isActive ? null : "Business deactivated",
+    });
+  }
+
+  async updateBusinessLifecycle(businessId: BusinessId, input: BusinessLifecycleUpdate): Promise<Business> {
     const business = this.businesses.get(businessId);
     if (!business) throw new OnboardingError(ONBOARDING_ERROR_CODES.MISSING_BUSINESS);
-    business.isActive = isActive;
-    return { ...business };
+    const updated = { ...business, ...input, isActive: input.status === "active" };
+    this.businesses.set(businessId, updated);
+    return { ...updated };
+  }
+
+  async listBusinesses(): Promise<Business[]> {
+    return [...this.businesses.values()].map((business) => ({ ...business }));
   }
 
   async listCategories(businessId: BusinessId): Promise<Category[]> {
@@ -351,8 +391,8 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
 
   async searchBusinesses(normalizedQuery: string): Promise<BusinessSearchResult[]> {
     return [...this.businesses.values()]
-      .filter((business) => business.isActive && business.normalizedName.includes(normalizedQuery))
-      .map(({ id, name, isActive }) => ({ id, name, isActive: isActive as true }));
+      .filter((business) => business.status === "active" && business.isActive && business.normalizedName.includes(normalizedQuery))
+      .map(({ id, name }) => ({ id, name, isActive: true as const }));
   }
 
   async createJoinRequest(
@@ -484,6 +524,24 @@ export async function createBusiness(
   actor: OnboardingActor,
   repository: OnboardingRepository = defaultOnboardingRepository,
 ): Promise<Business> {
+  return createBusinessWithStatus(input, actor, repository, "active", true);
+}
+
+export async function createBusinessRequest(
+  input: CreateBusinessInput,
+  actor: OnboardingActor,
+  repository: OnboardingRepository = defaultOnboardingRepository,
+): Promise<Business> {
+  return createBusinessWithStatus(input, actor, repository, "pending", false);
+}
+
+async function createBusinessWithStatus(
+  input: CreateBusinessInput,
+  actor: OnboardingActor,
+  repository: OnboardingRepository,
+  status: BusinessStatus,
+  provisionOwner: boolean,
+): Promise<Business> {
   if (typeof actor === "string") requireActorId(actor);
   const name = typeof input?.name === "string" ? input.name.trim().replace(/\s+/g, " ") : "";
   const normalizedName = normalizeBusinessName(name);
@@ -496,21 +554,28 @@ export async function createBusiness(
     const business = await transaction.createBusiness({
       name,
       normalizedName,
-      isActive: true,
+       status,
+       isActive: status === "active",
+       activatedAt: status === "active" ? new Date().toISOString() : null,
+       serviceExpiresAt: null,
+       suspendedAt: null,
+       suspensionReason: null,
       baseCurrencyKind: "standard",
       baseCurrencyCode: "GBP",
       baseCurrencyId: null,
       createdBy: actorId,
     });
-    await transaction.createMembership({
-      membershipId: randomUUID(),
-      userId: actorId,
-      businessId: business.id,
-      role: "owner_admin",
-      isActive: true,
-    });
     await transaction.provisionDefaultCategories(business.id);
-    await transaction.appendAuditEvent({ businessId: business.id, actorId, type: "business_created", entityId: business.id });
+    if (provisionOwner) {
+      await transaction.createMembership({
+        membershipId: randomUUID(),
+        userId: actorId,
+        businessId: business.id,
+        role: "owner_admin",
+        isActive: true,
+      });
+      await transaction.appendAuditEvent({ businessId: business.id, actorId, type: "business_created", entityId: business.id });
+    }
     return business;
   });
 }
@@ -532,6 +597,7 @@ export function createOnboardingServices(repository: OnboardingRepository = defa
   const joinRequestService = createJoinRequestService(repository);
   return {
     createBusiness: (input: CreateBusinessInput, actor: OnboardingActor) => createBusiness(input, actor, repository),
+    createBusinessRequest: (input: CreateBusinessInput, actor: OnboardingActor) => createBusinessRequest(input, actor, repository),
     searchBusinesses: (query: string, actor: OnboardingActor) => searchBusinesses(query, actor, repository),
     ...joinRequestService,
   };

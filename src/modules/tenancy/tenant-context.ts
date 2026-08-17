@@ -4,11 +4,11 @@ import {
   InfrastructureAuthorizationError,
 } from "../permissions/authorize";
 import { MembershipRole } from "../permissions/roles";
-import type { BusinessId, Membership, UserId } from "./types";
+import type { BusinessId, BusinessStatus, Membership, UserId } from "./types";
 
 export interface TenantRepository {
   findMembership(userId: UserId, businessId: BusinessId): Promise<Membership | null>;
-  findBusinessStatus(businessId: BusinessId): Promise<"active" | "inactive" | null>;
+  findBusinessStatus(businessId: BusinessId): Promise<BusinessStatus | "inactive" | null>;
 }
 
 export interface TenantContext {
@@ -116,7 +116,7 @@ async function requireBusinessAccessFrom(
   }
 
   let membership: Membership | null;
-  let businessStatus: "active" | "inactive" | null;
+   let businessStatus: BusinessStatus | "inactive" | null;
   try {
     [membership, businessStatus] = await Promise.all([
       repository.findMembership(userId, businessId),
