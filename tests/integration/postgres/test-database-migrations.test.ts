@@ -4,7 +4,9 @@ import { PGlite } from "@electric-sql/pglite";
 import { createTestDatabase } from "../../../src/db/test-database";
 import {
   applyBusinessLifecycleMigration,
+  applyAllMigrations,
   checkInitialMigration,
+  checkAllMigrations,
   applyInitialMigration,
   applyMembershipLifecycleMigration,
   applyProjectsMigration,
@@ -125,6 +127,38 @@ describe("PGlite test database migrations", () => {
       await expect(checkProjectsMigration(config, clientFactory)).resolves.toMatchObject({ applied: false, requiredTableCount: 0, ledgerRecordPresent: false });
       await expect(applyProjectsMigration(config, clientFactory)).resolves.toEqual({ version: "0005_projects", applied: true });
       await expect(checkProjectsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 2, ledgerRecordPresent: true });
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("runs and checks the canonical migration sequence through projects 0005", async () => {
+    const client = new PGlite();
+    const clientFactory: MigrationClientFactory = async () => ({
+      query: async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+        if (!values && /^(BEGIN|COMMIT|ROLLBACK)\b/i.test(text.trim())) {
+          await client.exec(text);
+          return { rows: [] as Row[], rowCount: 0 };
+        }
+        const result = await client.query<Row>(text, values ? [...values] : undefined);
+        return { rows: result.rows, rowCount: result.rows.length };
+      },
+      exec: (text: string) => client.exec(text),
+      end: async () => undefined,
+    });
+    try {
+      const config = { databaseUrl: "pglite://task5-canonical", allowStagingMigration: true as const };
+      const applied = await applyAllMigrations(config, clientFactory);
+      expect(Object.values(applied).map((result) => result.version)).toEqual([
+        "0001_initial",
+        "0002_platform_control_plane",
+        "0003_business_lifecycle",
+        "0004_membership_lifecycle",
+        "0005_projects",
+      ]);
+      await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({
+        projects: { applied: true, requiredTableCount: 2, ledgerRecordPresent: true },
+      });
     } finally {
       await client.close();
     }

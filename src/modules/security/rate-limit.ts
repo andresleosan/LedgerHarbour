@@ -121,6 +121,18 @@ const AUTHENTICATED_RATE_LIMITS = {
     windowMs: 5 * 60 * 1000,
     upstashWindow: "5 m",
   },
+  "project-request": {
+    keyPrefix: "authenticated-project-request",
+    maxRequests: 10,
+    windowMs: 5 * 60 * 1000,
+    upstashWindow: "5 m",
+  },
+  "project-membership": {
+    keyPrefix: "authenticated-project-membership",
+    maxRequests: 20,
+    windowMs: 5 * 60 * 1000,
+    upstashWindow: "5 m",
+  },
   "platform-administration": {
     keyPrefix: "authenticated-platform-administration",
     maxRequests: 30,
@@ -141,6 +153,18 @@ const AGGREGATED_RATE_LIMITS = {
   "ocr-process": {
     keyPrefix: "authenticated-ocr-process-address",
     maxRequests: 10,
+    windowMs: 5 * 60 * 1000,
+    upstashWindow: "5 m",
+  },
+  "project-request": {
+    keyPrefix: "authenticated-project-request-address",
+    maxRequests: 20,
+    windowMs: 5 * 60 * 1000,
+    upstashWindow: "5 m",
+  },
+  "project-membership": {
+    keyPrefix: "authenticated-project-membership-address",
+    maxRequests: 40,
     windowMs: 5 * 60 * 1000,
     upstashWindow: "5 m",
   },

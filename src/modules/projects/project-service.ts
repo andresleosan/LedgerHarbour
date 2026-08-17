@@ -10,6 +10,7 @@ import {
   ProjectRepositoryConflictError,
   type InMemoryProjectRepository,
   type NewProject,
+  type ProjectReferenceResolvers,
   type ProjectRepository,
 } from "./project-repository";
 import {
@@ -175,6 +176,7 @@ function transitionUpdate(status: (typeof ProjectStatus)[number], reason: string
 
 export function createProjectService(dependencies: ProjectServiceDependencies): ProjectService {
   const { tenancyRepository: tenancy, projectRepository: projects, platformRepository: platform } = dependencies;
+  configureProjectReferences(projects, tenancy);
 
   async function platformMember(actor: OnboardingActor): Promise<PlatformMember> {
     try {
@@ -315,19 +317,21 @@ export function createProjectService(dependencies: ProjectServiceDependencies): 
     },
 
     async getEffectiveProjectAccess(projectId, actor) {
-      const project = await projects.findProject(projectId);
-      if (!project) return { allowed: false, project: null, membership: null, reason: "project_not_found" };
-      const businessStatus = await tenancy.findBusinessStatus(project.businessId);
-      const businessDenial = statusReasonForBusiness(businessStatus);
-      if (businessDenial) return { allowed: false, project: null, membership: null, reason: businessDenial };
-      if (project.status === "pending") return { allowed: false, project: null, membership: null, reason: "project_pending" };
-      if (project.status === "rejected") return { allowed: false, project: null, membership: null, reason: "project_rejected" };
-      if (project.status !== "active" || !project.isActive) return { allowed: false, project: null, membership: null, reason: "project_suspended" };
-      const userId = await resolveOnboardingActor(tenancy, actor);
-      const membership = await projects.findProjectMembership(project.id, userId);
-      if (!membership) return { allowed: false, project: null, membership: null, reason: "membership_required" };
-      if (membership.status !== "active" || !membership.isActive) return { allowed: false, project: null, membership: null, reason: "membership_inactive" };
-      return { allowed: true, project, membership, reason: null };
+      return tenancy.transaction(async (transactionTenancy) => projects.transaction(async (transactionProjects) => {
+        const project = await transactionProjects.findProject(projectId);
+        if (!project) return { allowed: false, project: null, membership: null, reason: "project_not_found" };
+        const businessStatus = await transactionTenancy.findBusinessStatus(project.businessId);
+        const businessDenial = statusReasonForBusiness(businessStatus);
+        if (businessDenial) return { allowed: false, project: null, membership: null, reason: businessDenial };
+        if (project.status === "pending") return { allowed: false, project: null, membership: null, reason: "project_pending" };
+        if (project.status === "rejected") return { allowed: false, project: null, membership: null, reason: "project_rejected" };
+        if (project.status !== "active" || !project.isActive) return { allowed: false, project: null, membership: null, reason: "project_suspended" };
+        const userId = await resolveOnboardingActor(transactionTenancy, actor);
+        const membership = await transactionProjects.findProjectMembership(project.id, userId);
+        if (!membership) return { allowed: false, project: null, membership: null, reason: "membership_required" };
+        if (membership.status !== "active" || !membership.isActive) return { allowed: false, project: null, membership: null, reason: "membership_inactive" };
+        return { allowed: true, project, membership, reason: null };
+      }));
     },
   };
 }
@@ -339,6 +343,18 @@ function isProjectRepository(value: unknown): value is InMemoryProjectRepository
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<InMemoryProjectRepository>;
   return typeof candidate.transaction === "function" && Array.isArray(candidate.projects) && Array.isArray(candidate.memberships);
+}
+
+function configureProjectReferences(repository: ProjectRepository, tenancy: OnboardingRepository): void {
+  if (!isProjectRepository(repository)) return;
+  const references: ProjectReferenceResolvers = {
+    businessExists: async (businessId) => Boolean(await tenancy.findBusiness(businessId)),
+    userExists: async (userId) => Boolean(
+      await tenancy.findUserById?.(userId)
+      ?? (await tenancy.listBusinessesForUser(userId)).length > 0,
+    ),
+  };
+  repository.configureReferences(references);
 }
 
 function createDefaultProjectRepository(): InMemoryProjectRepository {

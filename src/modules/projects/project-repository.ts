@@ -24,6 +24,11 @@ export type NewProject = Omit<Project, "id" | "createdAt" | "updatedAt" | "revie
 
 export type NewProjectMembership = Omit<ProjectMembership, "membershipId">;
 
+export type ProjectReferenceResolvers = {
+  businessExists: (businessId: BusinessId) => Promise<boolean>;
+  userExists: (userId: UserId) => Promise<boolean>;
+};
+
 export class ProjectRepositoryConflictError extends Error {
   readonly name = "ProjectRepositoryConflictError";
 }
@@ -44,6 +49,7 @@ export interface InMemoryProjectRepository extends ProjectRepository {
   readonly projects: Project[];
   readonly memberships: ProjectMembership[];
   readonly transactionCount: number;
+  configureReferences(references: ProjectReferenceResolvers): void;
 }
 
 function cloneProject(project: Project): Project {
@@ -67,9 +73,14 @@ class MemoryProjectRepository implements InMemoryProjectRepository {
   private nextMembershipId = 1;
   private transactions = 0;
   private transactionTail: Promise<void> = Promise.resolve();
+  private references: ProjectReferenceResolvers | null = null;
 
   get transactionCount(): number {
     return this.transactions;
+  }
+
+  configureReferences(references: ProjectReferenceResolvers): void {
+    this.references = references;
   }
 
   async transaction<T>(operation: (repository: ProjectRepository) => Promise<T>): Promise<T> {
@@ -97,6 +108,9 @@ class MemoryProjectRepository implements InMemoryProjectRepository {
   async createProject(input: NewProject): Promise<Project> {
     if (!input.businessId || !input.createdBy || !input.name.trim() || input.status !== "pending" || input.isActive) {
       throw new ProjectRepositoryConflictError("Invalid project creation state");
+    }
+    if (!this.references || !(await this.references.businessExists(input.businessId)) || !(await this.references.userExists(input.createdBy))) {
+      throw new ProjectRepositoryConflictError("Project references an unknown business or user");
     }
     if (this.projects.some((project) => project.businessId === input.businessId && project.normalizedName === input.normalizedName)) {
       throw new ProjectRepositoryConflictError("Project name already exists");
@@ -144,6 +158,10 @@ class MemoryProjectRepository implements InMemoryProjectRepository {
 
   async createProjectMembership(input: NewProjectMembership): Promise<ProjectMembership> {
     assertMembershipState(input);
+    const project = this.projects.find((candidate) => candidate.id === input.projectId);
+    if (!project || !this.references || !(await this.references.businessExists(project.businessId)) || !(await this.references.userExists(input.userId))) {
+      throw new ProjectRepositoryConflictError("Project membership references an unknown project, business, or user");
+    }
     if (this.memberships.some((membership) => membership.projectId === input.projectId && membership.userId === input.userId)) {
       throw new ProjectRepositoryConflictError("Project membership already exists");
     }

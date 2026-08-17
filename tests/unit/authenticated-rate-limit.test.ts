@@ -7,12 +7,23 @@ const createAggregatedRateLimiter = vi.hoisted(() => vi.fn(() => ({ limit: aggre
 
 vi.mock("../../src/modules/security/rate-limit", () => ({ createAuthenticatedRateLimiter, createAggregatedRateLimiter }));
 
-import { enforceAuthenticatedRateLimit } from "../../src/modules/security/authenticated-rate-limit";
+import { authenticatedRateLimitResponse, enforceAuthenticatedRateLimit } from "../../src/modules/security/authenticated-rate-limit";
 import { AuthenticatedRateLimitError, AuthenticatedRateLimitUnavailableError } from "../../src/modules/security/rate-limit-errors";
+import type { AuthIdentity } from "../../src/modules/auth/auth-provider";
+
+const identity: AuthIdentity = {
+  provider: "firebase",
+  providerUserId: "rate-limit-response-user",
+  email: "rate-limit-response@example.com",
+  displayName: "Rate Limit Response User",
+  emailVerified: true,
+};
 
 describe("authenticated endpoint rate limit", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    limit.mockReset();
+    aggregateLimit.mockReset();
     limit.mockResolvedValue({ success: true, remaining: 1, resetAt: 1234 });
     aggregateLimit.mockResolvedValue({ success: true, remaining: 1, resetAt: 1234 });
   });
@@ -81,6 +92,18 @@ describe("authenticated endpoint rate limit", () => {
     await expect(enforceAuthenticatedRateLimit("upload", "firebase-user-2", new Headers({
       "x-vercel-forwarded-for": "203.0.113.11",
     }))).rejects.toBeInstanceOf(AuthenticatedRateLimitError);
+  });
+
+  it("maps rate-limit failures to generic HTTP responses", async () => {
+    limit.mockResolvedValueOnce({ success: false, remaining: 0, resetAt: 1234 });
+    const limited = await authenticatedRateLimitResponse("upload", new Request("http://localhost"), identity);
+    expect(limited?.status).toBe(429);
+    await expect(limited?.json()).resolves.toEqual({ error: { code: "RATE_LIMITED", message: "Too many requests." } });
+
+    limit.mockRejectedValueOnce(new Error("upstream secret"));
+    const unavailable = await authenticatedRateLimitResponse("ocr-process", new Request("http://localhost"), identity);
+    expect(unavailable?.status).toBe(503);
+    await expect(unavailable?.json()).resolves.toEqual({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "Platform protection is temporarily unavailable." } });
   });
 
   it("uses edge-unknown in production instead of client-controlled fallback headers", async () => {

@@ -64,6 +64,14 @@ export type MigrationCheck = MigrationResult & {
   ledgerRecordPresent: boolean;
 };
 
+export type MigrationSequence<T> = {
+  initial: T;
+  platform: T;
+  lifecycle: T;
+  membershipLifecycle: T;
+  projects: T;
+};
+
 export function assertRequiredMigrations(
   initial: MigrationCheck,
   platform: MigrationCheck,
@@ -492,4 +500,29 @@ export async function checkProjectsMigration(
   } finally {
     await client.end();
   }
+}
+
+export async function applyAllMigrations(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationSequence<MigrationResult>> {
+  const initial = await applyInitialMigration(config, clientFactory);
+  const platform = await applyPlatformControlPlaneMigration(config, clientFactory);
+  const lifecycle = await applyBusinessLifecycleMigration(config, clientFactory);
+  const membershipLifecycle = await applyMembershipLifecycleMigration(config, clientFactory);
+  const projects = await applyProjectsMigration(config, clientFactory);
+  return { initial, platform, lifecycle, membershipLifecycle, projects };
+}
+
+export async function checkAllMigrations(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationSequence<MigrationCheck>> {
+  const initial = await checkInitialMigration(config, clientFactory);
+  const platform = await checkPlatformControlPlaneMigration(config, clientFactory);
+  const lifecycle = await checkBusinessLifecycleMigration(config, clientFactory);
+  const membershipLifecycle = await checkMembershipLifecycleMigration(config, clientFactory);
+  const projects = await checkProjectsMigration(config, clientFactory);
+  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects);
+  return { initial, platform, lifecycle, membershipLifecycle, projects };
 }

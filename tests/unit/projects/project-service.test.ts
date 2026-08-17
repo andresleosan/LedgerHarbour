@@ -153,4 +153,40 @@ describe("project approval lifecycle", () => {
       role: "member",
     })).rejects.toMatchObject({ code: PROJECT_ERROR_CODES.INVALID_MEMBER });
   });
+
+  it("serializes effective access with a concurrent parent-business suspension", async () => {
+    const setup = await approvedBusiness();
+    const service = serviceFor(setup);
+    const project = await service.createProjectRequest(setup.business.id, setup.requester, { name: "Snapshot Project" });
+    await service.approveProject(project.id, user("platform-admin"));
+
+    let releaseMembership!: () => void;
+    const membershipGate = new Promise<void>((resolve) => { releaseMembership = resolve; });
+    let membershipReadStarted!: () => void;
+    const membershipRead = new Promise<void>((resolve) => { membershipReadStarted = resolve; });
+    const findMembership = setup.projectRepository.findProjectMembership.bind(setup.projectRepository);
+    setup.projectRepository.findProjectMembership = async (projectId, userId) => {
+      membershipReadStarted();
+      await membershipGate;
+      return findMembership(projectId, userId);
+    };
+
+    const accessPromise = service.getEffectiveProjectAccess(project.id, setup.requester);
+    await membershipRead;
+    const suspensionPromise = createPlatformService({ tenancyRepository: setup.tenancy, platformRepository: setup.platform })
+      .suspendBusiness(setup.business.id, user("platform-admin"), { reason: "Concurrent suspension" });
+    const suspensionRace = await Promise.race([
+      suspensionPromise.then(() => "suspended" as const),
+      new Promise<"blocked">((resolve) => setTimeout(() => resolve("blocked"), 20)),
+    ]);
+    expect(suspensionRace).toBe("blocked");
+
+    releaseMembership();
+    await expect(accessPromise).resolves.toMatchObject({ allowed: true });
+    await suspensionPromise;
+    await expect(service.getEffectiveProjectAccess(project.id, setup.requester)).resolves.toMatchObject({
+      allowed: false,
+      reason: "business_suspended",
+    });
+  });
 });

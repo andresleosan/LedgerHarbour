@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getCurrentIdentity } from "../../../../../../../modules/auth/session";
+import { authenticatedRateLimitResponse } from "../../../../../../../modules/security/authenticated-rate-limit";
 import { getPersistenceContext } from "../../../../../../../modules/persistence/repository-factory";
 import { createProjectService, ProjectError, PROJECT_ERROR_CODES } from "../../../../../../../modules/projects/project-service";
 import type { BusinessId, UserId } from "../../../../../../../modules/tenancy/types";
@@ -39,6 +40,8 @@ export async function GET(_request: Request, context: RouteContext) {
 export async function POST(request: Request, context: RouteContext) {
   const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
+  const limited = await authenticatedRateLimitResponse("project-membership", request, identity);
+  if (limited) return limited;
   let body: unknown;
   try { body = await request.json(); } catch { body = null; }
   const parsed = memberSchema.safeParse(body);

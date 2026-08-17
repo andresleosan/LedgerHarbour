@@ -1,3 +1,6 @@
+import { NextResponse } from "next/server";
+
+import type { AuthIdentity } from "../auth/auth-provider";
 import { createAggregatedRateLimiter, createAuthenticatedRateLimiter, type AuthenticatedRateLimitScope } from "./rate-limit";
 import {
   AuthenticatedRateLimitError,
@@ -39,5 +42,21 @@ export async function enforceAuthenticatedRateLimit(scope: AuthenticatedRateLimi
   } catch (error) {
     if (error instanceof AuthenticatedRateLimitError) throw error;
     throw new AuthenticatedRateLimitUnavailableError();
+  }
+}
+
+export async function authenticatedRateLimitResponse(
+  scope: AuthenticatedRateLimitScope,
+  request: Request,
+  identity: AuthIdentity,
+): Promise<NextResponse | null> {
+  try {
+    await enforceAuthenticatedRateLimit(scope, identity.providerUserId, request.headers);
+    return null;
+  } catch (error) {
+    if (error instanceof AuthenticatedRateLimitError) {
+      return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, { status: 429 });
+    }
+    return NextResponse.json({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "Platform protection is temporarily unavailable." } }, { status: 503 });
   }
 }
