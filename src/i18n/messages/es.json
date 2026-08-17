@@ -13,7 +13,7 @@
     "heroDescription": "LedgerHarbour convierte facturas dispersas en decisiones claras: revisa documentos, automatiza la captura y trabaja con cada negocio en su propio espacio.",
     "primaryAction": "Entrar al workspace",
     "secondaryAction": "Crear cuenta",
-    "localNote": "Demo local con datos sinteticos. Sin credenciales reales.",
+    "localNote": "Un espacio enfocado en decisiones financieras claras y verificables.",
     "flowAriaLabel": "Flujo de control de una factura",
     "flowTitle": "Flujo de control",
     "active": "Activo",
@@ -48,8 +48,7 @@
         "description": "Cambia de negocio sin mezclar documentos, miembros ni permisos entre espacios."
       }
     ],
-    "footerDescription": "Workspace local para revisar y ordenar operaciones financieras.",
-    "openDemo": "Abrir demo"
+    "footerDescription": "Un espacio enfocado en revisar y ordenar operaciones financieras."
   },
   "auth": {
     "brand": "LedgerHarbour",
@@ -71,23 +70,20 @@
       "emailPlaceholder": "tu@empresa.com",
       "emailAction": "Continuar con correo",
       "googleAction": "Continuar con Google",
-      "googleSimulation": "Simulación de desarrollo",
       "homeLabel": "Ir al inicio",
-      "demoAccount": "Cuenta de demostración",
-      "demoEmail": "admin@admin.com",
       "signedIn": "Sesión iniciada como {email}.",
       "registerPrompt": "¿Nuevo en LedgerHarbour?",
       "registerAction": "Crear una cuenta"
     },
     "register": {
-      "eyebrow": "Acceso de desarrollo",
+      "eyebrow": "Espacio de trabajo LedgerHarbour",
       "title": "Empieza con un espacio claro.",
-      "description": "El registro se simula localmente mientras se prepara el proveedor de identidad de producción.",
+      "description": "Crea una cuenta para solicitar acceso a un espacio de negocio.",
       "emailLabel": "Correo de trabajo",
       "emailPlaceholder": "tu@empresa.com",
-      "emailAction": "Crear cuenta de desarrollo",
-      "status": "Solo modo desarrollo. No se creará una cuenta de producción.",
-      "created": "Cuenta de desarrollo lista para {email}.",
+      "emailAction": "Crear cuenta",
+      "status": "",
+      "created": "Cuenta lista para {email}.",
       "loginPrompt": "¿Ya tienes acceso?",
       "loginAction": "Iniciar sesión"
     }
@@ -255,6 +251,7 @@
     "languageLabel": "Idioma",
     "localeEnglish": "English",
     "localeSpanish": "Espanol",
+    "signOut": "Cerrar sesión",
     "title": "Configura tu negocio",
     "description": "Elige un espacio de negocio antes de organizar tu trabajo financiero.",
     "createAction": "Crear un negocio nuevo",

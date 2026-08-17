@@ -33,7 +33,7 @@ interface AuthFormProps {
 
 const interpolate = (message: string, email: string) => message.replace("{email}", email);
 
-export default function AuthForm({ mode, providerActions, authMode = "development", firebaseConfig }: AuthFormProps) {
+export default function AuthForm({ mode, providerActions, authMode = "firebase", firebaseConfig }: AuthFormProps) {
   const [locale, setLocale] = useState<SupportedLocale>("en");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -189,7 +189,6 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
         .eyebrow { margin: 0 0 14px; color: #0b7772; font-size: .76rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
         h1 { max-width: 450px; margin: 0; color: #10283d; font-size: clamp(2.1rem, 5vw, 3.8rem); line-height: 1.03; letter-spacing: -.055em; }
         .description { max-width: 450px; margin: 20px 0 34px; color: #536572; font-size: 1rem; line-height: 1.65; }
-        .dev-status { display: flex; gap: 10px; align-items: flex-start; margin: 0 0 22px; padding: 12px 14px; border-left: 3px solid #e47d6c; border-radius: 4px; background: #fff3ed; color: #793e35; font-size: .86rem; line-height: 1.45; }
         .auth-form { display: grid; gap: 12px; }
         label { color: #263f50; font-size: .86rem; font-weight: 750; }
         input { width: 100%; min-height: 50px; margin-top: 7px; padding: 0 15px; border: 1px solid #aabbb9; border-radius: 10px; background: #fff; color: #10283d; font: inherit; font-size: 1rem; }
@@ -199,10 +198,8 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
         .primary-button:hover { background: #095f5b; }
         .google-button { position: relative; border: 1px solid #aabbb9; background: #fffdf8; color: #173348; }
         .google-button:hover { border-color: #0b7772; background: #f1faf7; }
-        .google-button small { display: block; color: #536572; font-size: .68rem; font-weight: 600; }
         .divider { display: flex; align-items: center; gap: 12px; margin: 12px 0; color: #73838a; font-size: .75rem; }
         .divider::before, .divider::after { content: ""; height: 1px; flex: 1; background: #d8ded8; }
-        .demo-note { margin: 12px 0 0; color: #536572; font-size: .78rem; line-height: 1.45; }
         .feedback { margin: 16px 0 0; color: #0b6663; font-size: .86rem; line-height: 1.45; }
         .error { margin: 4px 0 0; color: #913f35; font-size: .84rem; line-height: 1.4; }
         .auth-footer { margin-top: 30px; color: #536572; font-size: .86rem; }
@@ -256,8 +253,7 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
             <p className="eyebrow">{authCopy.eyebrow}</p>
             <h1 id="auth-title">{authCopy.title}</h1>
             <p className="description">{authCopy.description}</p>
-            {!isLogin && <p className="dev-status">{copy.register.status}</p>}
-            <form className="auth-form" onSubmit={handleEmailSubmit} noValidate>
+             <form className="auth-form" onSubmit={handleEmailSubmit} noValidate>
               <label htmlFor="email">{authCopy.emailLabel}</label>
               <input
                 id="email"
@@ -290,11 +286,9 @@ export default function AuthForm({ mode, providerActions, authMode = "developmen
               <>
                 <div className="divider">{copy.separator}</div>
                 <button className="google-button" type="button" onClick={handleGoogleSignIn}>
-                  {loginCopy.googleAction}
-                   {!isFirebase && <small>{loginCopy.googleSimulation}</small>}
+                   {loginCopy.googleAction}
                  </button>
-                 {!isFirebase && <p className="demo-note"><strong>{loginCopy.demoAccount}:</strong> {loginCopy.demoEmail}</p>}
-              </>
+               </>
             )}
             {feedback && (
               <p className="feedback" role="status" aria-live="polite">

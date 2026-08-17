@@ -137,10 +137,12 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
    await page.getByRole("button", { name: "Espanol" }).click();
    await page.keyboard.press("Shift+Tab");
    await expectVisibleFocusRing(page.getByRole("button", { name: "English" }));
-   await page.keyboard.press("Tab");
-     await expectVisibleFocusRing(page.getByRole("button", { name: "Espanol" }));
-   await page.keyboard.press("Tab");
-   await expectVisibleFocusRing(page.getByRole("link").first());
+    await page.keyboard.press("Tab");
+    await expectVisibleFocusRing(page.getByRole("button", { name: "Espanol" }));
+    await page.keyboard.press("Tab");
+    await expectVisibleFocusRing(page.getByRole("button", { name: "Cerrar sesión" }));
+    await page.keyboard.press("Tab");
+    await expectVisibleFocusRing(page.getByRole("link").first());
    await page.keyboard.press("Tab");
    await expectVisibleFocusRing(page.getByLabel("Nombre del negocio"));
    await expect(page.locator("html")).toHaveJSProperty(

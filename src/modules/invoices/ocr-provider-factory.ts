@@ -6,6 +6,7 @@ import {
 } from "./google-document-ai-provider";
 import { FakeOcrProvider } from "./fake-ocr-provider";
 import type { OcrProvider } from "./ocr-provider";
+import { isDeterministicTestEnvironment } from "../auth/runtime-mode";
 
 const INVALID_CONFIGURATION_MESSAGE = "OCR provider configuration is invalid.";
 const CONTROL_CHARACTER_PATTERN = /[\u0000-\u001f\u007f]/;
@@ -140,7 +141,7 @@ export function createOcrProvider(env: NodeJS.ProcessEnv = process.env): OcrProv
   const provider = env.OCR_PROVIDER;
 
   if (provider === "fake") {
-    if (env.NODE_ENV?.trim() === "production") throw new OcrConfigurationError();
+    if (!isDeterministicTestEnvironment(env)) throw new OcrConfigurationError();
     return new FakeOcrProvider();
   }
   if (provider === "google-document-ai") return createGoogleProvider(env);

@@ -13,7 +13,7 @@
     "heroDescription": "LedgerHarbour turns scattered invoices into clear decisions: review documents, automate capture, and work with each business in its own space.",
     "primaryAction": "Enter workspace",
     "secondaryAction": "Create account",
-    "localNote": "Local demo with synthetic data. No real credentials.",
+    "localNote": "A focused workspace for clear, auditable financial decisions.",
     "flowAriaLabel": "Invoice control flow",
     "flowTitle": "Control flow",
     "active": "Active",
@@ -48,8 +48,7 @@
         "description": "Switch businesses without mixing documents, members or permissions between workspaces."
       }
     ],
-    "footerDescription": "A local workspace for reviewing and organizing financial operations.",
-    "openDemo": "Open demo"
+    "footerDescription": "A focused workspace for reviewing and organizing financial operations."
   },
   "auth": {
     "brand": "LedgerHarbour",
@@ -71,23 +70,20 @@
       "emailPlaceholder": "you@company.com",
       "emailAction": "Continue with email",
       "googleAction": "Continue with Google",
-      "googleSimulation": "Development simulation",
       "homeLabel": "Go to home",
-      "demoAccount": "Demo account",
-      "demoEmail": "admin@admin.com",
       "signedIn": "Signed in as {email}.",
       "registerPrompt": "New to LedgerHarbour?",
       "registerAction": "Create an account"
     },
     "register": {
-      "eyebrow": "Development access",
+      "eyebrow": "LedgerHarbour workspace",
       "title": "Start with a clear workspace.",
-      "description": "Registration is currently simulated locally while the production identity provider is prepared.",
+      "description": "Create an account to request access to a business workspace.",
       "emailLabel": "Work email",
       "emailPlaceholder": "you@company.com",
-      "emailAction": "Create development account",
-      "status": "Development mode only. No production account will be created.",
-      "created": "Development account ready for {email}.",
+      "emailAction": "Create account",
+      "status": "",
+      "created": "Account ready for {email}.",
       "loginPrompt": "Already have access?",
       "loginAction": "Sign in"
     }
@@ -255,6 +251,7 @@
     "languageLabel": "Language",
     "localeEnglish": "English",
     "localeSpanish": "Espanol",
+    "signOut": "Sign out",
     "title": "Set up your business",
     "description": "Choose a business workspace before you start organising financial work.",
     "createAction": "Create a new business",

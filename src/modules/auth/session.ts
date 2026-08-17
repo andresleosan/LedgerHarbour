@@ -4,6 +4,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { AuthIdentity } from "./auth-provider";
 import { FirebaseAuthProvider } from "./firebase-auth-provider";
+import { isDeterministicTestRuntime } from "./runtime-mode";
 
 export const DEV_SESSION_COOKIE = "ledgerharbour_dev_session";
 export const DEV_SESSION_MAX_AGE = 5 * 60;
@@ -13,7 +14,7 @@ interface StoredSession {
   readonly expiresAt: number;
 }
 
-const isDevelopmentMode = () => process.env.AUTH_MODE === "development" && process.env.NODE_ENV !== "production";
+const isDevelopmentMode = () => process.env.AUTH_MODE === "development" && isDeterministicTestRuntime();
 const sessionSecret = () => process.env.DEV_SESSION_SECRET;
 
 function getRequestCookies(): UnsafeUnwrappedCookies | null {

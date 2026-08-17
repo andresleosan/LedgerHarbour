@@ -20,6 +20,14 @@ export interface FirebaseClientConfig {
   appId: string;
 }
 
+export function firebaseClientConfigFromEnv(env: NodeJS.ProcessEnv = process.env): FirebaseClientConfig | undefined {
+  const apiKey = env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  const authDomain = env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
+  const projectId = env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+  const appId = env.NEXT_PUBLIC_FIREBASE_APP_ID;
+  return apiKey && authDomain && projectId && appId ? { apiKey, authDomain, projectId, appId } : undefined;
+}
+
 function firebaseApp(config: FirebaseClientConfig): FirebaseApp {
   return getApps()[0] ?? initializeApp(config);
 }

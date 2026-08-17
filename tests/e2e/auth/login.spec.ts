@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("renders the English login and completes the development email flow", async ({ browser }) => {
+test("renders the English login and completes the test email flow without demo copy", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
 
@@ -9,6 +9,8 @@ test("renders the English login and completes the development email flow", async
   await expect(page.getByRole("link", { name: "Go to home" })).toHaveAttribute("href", "/");
   await expect(page.getByRole("button", { name: /Continue with Google/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with email" })).toBeVisible();
+  await expect(page.getByText("Development simulation")).toHaveCount(0);
+  await expect(page.getByText(/Demo account/i)).toHaveCount(0);
 
   await page.getByLabel("Work email").fill("admin@admin.com");
   await page.getByRole("button", { name: "Continue with email" }).click();
@@ -51,13 +53,13 @@ test("keeps the login usable without horizontal overflow on mobile", async ({ br
   await context.close();
 });
 
-test("renders the register development status and generic auth failure states", async ({ browser }) => {
+test("renders register without demo status and generic auth failure states", async ({ browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
 
   await page.goto("/register");
   await expect(page.getByRole("heading", { name: "Start with a clear workspace." })).toBeVisible();
-  await expect(page.getByText("Development mode only. No production account will be created.")).toBeVisible();
+  await expect(page.getByText("Development mode only. No production account will be created.")).toHaveCount(0);
   await expect(page.getByLabel("Work email")).toBeVisible();
 
   await page.goto("/login");

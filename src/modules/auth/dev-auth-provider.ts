@@ -1,5 +1,6 @@
 import { AUTH_ERROR_CODES, AuthError } from "./auth-errors";
 import type { AuthIdentity, AuthProvider, EmailSignInInput } from "./auth-provider";
+import { isDeterministicTestRuntime } from "./runtime-mode";
 import {
   clearCurrentIdentity,
   getCurrentIdentitySync,
@@ -20,10 +21,6 @@ function hashEmail(email: string): string {
 }
 
 function displayNameFor(email: string): string {
-  if (email === "admin@admin.com") {
-    return "Demo Admin";
-  }
-
   return email
     .split("@", 1)[0]
     .split(/[._-]+/)
@@ -90,14 +87,14 @@ export class DevAuthProvider extends InMemoryDevAuthProvider {
   constructor() {
     super();
 
-    if (process.env.AUTH_MODE !== "development" || process.env.NODE_ENV === "production") {
+    if (process.env.AUTH_MODE !== "development" || !isDeterministicTestRuntime()) {
       throw new AuthError(AUTH_ERROR_CODES.DEVELOPMENT_MODE_REQUIRED);
     }
   }
 }
 
 export function createAuthProvider(): AuthProvider | null {
-  if (process.env.AUTH_MODE !== "development" || process.env.NODE_ENV === "production") {
+  if (process.env.AUTH_MODE !== "development" || !isDeterministicTestRuntime()) {
     return null;
   }
 

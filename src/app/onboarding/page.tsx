@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { messages, type SupportedLocale } from "@/i18n/config";
+import OnboardingSignOut from "@/ui/OnboardingSignOut";
 
 export default function OnboardingPage() {
   const [locale, setLocale] = useState<SupportedLocale>("en");
@@ -20,7 +21,8 @@ export default function OnboardingPage() {
         .onboarding-shell { width: min(100%, 920px); margin: 0 auto; }
         .toolbar { display: flex; justify-content: flex-end; gap: 10px; align-items: center; color: #4c6270; font-size: .82rem; }
         .locale-button { border: 0; border-radius: 7px; padding: 7px 9px; background: transparent; color: #4c6270; cursor: pointer; font: inherit; font-weight: 700; }
-        .locale-button[aria-pressed="true"] { background: #d9eeea; color: #0b6663; }
+         .locale-button[aria-pressed="true"] { background: #d9eeea; color: #0b6663; }
+         .sign-out { border: 1px solid #9bb7b0; border-radius: 8px; padding: 7px 10px; background: #fffdf8; color: #315b60; cursor: pointer; font: inherit; font-weight: 750; }
         .intro { max-width: 700px; margin: 90px 0 42px; }
         .eyebrow { margin: 0 0 15px; color: #0b7772; font-size: .76rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; }
         h1 { margin: 0; color: #10283d; font-size: clamp(2.5rem, 7vw, 5.7rem); line-height: .98; letter-spacing: -.06em; }
@@ -38,7 +40,7 @@ export default function OnboardingPage() {
       <div className="onboarding-shell">
         <div className="toolbar" aria-label={copy.languageLabel}>
           <span>{copy.languageLabel}</span>
-          {(["en", "es"] as const).map((candidate) => (
+           {(["en", "es"] as const).map((candidate) => (
             <button
               className="locale-button"
               key={candidate}
@@ -46,10 +48,11 @@ export default function OnboardingPage() {
               aria-pressed={locale === candidate}
               onClick={() => setLocale(candidate)}
             >
-              {candidate === "en" ? copy.localeEnglish : copy.localeSpanish}
-            </button>
-          ))}
-        </div>
+               {candidate === "en" ? copy.localeEnglish : copy.localeSpanish}
+             </button>
+           ))}
+           <OnboardingSignOut label={copy.signOut} />
+         </div>
         <section className="intro" aria-labelledby="onboarding-title">
           <p className="eyebrow">{copy.workspaceLabel}</p>
           <h1 id="onboarding-title">{copy.title}</h1>

@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
-import { clearCurrentIdentity, getCurrentIdentity } from "@/modules/auth/session";
+import { getCurrentIdentity } from "@/modules/auth/session";
 import { listUserBusinesses } from "@/modules/tenancy/portfolio-service";
 import { getPersistenceContext } from "@/modules/persistence/repository-factory";
+import { signOutAction } from "@/app/onboarding/actions";
 import AppShell from "@/ui/AppShell";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
@@ -25,12 +26,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
         appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "",
       }
     : undefined;
-
-  async function signOutAction() {
-    "use server";
-    await clearCurrentIdentity();
-    redirect("/login");
-  }
 
   return <AppShell identity={identity} businesses={businesses} locale={locale} firebaseConfig={firebaseConfig} signOutAction={signOutAction}>{children}</AppShell>;
 }

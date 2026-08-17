@@ -5,18 +5,15 @@ import type { AuthIdentity, GoogleSignInInput, AuthProvider } from "@/modules/au
 import { createAuthProvider } from "@/modules/auth/dev-auth-provider";
 import { FirebaseAuthProvider } from "@/modules/auth/firebase-auth-provider";
 import { enforceAuthRateLimit } from "@/modules/security/auth-rate-limit";
+import { isDeterministicTestRuntime } from "@/modules/auth/runtime-mode";
+
+export const dynamic = "force-dynamic";
 
 function requireProvider(): AuthProvider {
-  if (process.env.AUTH_MODE === "firebase") {
-    try { return new FirebaseAuthProvider(); } catch { throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE); }
-  }
   const provider = createAuthProvider();
-
-  if (provider === null) {
-    throw new AuthError(AUTH_ERROR_CODES.DEVELOPMENT_MODE_REQUIRED);
-  }
-
-  return provider;
+  if (provider) return provider;
+  if (process.env.AUTH_MODE !== "firebase") throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE);
+  try { return new FirebaseAuthProvider(); } catch { throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE); }
 }
 
 async function signInWithEmail(input: EmailSignInInput): Promise<AuthIdentity> {
@@ -50,10 +47,12 @@ function firebaseConfig() {
 }
 
 export default function RegisterPage() {
+  const testAuth = isDeterministicTestRuntime() && process.env.AUTH_MODE === "development";
+
   return (
     <AuthForm
       mode="register"
-      authMode={process.env.AUTH_MODE === "firebase" ? "firebase" : "development"}
+      authMode={testAuth ? "development" : "firebase"}
       firebaseConfig={firebaseConfig()}
       providerActions={{ signInWithEmail, signInWithGoogle, signOut, getCurrentIdentity }}
     />

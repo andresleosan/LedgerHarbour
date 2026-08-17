@@ -15,7 +15,7 @@ interface AppShellProps {
   businesses: readonly BusinessSummary[];
   locale: "en" | "es";
   firebaseConfig?: FirebaseClientConfig;
-  signOutAction: (formData: FormData) => void | Promise<void>;
+  signOutAction: () => Promise<never>;
 }
 
 export default function AppShell({ children, identity, businesses, locale, firebaseConfig, signOutAction }: AppShellProps) {
@@ -181,7 +181,7 @@ export default function AppShell({ children, identity, businesses, locale, fireb
            <span className="shell-nav-disabled" aria-disabled="true" title={copy.unavailable}>{copy.documents}</span>
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/settings/members`)}>{copy.settings}</a> : <span className="shell-nav-disabled">{copy.settings}</span>}
         </nav>
-         <div className="shell-user"><LanguageSwitcher locale={activeLocale} /><span><strong>{identity.displayName}</strong>{identity.email}</span><form action={signOutAction} onSubmit={async (event) => { event.preventDefault(); const form = event.currentTarget; try { await signOutFirebaseUser(firebaseConfig); } finally { await signOutAction(new FormData(form)); } }}><button className="sign-out" type="submit">{copy.signOut}</button></form></div>
+          <div className="shell-user"><LanguageSwitcher locale={activeLocale} /><span><strong>{identity.displayName}</strong>{identity.email}</span><form action={signOutAction} onSubmit={async (event) => { event.preventDefault(); try { await signOutFirebaseUser(firebaseConfig); } finally { await signOutAction(); } }}><button className="sign-out" type="submit">{copy.signOut}</button></form></div>
        </header>
        <main className="shell-main"><div className="shell-layout"><BusinessSwitcher businesses={businesses} locale={activeLocale} /><div className="shell-content">{children}</div></div></main>
     </div>

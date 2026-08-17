@@ -123,10 +123,9 @@ export default async function Home({ searchParams }: HomeProps) {
        <footer className={styles.footer}>
          <div>
            <img className={styles.footerLogo} src="/brand/ledgerharbour-logo.png" alt="LedgerHarbour" width={132} height={88} />
-        </div>
-        <p>{copy.footerDescription}</p>
-        <a href={localizedPath("/login", locale)}>{copy.openDemo} <span aria-hidden="true">-&gt;</span></a>
-      </footer>
+         </div>
+         <p>{copy.footerDescription}</p>
+       </footer>
     </main>
   );
 }

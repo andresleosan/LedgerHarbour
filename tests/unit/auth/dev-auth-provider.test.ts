@@ -86,7 +86,7 @@ describe("development authentication provider", () => {
         expect(identityFor(identity)).toEqual({
           providerUserId: expect.stringMatching(/^dev-[a-f0-9]{8}$/),
           email: "admin@admin.com",
-          displayName: "Demo Admin",
+           displayName: "Admin",
           emailVerified: true,
         });
         return true;
