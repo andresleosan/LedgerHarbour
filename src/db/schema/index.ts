@@ -18,6 +18,8 @@ export { categories } from "./categories";
 export { currencies } from "./currencies";
 export { auditEvents, AuditActorType, auditActorTypeEnum } from "./audit-events";
 export { jobs, JobStatus, jobStatusEnum } from "./jobs";
+export { PlatformRole, platformMembers, platformRoleEnum } from "./platform-members";
+export { platformAuditEvents } from "./platform-audit-events";
 
 import { auditEvents } from "./audit-events";
 import { businesses } from "./businesses";
@@ -29,6 +31,8 @@ import { jobs } from "./jobs";
 import { joinRequests } from "./join-requests";
 import { memberships } from "./memberships";
 import { users } from "./users";
+import { platformAuditEvents } from "./platform-audit-events";
+import { platformMembers } from "./platform-members";
 
 export const schema = {
   users,
@@ -41,4 +45,6 @@ export const schema = {
   currencies,
   auditEvents,
   jobs,
+  platformMembers,
+  platformAuditEvents,
 };

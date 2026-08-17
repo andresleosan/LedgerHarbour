@@ -19,6 +19,7 @@ export async function applyMigration(client: PGlite, migrationSql: string): Prom
 
 export async function createTestDatabase(): Promise<{
   db: TestDatabase;
+  execute: (sql: string) => Promise<unknown>;
   close: () => Promise<void>;
 }> {
   const client = new PGlite();
@@ -37,6 +38,7 @@ export async function createTestDatabase(): Promise<{
 
   return {
     db,
+    execute: (sql: string) => client.exec(sql),
     close: () => client.close(),
   };
 }

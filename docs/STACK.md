@@ -46,7 +46,11 @@ La aplicacion dispone del selector reversible `PERSISTENCE_MODE=memory|postgres`
 
 El estado local verificado cubre selección de modo, fail-closed sin fallback, cache del contexto runtime, aislamiento tenant-aware y wiring explícito de las rutas API. La evidencia usa PGlite y la migración SQL versionada; no se usó Neon, PostgreSQL remoto ni se aplicaron migraciones productivas.
 
-El esquema relacional existente en `src/db/schema` y `src/db/migrations/0001_initial.sql` es la fuente inicial, sujeto a validacion contra PostgreSQL real.
+El esquema relacional versionado en `src/db/schema` y `src/db/migrations` es la fuente de persistencia. `0001_initial.sql` crea el dominio existente y `0002_platform_control_plane.sql` agrega `platform_members` y `platform_audit_events`; el runner exige aplicar la inicial antes de la segunda.
+
+El bootstrap de administradores globales vive en `scripts/db/bootstrap-platform-admins.ts`. Solo acepta una lista explícita mediante `--emails` en producción; el fallback por `PLATFORM_ADMIN_EMAILS` requiere `PLATFORM_ADMIN_BOOTSTRAP=true` y no se permite en producción. Las direcciones se normalizan y se guardan sin allowlist de autorización en código; el enlace a `users` queda nullable para el primer login verificado.
+
+`platform_audit_events` es append-only mediante trigger y privilegios revocados. Solo conserva actor, acción, target, estados, motivo y timestamp; nunca secretos, tokens ni bytes de documentos. El rollback manual está en `src/db/migrations/rollback/0002_platform_control_plane_down.sql` y no se ejecutó contra producción.
 
 El storage de documentos dispone de `STORAGE_MODE=local|r2`. `local` es el valor por defecto para desarrollo; `r2` requiere las cuatro variables privadas del proveedor y usa un bucket privado. Las claves de objetos permanecen privadas y nunca forman parte de DTOs publicos. Ver `docs/r2-private-storage.md`.
 
