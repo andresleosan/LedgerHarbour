@@ -1,5 +1,5 @@
 import type { Capability } from "./capabilities";
-import type { MembershipRole } from "./roles";
+import type { AuthorizationRole } from "./roles";
 import type { Membership } from "../tenancy/types";
 
 export const AUTHORIZATION_ERROR_CODES = {
@@ -14,7 +14,7 @@ export type AuthorizationErrorCode = (typeof AUTHORIZATION_ERROR_CODES)[keyof ty
 export class AuthorizationError extends Error {
   readonly name: string = "AuthorizationError";
 
-  constructor(readonly code: AuthorizationErrorCode, message: string) {
+  constructor(readonly code: AuthorizationErrorCode, message: string, readonly reason?: string) {
     super(message);
   }
 }
@@ -33,7 +33,7 @@ export class InfrastructureAuthorizationError extends AuthorizationError {
   }
 }
 
-const capabilityMatrix: Record<MembershipRole, readonly Capability[]> = {
+const capabilityMatrix: Record<AuthorizationRole, readonly Capability[]> = {
   owner_admin: [
     "read_finance",
     "edit_finance",
@@ -51,9 +51,10 @@ const capabilityMatrix: Record<MembershipRole, readonly Capability[]> = {
     "remove_administrator",
   ],
   administrator: ["read_finance", "edit_finance"],
+  platform_admin: ["approve_administrator", "suspend_administrator", "revoke_administrator"],
 };
 
-export function can(role: MembershipRole, capability: Capability): boolean {
+export function can(role: AuthorizationRole, capability: Capability): boolean {
   return capabilityMatrix[role]?.includes(capability) ?? false;
 }
 

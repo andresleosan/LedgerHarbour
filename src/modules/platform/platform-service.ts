@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { AuthIdentity } from "../auth/auth-provider";
+import { can } from "../permissions/authorize";
 
 import {
   defaultOnboardingRepository,
@@ -26,6 +27,7 @@ export const PLATFORM_ERROR_CODES = {
   REASON_REQUIRED: "PLATFORM_REASON_REQUIRED",
   INVALID_DATE: "INVALID_SERVICE_DATE",
   REPOSITORY_CONFLICT: "PLATFORM_REPOSITORY_CONFLICT",
+  ADMINISTRATOR_NOT_FOUND: "ADMINISTRATOR_NOT_FOUND",
 } as const;
 
 export type PlatformErrorCode = (typeof PLATFORM_ERROR_CODES)[keyof typeof PLATFORM_ERROR_CODES];
@@ -37,6 +39,7 @@ const messages: Record<PlatformErrorCode, string> = {
   PLATFORM_REASON_REQUIRED: "A reason is required for this action.",
   INVALID_SERVICE_DATE: "The service expiration date is invalid.",
   PLATFORM_REPOSITORY_CONFLICT: "The business state changed elsewhere.",
+  ADMINISTRATOR_NOT_FOUND: "Administrator not found.",
 };
 
 export class PlatformError extends Error {
@@ -64,6 +67,20 @@ export interface ApproveBusinessInput {
 
 export interface ReasonInput {
   reason?: string;
+}
+
+export interface PlatformAdministratorDto {
+  membershipId: string;
+  businessId: BusinessId;
+  userId: UserId;
+  role: "general_admin" | "administrator";
+  isActive: boolean;
+  businessStatus: BusinessStatus;
+}
+
+export interface AdministratorActionInput {
+  action: "suspend" | "revoke";
+  reason: string;
 }
 
 function requireReason(reason: string | undefined): string {
@@ -127,6 +144,45 @@ async function requirePlatformMember(
   return member;
 }
 
+function requirePlatformCapability(
+  member: PlatformMember,
+  capability: "approve_administrator" | "suspend_administrator" | "revoke_administrator",
+): void {
+  if (!can(member.role, capability)) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
+}
+
+type AdministratorEntry = {
+  membership: Awaited<ReturnType<OnboardingRepository["listMemberships"]>>[number];
+  business: Business;
+};
+
+async function listAdministratorEntries(repository: OnboardingRepository): Promise<AdministratorEntry[]> {
+  const businesses = await repository.listBusinesses();
+  const entries = await Promise.all(businesses.map(async (business) => ({
+    business,
+    memberships: await repository.listMemberships(business.id),
+  })));
+  return entries.flatMap(({ business, memberships }) => memberships
+    .filter((membership) => membership.role === "administrator" || membership.role === "general_admin")
+    .map((membership) => ({ membership, business })));
+}
+
+async function findAdministratorEntry(repository: OnboardingRepository, membershipId: string): Promise<AdministratorEntry | null> {
+  if (typeof membershipId !== "string" || !membershipId.trim()) return null;
+  return (await listAdministratorEntries(repository)).find(({ membership }) => membership.membershipId === membershipId) ?? null;
+}
+
+function toPlatformAdministratorDto(entry: AdministratorEntry): PlatformAdministratorDto {
+  return {
+    membershipId: entry.membership.membershipId,
+    businessId: entry.membership.businessId,
+    userId: entry.membership.userId,
+    role: entry.membership.role === "general_admin" ? "general_admin" : "administrator",
+    isActive: entry.membership.isActive,
+    businessStatus: entry.business.status,
+  };
+}
+
 export interface PlatformServiceDependencies {
   tenancyRepository: OnboardingRepository;
   platformRepository: PlatformRepository;
@@ -139,6 +195,9 @@ export interface PlatformService {
   rejectBusiness(businessId: BusinessId, actor: OnboardingActor, input: ReasonInput): Promise<Business>;
   suspendBusiness(businessId: BusinessId, actor: OnboardingActor, input: ReasonInput): Promise<Business>;
   reactivateBusiness(businessId: BusinessId, actor: OnboardingActor, input: ReasonInput): Promise<Business>;
+  listAdministrators(actor: OnboardingActor): Promise<PlatformAdministratorDto[]>;
+  approveAdministrator(membershipId: string, actor: OnboardingActor, input: ReasonInput): Promise<PlatformAdministratorDto>;
+  suspendAdministrator(membershipId: string, actor: OnboardingActor, input: AdministratorActionInput): Promise<PlatformAdministratorDto>;
 }
 
 export function createPlatformService(dependencies: PlatformServiceDependencies): PlatformService {
@@ -244,6 +303,71 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
         suspendedAt: null,
         suspensionReason: null,
       }, input.reason?.trim() || null);
+    },
+
+    async listAdministrators(actor) {
+      const member = await requirePlatformMember(actor, tenancy, platform);
+      requirePlatformCapability(member, "approve_administrator");
+      return (await listAdministratorEntries(tenancy)).map(toPlatformAdministratorDto);
+    },
+
+    async approveAdministrator(membershipId, actor, input) {
+      const member = await requirePlatformMember(actor, tenancy, platform);
+      requirePlatformCapability(member, "approve_administrator");
+      const before = await findAdministratorEntry(tenancy, membershipId);
+      if (!before || before.membership.isActive) throw new PlatformError(PLATFORM_ERROR_CODES.ADMINISTRATOR_NOT_FOUND);
+      const reason = input.reason?.trim() || null;
+      const execute = async (transaction: OnboardingRepository, transactionPlatform: PlatformRepository): Promise<PlatformAdministratorDto> => {
+        const current = await findAdministratorEntry(transaction, membershipId);
+        if (!current || current.membership.isActive) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+        const updated = await transaction.updateMembership({ ...current.membership, isActive: true });
+        await transactionPlatform.appendAuditEvent({
+          actorId: member.id,
+          action: "administrator_approved",
+          targetType: "membership",
+          targetId: updated.membershipId,
+          beforeStatus: "suspended",
+          afterStatus: "active",
+          reason,
+        });
+        return toPlatformAdministratorDto({ membership: updated, business: current.business });
+      };
+      if (platform.transaction) return platform.transaction((transactionPlatform) => tenancy.transaction((transaction) => execute(transaction, transactionPlatform)));
+      return tenancy.transaction((transaction) => execute(transaction, platform));
+    },
+
+    async suspendAdministrator(membershipId, actor, input) {
+      const member = await requirePlatformMember(actor, tenancy, platform);
+      requirePlatformCapability(member, input.action === "revoke" ? "revoke_administrator" : "suspend_administrator");
+      const reason = requireReason(input.reason);
+      const before = await findAdministratorEntry(tenancy, membershipId);
+      if (!before) throw new PlatformError(PLATFORM_ERROR_CODES.ADMINISTRATOR_NOT_FOUND);
+      const execute = async (transaction: OnboardingRepository, transactionPlatform: PlatformRepository): Promise<PlatformAdministratorDto> => {
+        const current = await findAdministratorEntry(transaction, membershipId);
+        if (!current) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+        const nextStatus = input.action === "revoke" ? "revoked" : "suspended";
+        if (input.action === "suspend" && !current.membership.isActive) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+        if (input.action === "revoke") {
+          await transaction.deleteMembership(current.membership.membershipId);
+        } else {
+          await transaction.updateMembership({ ...current.membership, isActive: false });
+        }
+        await transactionPlatform.appendAuditEvent({
+          actorId: member.id,
+          action: input.action === "revoke" ? "administrator_revoked" : "administrator_suspended",
+          targetType: "membership",
+          targetId: current.membership.membershipId,
+          beforeStatus: current.membership.isActive ? "active" : "suspended",
+          afterStatus: nextStatus,
+          reason,
+        });
+        return toPlatformAdministratorDto({
+          membership: { ...current.membership, isActive: false },
+          business: current.business,
+        });
+      };
+      if (platform.transaction) return platform.transaction((transactionPlatform) => tenancy.transaction((transaction) => execute(transaction, transactionPlatform)));
+      return tenancy.transaction((transaction) => execute(transaction, platform));
     },
   };
 }

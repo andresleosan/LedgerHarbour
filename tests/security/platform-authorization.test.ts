@@ -54,4 +54,24 @@ describe("platform administration authorization", () => {
       error: { code: "PLATFORM_ACCESS_DENIED", message: "Platform administration access denied." },
     });
   });
+
+  it("allows a linked platform administrator to act globally without business membership", async () => {
+    const tenancy = createInMemoryOnboardingRepository();
+    const platform = createInMemoryPlatformRepository();
+    const business = await createBusinessRequest({ name: "Global Target Harbour" }, user("requester"), tenancy);
+    await tenancy.createMembership({
+      membershipId: "membership-target",
+      userId: user("target-admin"),
+      businessId: business.id,
+      role: "administrator",
+      isActive: true,
+    });
+    platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
+    const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+
+    await expect(service.suspendAdministrator("membership-target", user("platform-admin"), {
+      action: "suspend",
+      reason: "Global review",
+    })).resolves.toMatchObject({ isActive: false });
+  });
 });

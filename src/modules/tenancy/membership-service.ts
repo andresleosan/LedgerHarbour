@@ -103,9 +103,10 @@ async function requireActiveBusiness(repository: OnboardingRepository, businessI
 
 async function requireOwner(repository: OnboardingRepository, businessId: BusinessId, actorId: UserId): Promise<Membership> {
   requireActor(actorId);
-  const membership = await createTenantContext(repository).getMembership(actorId, businessId);
+  let membership: Membership;
   try {
-    requireCapability(membership as Membership, "manage_general_admin");
+    membership = await createTenantContext(repository).requireBusinessAccess(actorId, businessId);
+    requireCapability(membership, "manage_general_admin");
   } catch {
     throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.INSUFFICIENT_CAPABILITY);
   }
@@ -121,11 +122,9 @@ async function requireMutationActor(
   actorId: UserId,
 ): Promise<Membership> {
   requireActor(actorId);
-  const membership = await createTenantContext(repository).getMembership(actorId, businessId);
-  if (!membership?.isActive) {
-    throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.INSUFFICIENT_CAPABILITY);
-  }
+  let membership: Membership;
   try {
+    membership = await createTenantContext(repository).requireBusinessAccess(actorId, businessId);
     requireCapability(membership, "remove_administrator");
   } catch {
     throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.INSUFFICIENT_CAPABILITY);

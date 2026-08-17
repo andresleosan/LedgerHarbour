@@ -17,7 +17,7 @@ export interface PlatformAuditEvent {
   id: string;
   actorId: string;
   action: string;
-  targetType: "business";
+  targetType: "business" | "membership";
   targetId: string;
   beforeStatus: string | null;
   afterStatus: string | null;
@@ -129,7 +129,7 @@ function mapAudit(row: typeof platformAuditEvents.$inferSelect): PlatformAuditEv
     id: row.id,
     actorId: row.actorId,
     action: row.action,
-    targetType: row.targetType as "business",
+    targetType: row.targetType as "business" | "membership",
     targetId: row.targetId,
     beforeStatus: row.beforeStatus,
     afterStatus: row.afterStatus,

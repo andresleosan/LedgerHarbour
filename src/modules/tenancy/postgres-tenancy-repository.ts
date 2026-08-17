@@ -119,7 +119,7 @@ function mapBusiness(row: typeof businesses.$inferSelect, createdBy: UserId): Bu
     name: row.name,
     normalizedName: row.normalizedSearchName,
     status: row.status as Business["status"],
-    isActive: row.status === "active",
+    isActive: row.status === "active" && row.isActive,
     activatedAt: row.activatedAt?.toISOString() ?? null,
     serviceExpiresAt: row.serviceExpiresAt?.toISOString() ?? null,
     suspendedAt: row.suspendedAt?.toISOString() ?? null,
@@ -195,7 +195,8 @@ function createRepository(db: Database, transactionCount: { value: number }): On
 
     async findBusinessStatus(businessId) {
       const business = await repository.findBusiness(businessId);
-      return business?.status ?? null;
+      if (!business) return null;
+      return business.status === "active" && business.isActive ? "active" : business.status === "active" ? "suspended" : business.status;
     },
 
     async createBusiness(input: BusinessCreateInput) {

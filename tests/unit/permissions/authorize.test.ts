@@ -4,10 +4,11 @@ import {
   AuthorizationError,
   AUTHORIZATION_ERROR_CODES,
   InfrastructureAuthorizationError,
+  can,
   requireCapability,
 } from "../../../src/modules/permissions/authorize";
 import { Capability } from "../../../src/modules/permissions/capabilities";
-import { MembershipRole } from "../../../src/modules/permissions/roles";
+import { MembershipRole, PlatformRole } from "../../../src/modules/permissions/roles";
 import type { Membership } from "../../../src/modules/tenancy/types";
 
 const userId = "user-1" as Membership["userId"];
@@ -32,6 +33,8 @@ const capabilities: Capability[] = [
   "reactivate_business",
 ];
 
+const platformCapabilities: Capability[] = ["suspend_administrator", "revoke_administrator"];
+
 const expectedCapabilities: Record<MembershipRole, Capability[]> = {
   owner_admin: capabilities,
   general_admin: [
@@ -44,6 +47,14 @@ const expectedCapabilities: Record<MembershipRole, Capability[]> = {
 };
 
 describe("authorization capability policy", () => {
+  it("gives equivalent global capabilities to every platform administrator", () => {
+    for (const capability of platformCapabilities) {
+      expect(can(PlatformRole[0], capability)).toBe(true);
+    }
+    expect(can("platform_admin", "approve_administrator")).toBe(true);
+    expect(can("administrator", "suspend_administrator")).toBe(false);
+  });
+
   it.each(
     Object.entries(expectedCapabilities).flatMap(([role, allowed]) =>
       capabilities.map((capability) => ({

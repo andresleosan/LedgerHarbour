@@ -6,6 +6,22 @@ import {
 import { MembershipRole } from "../permissions/roles";
 import type { BusinessId, BusinessStatus, Membership, UserId } from "./types";
 
+export const BUSINESS_ACCESS_DENIAL_REASONS = {
+  BUSINESS_NOT_FOUND: "business_not_found",
+  BUSINESS_PENDING: "business_pending",
+  BUSINESS_REJECTED: "business_rejected",
+  BUSINESS_SUSPENDED: "business_suspended",
+  MEMBERSHIP_REQUIRED: "membership_required",
+  MEMBERSHIP_INACTIVE: "membership_inactive",
+} as const;
+
+export type BusinessAccessDenialReason =
+  (typeof BUSINESS_ACCESS_DENIAL_REASONS)[keyof typeof BUSINESS_ACCESS_DENIAL_REASONS];
+
+export type EffectiveBusinessAccess =
+  | { allowed: true; membership: Membership; reason: null }
+  | { allowed: false; membership: null; reason: BusinessAccessDenialReason };
+
 export interface TenantRepository {
   findMembership(userId: UserId, businessId: BusinessId): Promise<Membership | null>;
   findBusinessStatus(businessId: BusinessId): Promise<BusinessStatus | "inactive" | null>;
@@ -14,6 +30,7 @@ export interface TenantRepository {
 export interface TenantContext {
   getMembership(userId: UserId, businessId: BusinessId): Promise<Membership | null>;
   requireBusinessAccess(userId: UserId, businessId: BusinessId): Promise<Membership>;
+  effectiveBusinessAccess(businessId: BusinessId, userId: UserId): Promise<EffectiveBusinessAccess>;
 }
 
 export const TENANT_REPOSITORY_CONFIGURATION_CODES = {
@@ -80,10 +97,11 @@ function isMembershipForRequest(
   );
 }
 
-function accessDenied(): AuthorizationError {
+function accessDenied(reason: BusinessAccessDenialReason = BUSINESS_ACCESS_DENIAL_REASONS.MEMBERSHIP_REQUIRED): AuthorizationError {
   return new AuthorizationError(
     AUTHORIZATION_ERROR_CODES.BUSINESS_ACCESS_DENIED,
     "Business access denied",
+    reason,
   );
 }
 
@@ -115,26 +133,51 @@ async function requireBusinessAccessFrom(
     throw accessDenied();
   }
 
-  let membership: Membership | null;
-   let businessStatus: BusinessStatus | "inactive" | null;
+  const result = await effectiveBusinessAccessFrom(repository, businessId, userId);
+  if (!result.allowed) throw accessDenied(result.reason);
+  return result.membership;
+}
+
+function denialReasonForBusinessStatus(status: BusinessStatus | "inactive" | null): BusinessAccessDenialReason | null {
+  if (status === null) return BUSINESS_ACCESS_DENIAL_REASONS.BUSINESS_NOT_FOUND;
+  if (status === "pending") return BUSINESS_ACCESS_DENIAL_REASONS.BUSINESS_PENDING;
+  if (status === "rejected") return BUSINESS_ACCESS_DENIAL_REASONS.BUSINESS_REJECTED;
+  if (status === "suspended" || status === "inactive") return BUSINESS_ACCESS_DENIAL_REASONS.BUSINESS_SUSPENDED;
+  return null;
+}
+
+async function effectiveBusinessAccessFrom(
+  repository: TenantRepository,
+  businessId: BusinessId,
+  userId: UserId,
+): Promise<EffectiveBusinessAccess> {
+  if (!isOpaqueId(userId) || !isOpaqueId(businessId)) {
+    return { allowed: false, membership: null, reason: BUSINESS_ACCESS_DENIAL_REASONS.MEMBERSHIP_REQUIRED };
+  }
+
+  let businessStatus: BusinessStatus | "inactive" | null;
   try {
-    [membership, businessStatus] = await Promise.all([
-      repository.findMembership(userId, businessId),
-      repository.findBusinessStatus(businessId),
-    ]);
+    businessStatus = await repository.findBusinessStatus(businessId);
   } catch (cause) {
     throw new InfrastructureAuthorizationError(cause);
   }
 
-  if (!isMembershipForRequest(membership, userId, businessId) || !membership.isActive) {
-    throw accessDenied();
-  }
+  const businessDenial = denialReasonForBusinessStatus(businessStatus);
+  if (businessDenial) return { allowed: false, membership: null, reason: businessDenial };
 
-  if (businessStatus !== "active") {
-    throw accessDenied();
+  let membership: Membership | null;
+  try {
+    membership = await repository.findMembership(userId, businessId);
+  } catch (cause) {
+    throw new InfrastructureAuthorizationError(cause);
   }
-
-  return membership;
+  if (!isMembershipForRequest(membership, userId, businessId)) {
+    return { allowed: false, membership: null, reason: BUSINESS_ACCESS_DENIAL_REASONS.MEMBERSHIP_REQUIRED };
+  }
+  if (!membership.isActive) {
+    return { allowed: false, membership: null, reason: BUSINESS_ACCESS_DENIAL_REASONS.MEMBERSHIP_INACTIVE };
+  }
+  return { allowed: true, membership, reason: null };
 }
 
 export function getMembership(userId: UserId, businessId: BusinessId): Promise<Membership | null> {
@@ -149,10 +192,24 @@ export function requireBusinessAccess(userId: UserId, businessId: BusinessId): P
   );
 }
 
+export function effectiveBusinessAccess(businessId: BusinessId, userId: UserId): Promise<EffectiveBusinessAccess>;
+export function effectiveBusinessAccess(repository: TenantRepository, businessId: BusinessId, userId: UserId): Promise<EffectiveBusinessAccess>;
+export function effectiveBusinessAccess(
+  first: TenantRepository | BusinessId,
+  second: BusinessId | UserId,
+  third?: UserId,
+): Promise<EffectiveBusinessAccess> {
+  if (third === undefined) {
+    return effectiveBusinessAccessFrom(configuredRepository ?? noConfiguredRepository, first as BusinessId, second as UserId);
+  }
+  return effectiveBusinessAccessFrom(first as TenantRepository, second as BusinessId, third);
+}
+
 export function createTenantContext(repository: TenantRepository): TenantContext {
   return {
     getMembership: (userId, businessId) => getMembershipFrom(repository, userId, businessId),
     requireBusinessAccess: (userId, businessId) =>
       requireBusinessAccessFrom(repository, userId, businessId),
+    effectiveBusinessAccess: (businessId, userId) => effectiveBusinessAccessFrom(repository, businessId, userId),
   };
 }

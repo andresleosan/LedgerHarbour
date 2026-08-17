@@ -3,6 +3,8 @@ export const Capability = [
   "edit_finance",
   "approve_administrator",
   "remove_administrator",
+  "suspend_administrator",
+  "revoke_administrator",
   "manage_general_admin",
   "transfer_ownership",
   "deactivate_business",

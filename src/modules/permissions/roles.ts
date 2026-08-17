@@ -5,3 +5,9 @@ export const MembershipRole = [
 ] as const;
 
 export type MembershipRole = (typeof MembershipRole)[number];
+
+export const PlatformRole = ["platform_admin"] as const;
+
+export type PlatformRole = (typeof PlatformRole)[number];
+
+export type AuthorizationRole = MembershipRole | PlatformRole;
