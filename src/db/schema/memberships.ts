@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import { sql } from "drizzle-orm";
-import { boolean, index, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
+import { boolean, check, index, pgEnum, pgTable, text, timestamp, uniqueIndex } from "drizzle-orm/pg-core";
 
 import { businesses } from "./businesses";
 import { users } from "./users";
@@ -25,6 +25,7 @@ export const memberships = pgTable(
     businessId: text("business_id").notNull().references(() => businesses.id),
     role: membershipRoleEnum("role").notNull().default("administrator"),
     isActive: boolean("is_active").notNull().default(true),
+    status: text("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -34,6 +35,8 @@ export const memberships = pgTable(
       .on(table.businessId)
       .where(sql`${table.role} = 'owner_admin' AND ${table.isActive} = true`),
     index("memberships_business_active_idx").on(table.businessId, table.isActive),
+    index("memberships_status_idx").on(table.status),
+    check("memberships_status_check", sql`${table.status} IN ('pending', 'active', 'suspended', 'revoked')`),
   ],
 );
 

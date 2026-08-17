@@ -248,6 +248,25 @@ describe("PostgreSQL initial migration", () => {
     }
   }, 30_000);
 
+  it("stores explicit administrator lifecycle status independently from access", async () => {
+    const { db, close } = await createTestDatabase();
+
+    try {
+      const columns = await db.execute<{ column_name: string }>(`
+        SELECT column_name
+        FROM information_schema.columns
+        WHERE table_name = 'memberships' AND column_name = 'status'
+      `);
+      expect(columns.rows).toEqual([{ column_name: "status" }]);
+      await expect(db.execute(`
+        INSERT INTO memberships (id, user_id, business_id, role, is_active, status)
+        VALUES ('membership-invalid-status', 'missing-user', 'missing-business', 'administrator', false, 'invalid')
+      `)).rejects.toThrow();
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
   it("enforces tenant-aware foreign keys and append-only audit events", async () => {
     const { db, close } = await createTestDatabase();
 

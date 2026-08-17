@@ -89,7 +89,7 @@ async function createBusiness(
 }
 
 describe("portfolio tenant boundary", () => {
-  it("lists only active memberships and preserves the real role, including inactive businesses", async () => {
+  it("lists only operational businesses while preserving the real role", async () => {
     const repository = createInMemoryOnboardingRepository();
     const actorId = user("portfolio-user");
     const active = await createApprovedBusiness(repository, "Active Books", actorId);
@@ -113,7 +113,6 @@ describe("portfolio tenant boundary", () => {
 
     await expect(listUserBusinesses(actorId, { tenancyRepository: repository })).resolves.toEqual([
       { id: active.id, name: "Active Books", isActive: true, role: "owner_admin" },
-      { id: inactive.id, name: "Closed Books", isActive: false, role: "owner_admin" },
     ]);
   });
 

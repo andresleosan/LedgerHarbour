@@ -7,6 +7,7 @@ import {
   PLATFORM_ERROR_CODES,
 } from "../../../../modules/platform/platform-service";
 import { getPersistenceContext } from "../../../../modules/persistence/repository-factory";
+import { platformRateLimitResponse } from "../../../../modules/platform/platform-route-security";
 
 function errorResponse(error: unknown): NextResponse {
   if (error instanceof PlatformError) {
@@ -16,9 +17,11 @@ function errorResponse(error: unknown): NextResponse {
   return NextResponse.json({ error: { code: "PLATFORM_REQUEST_FAILED", message: "The platform request could not be completed." } }, { status: 500 });
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
+  const limited = await platformRateLimitResponse(request, identity);
+  if (limited) return limited;
   try {
     const persistence = getPersistenceContext();
     const businesses = await createPlatformService({

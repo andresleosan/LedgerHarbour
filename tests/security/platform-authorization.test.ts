@@ -47,7 +47,7 @@ describe("platform administration authorization", () => {
 
   it("returns a generic forbidden response from the platform API", async () => {
     const { GET } = await import("../../src/app/api/platform/businesses/route");
-    const response = await GET();
+    const response = await GET(new Request("http://localhost/api/platform/businesses"));
 
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toEqual({

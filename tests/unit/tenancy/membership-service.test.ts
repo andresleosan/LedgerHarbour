@@ -119,7 +119,7 @@ describe("membership administration", () => {
     });
     await expect(service.transferOwnership(input, user("owner"))).resolves.toBeUndefined();
     expect(repository.memberships.filter((membership) => membership.role === "owner_admin" && membership.isActive)).toEqual([
-      { membershipId: general.membershipId, userId: user("general"), businessId: created.id, role: "owner_admin", isActive: true },
+       { membershipId: general.membershipId, userId: user("general"), businessId: created.id, role: "owner_admin", isActive: true, status: "active" },
     ]);
     expect(repository.memberships.find((membership) => membership.userId === user("owner"))).toMatchObject({ role: "administrator" });
     expect(repository.auditEvents).toContainEqual(expect.objectContaining({ type: "ownership_transferred" }));

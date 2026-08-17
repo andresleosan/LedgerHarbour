@@ -7,11 +7,7 @@ import {
   PLATFORM_ERROR_CODES,
 } from "../../../../modules/platform/platform-service";
 import { getPersistenceContext } from "../../../../modules/persistence/repository-factory";
-import { enforceAuthenticatedRateLimit } from "../../../../modules/security/authenticated-rate-limit";
-import {
-  AuthenticatedRateLimitError,
-  AuthenticatedRateLimitUnavailableError,
-} from "../../../../modules/security/rate-limit-errors";
+import { platformRateLimitResponse } from "../../../../modules/platform/platform-route-security";
 
 function errorResponse(error: unknown): NextResponse {
   if (error instanceof PlatformError) {
@@ -24,13 +20,8 @@ function errorResponse(error: unknown): NextResponse {
 export async function GET(request: Request) {
   const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
-  try {
-    await enforceAuthenticatedRateLimit("platform-administration", identity.providerUserId, request.headers);
-  } catch (error) {
-    if (error instanceof AuthenticatedRateLimitError) return NextResponse.json({ error: { code: "RATE_LIMITED", message: "Too many requests." } }, { status: 429 });
-    if (error instanceof AuthenticatedRateLimitUnavailableError) return NextResponse.json({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "Platform protection is temporarily unavailable." } }, { status: 503 });
-    return NextResponse.json({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "Platform protection is temporarily unavailable." } }, { status: 503 });
-  }
+  const limited = await platformRateLimitResponse(request, identity);
+  if (limited) return limited;
   try {
     const persistence = getPersistenceContext();
     const administrators = await createPlatformService({

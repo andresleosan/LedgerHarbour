@@ -26,7 +26,7 @@ import {
   type JoinRequest,
   type OnboardingRepository,
 } from "./business-service";
-import type { BusinessId, Membership, UserId } from "./types";
+import type { BusinessId, Membership, MembershipStatus, UserId } from "./types";
 
 function id<T extends string>(value: string): T {
   return value as T;
@@ -94,6 +94,7 @@ function mapMembership(row: typeof memberships.$inferSelect): Membership {
     businessId: id<BusinessId>(row.businessId),
     role: row.role,
     isActive: row.isActive,
+    status: row.status as MembershipStatus,
   };
 }
 
@@ -241,8 +242,9 @@ function createRepository(db: Database, transactionCount: { value: number }): On
           id: membership.membershipId,
           userId: membership.userId,
           businessId: membership.businessId,
-          role: membership.role,
-          isActive: membership.isActive,
+        role: membership.role,
+        isActive: membership.isActive,
+        status: membership.status ?? (membership.isActive ? "active" : "pending"),
         }).returning();
         if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
         return mapMembership(row);
@@ -251,13 +253,17 @@ function createRepository(db: Database, transactionCount: { value: number }): On
       }
     },
 
-      async updateMembership(membership) {
+      async updateMembership(membership, expected) {
       try {
         const [row] = await db.update(memberships).set({
           role: membership.role,
           isActive: membership.isActive,
+          status: membership.status ?? (membership.isActive ? "active" : "suspended"),
           updatedAt: new Date(),
-        }).where(eq(memberships.id, membership.membershipId)).returning();
+        }).where(and(
+          eq(memberships.id, membership.membershipId),
+          ...(expected ? [eq(memberships.isActive, expected.isActive), eq(memberships.role, expected.role), ...(expected.status ? [eq(memberships.status, expected.status)] : [])] : []),
+        )).returning();
         if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
         return mapMembership(row);
       } catch (error) {
@@ -265,9 +271,12 @@ function createRepository(db: Database, transactionCount: { value: number }): On
       }
     },
 
-    async deleteMembership(membershipId) {
+    async deleteMembership(membershipId, expected) {
       try {
-        const rows = await db.delete(memberships).where(eq(memberships.id, membershipId)).returning({ id: memberships.id });
+        const rows = await db.delete(memberships).where(and(
+          eq(memberships.id, membershipId),
+          ...(expected ? [eq(memberships.isActive, expected.isActive), eq(memberships.role, expected.role), ...(expected.status ? [eq(memberships.status, expected.status)] : [])] : []),
+        )).returning({ id: memberships.id });
         if (rows.length === 0) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
       } catch (error) {
         return preserveOrMap(error);
@@ -361,7 +370,7 @@ function createRepository(db: Database, transactionCount: { value: number }): On
       });
     },
 
-    async updateBusinessLifecycle(businessId, input: BusinessLifecycleUpdate) {
+    async updateBusinessLifecycle(businessId, input: BusinessLifecycleUpdate, expectedStatus) {
       try {
         const current = await repository.findBusiness(businessId);
         if (!current) throw new OnboardingError(ONBOARDING_ERROR_CODES.MISSING_BUSINESS);
@@ -382,7 +391,10 @@ function createRepository(db: Database, transactionCount: { value: number }): On
           suspendedAt: input.suspendedAt === undefined ? undefined : input.suspendedAt ? new Date(input.suspendedAt) : null,
           suspensionReason: input.suspensionReason,
           updatedAt: new Date(),
-        }).where(eq(businesses.id, businessId)).returning();
+        }).where(and(
+          eq(businesses.id, businessId),
+          ...(expectedStatus ? [eq(businesses.status, expectedStatus)] : []),
+        )).returning();
         if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.MISSING_BUSINESS);
         if (!row.createdBy) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
         return mapBusiness(row, id<UserId>(row.createdBy));

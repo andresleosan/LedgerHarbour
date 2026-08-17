@@ -190,6 +190,7 @@ export function createMembershipService(repository: OnboardingRepository = defau
       }
 
       return repository.transaction(async (transaction) => {
+        await requireOwner(transaction, input.businessId, actorId);
         await ensureOwnerInvariant(transaction, input.businessId);
         const current = await findTarget(transaction, input.businessId, input.membershipId);
         if (current.role !== "administrator" || !current.isActive) {
@@ -221,6 +222,7 @@ export function createMembershipService(repository: OnboardingRepository = defau
       }
 
       await repository.transaction(async (transaction) => {
+        const currentActor = await requireMutationActor(transaction, input.businessId, actorId);
         await ensureOwnerInvariant(transaction, input.businessId);
         const current = await findTarget(transaction, input.businessId, input.membershipId).catch(() => null);
         if (!current) {
@@ -232,7 +234,7 @@ export function createMembershipService(repository: OnboardingRepository = defau
         if (expectedRole && current.role !== expectedRole) {
           throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.REPOSITORY_CONFLICT);
         }
-        if (current.role === "general_admin" && actorMembership.role !== "owner_admin") {
+        if (current.role === "general_admin" && currentActor.role !== "owner_admin") {
           throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.INSUFFICIENT_CAPABILITY);
         }
         await transaction.deleteMembership(current.membershipId);
@@ -255,6 +257,7 @@ export function createMembershipService(repository: OnboardingRepository = defau
       }
 
       await repository.transaction(async (transaction) => {
+        await requireOwner(transaction, input.businessId, actorId);
         await ensureOwnerInvariant(transaction, input.businessId);
         const owner = (await transaction.listMemberships(input.businessId)).find(
           (membership) => membership.userId === actorId,

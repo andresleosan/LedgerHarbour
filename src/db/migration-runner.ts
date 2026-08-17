@@ -8,6 +8,8 @@ const PLATFORM_MIGRATION_VERSION = "0002_platform_control_plane";
 const PLATFORM_MIGRATION_FILE = new URL("./migrations/0002_platform_control_plane.sql", import.meta.url);
 const BUSINESS_LIFECYCLE_MIGRATION_VERSION = "0003_business_lifecycle";
 const BUSINESS_LIFECYCLE_MIGRATION_FILE = new URL("./migrations/0003_business_lifecycle.sql", import.meta.url);
+const MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION = "0004_membership_lifecycle";
+const MEMBERSHIP_LIFECYCLE_MIGRATION_FILE = new URL("./migrations/0004_membership_lifecycle.sql", import.meta.url);
 const REQUIRED_TABLES = [
   "users",
   "businesses",
@@ -22,6 +24,7 @@ const REQUIRED_TABLES = [
 ] as const;
 const PLATFORM_REQUIRED_TABLES = ["platform_members", "platform_audit_events"] as const;
 const BUSINESS_LIFECYCLE_REQUIRED_COLUMNS = ["created_by", "status", "activated_at", "service_expires_at", "suspended_at", "suspension_reason"] as const;
+const MEMBERSHIP_LIFECYCLE_REQUIRED_COLUMNS = ["status"] as const;
 
 export type MigrationConfigInput = {
   databaseUrl?: string;
@@ -47,6 +50,7 @@ export function assertRequiredMigrations(
   initial: MigrationCheck,
   platform: MigrationCheck,
   lifecycle?: MigrationCheck,
+  membershipLifecycle?: MigrationCheck,
 ): void {
   if (
     initial.version !== MIGRATION_VERSION
@@ -68,6 +72,9 @@ export function assertRequiredMigrations(
   }
   if (lifecycle && (!lifecycle.applied || lifecycle.version !== BUSINESS_LIFECYCLE_MIGRATION_VERSION || lifecycle.requiredTableCount !== BUSINESS_LIFECYCLE_REQUIRED_COLUMNS.length)) {
     throw new Error("Required PostgreSQL business lifecycle migration is not applied");
+  }
+  if (membershipLifecycle && (!membershipLifecycle.applied || membershipLifecycle.version !== MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION || membershipLifecycle.requiredTableCount !== MEMBERSHIP_LIFECYCLE_REQUIRED_COLUMNS.length)) {
+    throw new Error("Required PostgreSQL membership lifecycle migration is not applied");
   }
 }
 
@@ -273,6 +280,50 @@ export async function checkBusinessLifecycleMigration(config: MigrationConfig): 
     );
     return {
       version: BUSINESS_LIFECYCLE_MIGRATION_VERSION,
+      applied,
+      requiredTableCount: columns.rowCount ?? 0,
+      ledgerRecordPresent: applied,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
+export async function applyMembershipLifecycleMigration(config: MigrationConfig): Promise<MigrationResult> {
+  const client = await connect(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, BUSINESS_LIFECYCLE_MIGRATION_VERSION))) {
+      throw new Error("Business lifecycle migration must be applied before membership lifecycle migration");
+    }
+    if (await migrationWasApplied(client, MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION)) {
+      return { version: MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION, applied: false };
+    }
+    const migrationSql = withoutTransactionMarkers(await readFile(MEMBERSHIP_LIFECYCLE_MIGRATION_FILE, "utf8"));
+    await client.query("BEGIN");
+    await client.query(migrationSql);
+    await client.query("INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)", [MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION]);
+    await client.query("COMMIT");
+    return { version: MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function checkMembershipLifecycleMigration(config: MigrationConfig): Promise<MigrationCheck> {
+  const client = await connect(config);
+  try {
+    await ensureMigrationTable(client);
+    const applied = await migrationWasApplied(client, MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION);
+    const columns = await client.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'memberships' AND column_name = ANY($1::text[])`,
+      [MEMBERSHIP_LIFECYCLE_REQUIRED_COLUMNS],
+    );
+    return {
+      version: MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION,
       applied,
       requiredTableCount: columns.rowCount ?? 0,
       ledgerRecordPresent: applied,

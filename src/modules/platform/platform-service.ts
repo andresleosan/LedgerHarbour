@@ -4,13 +4,14 @@ import { can } from "../permissions/authorize";
 
 import {
   defaultOnboardingRepository,
+  OnboardingError,
   resolveOnboardingActor,
   type Business,
   type BusinessLifecycleUpdate,
   type OnboardingActor,
   type OnboardingRepository,
 } from "../tenancy/business-service";
-import type { BusinessId, BusinessStatus, UserId } from "../tenancy/types";
+import type { BusinessId, BusinessStatus, MembershipStatus, UserId } from "../tenancy/types";
 import {
   createInMemoryPlatformRepository,
   type InMemoryPlatformRepository,
@@ -75,6 +76,7 @@ export interface PlatformAdministratorDto {
   userId: UserId;
   role: "general_admin" | "administrator";
   isActive: boolean;
+  status: MembershipStatus;
   businessStatus: BusinessStatus;
 }
 
@@ -134,6 +136,7 @@ async function requirePlatformMember(
 ): Promise<PlatformMember> {
   const userId = await resolveOnboardingActor(tenancy, actor);
   let member = await platform.findActiveMemberByUserId(userId);
+  // Firebase email is used only for this one-time initial claim; normal authorization is user_id.
   if (!member && typeof actor !== "string" && actor.provider === "firebase" && actor.emailVerified) {
     await claimPlatformMemberForActor(actor, tenancy, platform);
     member = await platform.findActiveMemberByUserId(userId);
@@ -179,6 +182,7 @@ function toPlatformAdministratorDto(entry: AdministratorEntry): PlatformAdminist
     userId: entry.membership.userId,
     role: entry.membership.role === "general_admin" ? "general_admin" : "administrator",
     isActive: entry.membership.isActive,
+    status: entry.membership.status ?? (entry.membership.isActive ? "active" : "pending"),
     businessStatus: entry.business.status,
   };
 }
@@ -216,7 +220,13 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
       const current = await transaction.findBusiness(businessId);
       if (!current) throw new PlatformError(PLATFORM_ERROR_CODES.BUSINESS_NOT_FOUND);
       if (current.status !== beforeStatus) throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_TRANSITION);
-      const updated = await transaction.updateBusinessLifecycle(businessId, update);
+      let updated: Business;
+      try {
+        updated = await transaction.updateBusinessLifecycle(businessId, update, beforeStatus);
+      } catch (error) {
+        if (error instanceof OnboardingError) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+        throw error;
+      }
       await transactionPlatform.appendAuditEvent({
         actorId: member.id,
         action,
@@ -257,13 +267,19 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
           role: "owner_admin",
           isActive: true,
         });
-        const approved = await transaction.updateBusinessLifecycle(businessId, {
+         let approved: Business;
+         try {
+           approved = await transaction.updateBusinessLifecycle(businessId, {
           status: "active",
           activatedAt: now,
           serviceExpiresAt,
           suspendedAt: null,
           suspensionReason: null,
-        });
+           }, "pending");
+         } catch (error) {
+           if (error instanceof OnboardingError) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+           throw error;
+         }
         await transaction.appendAuditEvent({ businessId, actorId: current.createdBy, type: "business_created", entityId: businessId });
         await transactionPlatform.appendAuditEvent({
           actorId: member.id,
@@ -316,17 +332,29 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
       requirePlatformCapability(member, "approve_administrator");
       const before = await findAdministratorEntry(tenancy, membershipId);
       if (!before || before.membership.isActive) throw new PlatformError(PLATFORM_ERROR_CODES.ADMINISTRATOR_NOT_FOUND);
+      if (before.membership.status !== "pending") throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_TRANSITION);
       const reason = input.reason?.trim() || null;
       const execute = async (transaction: OnboardingRepository, transactionPlatform: PlatformRepository): Promise<PlatformAdministratorDto> => {
         const current = await findAdministratorEntry(transaction, membershipId);
         if (!current || current.membership.isActive) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
-        const updated = await transaction.updateMembership({ ...current.membership, isActive: true });
+        if (current.membership.status !== "pending") throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_TRANSITION);
+        let updated: Awaited<ReturnType<OnboardingRepository["updateMembership"]>>;
+        try {
+          updated = await transaction.updateMembership({ ...current.membership, isActive: true, status: "active" }, {
+            isActive: false,
+            role: current.membership.role,
+            status: "pending",
+          });
+        } catch (error) {
+          if (error instanceof OnboardingError) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+          throw error;
+        }
         await transactionPlatform.appendAuditEvent({
           actorId: member.id,
           action: "administrator_approved",
           targetType: "membership",
           targetId: updated.membershipId,
-          beforeStatus: "suspended",
+          beforeStatus: "pending",
           afterStatus: "active",
           reason,
         });
@@ -346,11 +374,20 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
         const current = await findAdministratorEntry(transaction, membershipId);
         if (!current) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
         const nextStatus = input.action === "revoke" ? "revoked" : "suspended";
-        if (input.action === "suspend" && !current.membership.isActive) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
-        if (input.action === "revoke") {
-          await transaction.deleteMembership(current.membership.membershipId);
-        } else {
-          await transaction.updateMembership({ ...current.membership, isActive: false });
+        if (!current.membership.isActive || current.membership.status !== "active") throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+        try {
+          await transaction.updateMembership({
+            ...current.membership,
+            isActive: false,
+            status: input.action === "revoke" ? "revoked" : "suspended",
+          }, {
+            isActive: true,
+            role: current.membership.role,
+            status: "active",
+          });
+        } catch (error) {
+          if (error instanceof OnboardingError) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+          throw error;
         }
         await transactionPlatform.appendAuditEvent({
           actorId: member.id,
@@ -362,7 +399,11 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
           reason,
         });
         return toPlatformAdministratorDto({
-          membership: { ...current.membership, isActive: false },
+          membership: {
+            ...current.membership,
+            isActive: false,
+            status: input.action === "revoke" ? "revoked" : "suspended",
+          },
           business: current.business,
         });
       };

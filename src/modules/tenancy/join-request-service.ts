@@ -26,6 +26,15 @@ function assertPending(request: JoinRequest): void {
   }
 }
 
+async function requireJoinReviewAccess(
+  repository: OnboardingRepository,
+  actorId: Membership["userId"],
+  businessId: BusinessId,
+): Promise<void> {
+  const membership = await createTenantContext(repository).requireBusinessAccess(actorId, businessId);
+  requireCapability(membership, "approve_administrator");
+}
+
 export interface JoinRequestService {
   requestMembership(input: CreateJoinRequestInput, actor: OnboardingActor): Promise<JoinRequest>;
   listJoinRequests(businessId: BusinessId, actor: OnboardingActor): Promise<JoinRequest[]>;
@@ -34,8 +43,6 @@ export interface JoinRequestService {
 }
 
 export function createJoinRequestService(repository: OnboardingRepository): JoinRequestService {
-  const tenant = createTenantContext(repository);
-
   return {
     async requestMembership(input, actorId) {
       validateRequestInput(input);
@@ -48,6 +55,10 @@ export function createJoinRequestService(repository: OnboardingRepository): Join
       }
 
       return repository.transaction(async (transaction) => {
+        const currentBusiness = await transaction.findBusiness(input.businessId);
+        if (!currentBusiness || currentBusiness.status !== "active" || !currentBusiness.isActive) {
+          throw new OnboardingError(ONBOARDING_ERROR_CODES.INACTIVE_BUSINESS);
+        }
         const requesterId = await resolveOnboardingActor(transaction, actorId);
         if (await transaction.findMembership(requesterId, input.businessId)) {
           throw new OnboardingError(ONBOARDING_ERROR_CODES.DUPLICATE_MEMBERSHIP);
@@ -63,14 +74,8 @@ export function createJoinRequestService(repository: OnboardingRepository): Join
 
     async listJoinRequests(businessId, actorId) {
       const resolvedActorId = await resolveOnboardingActor(repository, actorId);
-      let membership: Membership;
       try {
-        membership = await tenant.requireBusinessAccess(resolvedActorId, businessId);
-      } catch {
-        throw new OnboardingError(ONBOARDING_ERROR_CODES.INSUFFICIENT_CAPABILITY);
-      }
-      try {
-        requireCapability(membership, "approve_administrator");
+        await requireJoinReviewAccess(repository, resolvedActorId, businessId);
       } catch {
         throw new OnboardingError(ONBOARDING_ERROR_CODES.INSUFFICIENT_CAPABILITY);
       }
@@ -102,14 +107,8 @@ export function createJoinRequestService(repository: OnboardingRepository): Join
         throw new OnboardingError(ONBOARDING_ERROR_CODES.INVALID_TRANSITION);
       }
 
-      let membership: Membership;
       try {
-        membership = await tenant.requireBusinessAccess(resolvedActorId, input.businessId);
-      } catch {
-        throw new OnboardingError(ONBOARDING_ERROR_CODES.INSUFFICIENT_CAPABILITY);
-      }
-      try {
-        requireCapability(membership, "approve_administrator");
+        await requireJoinReviewAccess(repository, resolvedActorId, input.businessId);
       } catch {
         throw new OnboardingError(ONBOARDING_ERROR_CODES.INSUFFICIENT_CAPABILITY);
       }
@@ -121,6 +120,11 @@ export function createJoinRequestService(repository: OnboardingRepository): Join
       assertPending(request);
 
       return repository.transaction(async (transaction) => {
+        try {
+          await requireJoinReviewAccess(transaction, resolvedActorId, input.businessId);
+        } catch {
+          throw new OnboardingError(ONBOARDING_ERROR_CODES.INSUFFICIENT_CAPABILITY);
+        }
         const current = await transaction.findJoinRequest(input.joinRequestId);
         if (!current || current.businessId !== input.businessId) {
           throw new OnboardingError(ONBOARDING_ERROR_CODES.HIDDEN_REQUEST);

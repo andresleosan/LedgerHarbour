@@ -73,6 +73,59 @@ describe("platform administrator approval", () => {
     });
   });
 
+  it("does not approve a membership after platform suspension", async () => {
+    const { tenancy, service, administrator } = await fixture();
+    await tenancy.updateMembership({ ...administrator, isActive: true, status: "active" });
+
+    await service.suspendAdministrator(administrator.membershipId, user("platform-admin"), {
+      action: "suspend",
+      reason: "Temporary review",
+    });
+
+    await expect(service.approveAdministrator(administrator.membershipId, user("platform-admin"), {}))
+      .rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.INVALID_TRANSITION });
+  });
+
+  it("serializes administrator actions and audits only the winning transition", async () => {
+    const { tenancy, service, platform, administrator } = await fixture();
+    await tenancy.updateMembership({ ...administrator, isActive: true, status: "active" });
+
+    const results = await Promise.allSettled([
+      service.suspendAdministrator(administrator.membershipId, user("platform-admin"), {
+        action: "suspend",
+        reason: "Suspend race",
+      }),
+      service.suspendAdministrator(administrator.membershipId, user("platform-admin"), {
+        action: "revoke",
+        reason: "Revoke race",
+      }),
+    ]);
+
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    expect(platform.auditEvents.filter((event) => event.targetId === administrator.membershipId)).toHaveLength(1);
+  });
+
+  it("claims a verified Firebase platform member once, then authorizes by linked user id", async () => {
+    const tenancy = createInMemoryOnboardingRepository();
+    const platform = createInMemoryPlatformRepository();
+    platform.addMember({ id: "platform-claim", userId: null, normalizedEmail: "claimed@example.com" });
+    const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+    const firstIdentity = {
+      provider: "firebase" as const,
+      providerUserId: "firebase-claimed",
+      email: "claimed@example.com",
+      displayName: "Claimed Admin",
+      emailVerified: true,
+    };
+
+    await expect(service.listAdministrators(firstIdentity)).resolves.toEqual([]);
+    const linkedUserId = platform.platformMembers[0]?.userId;
+    expect(linkedUserId).toMatch(/^user-/);
+    await expect(service.listAdministrators({ ...firstIdentity, email: "renamed@example.com" })).resolves.toEqual([]);
+    expect(platform.platformMembers[0]?.userId).toBe(linkedUserId);
+  });
+
   it("cascades a suspended business through effective access without deleting memberships", async () => {
     const { tenancy, service, created } = await fixture();
     await tenancy.updateMembership({
@@ -81,6 +134,7 @@ describe("platform administrator approval", () => {
       businessId: created.id,
       role: "administrator",
       isActive: true,
+      status: "active",
     });
 
     await service.suspendBusiness(created.id, user("platform-admin"), { reason: "Business review" });
@@ -101,6 +155,7 @@ describe("platform administrator approval", () => {
 
   it("revokes only the requested membership and keeps other businesses isolated", async () => {
     const { tenancy, service, administrator } = await fixture();
+    await tenancy.updateMembership({ ...administrator, isActive: true, status: "active" });
     const second = await createApprovedBusiness(tenancy, "Second Administrator Harbour", user("second-owner"));
     const secondAdministrator = await tenancy.createMembership({
       membershipId: "membership-second-administrator",
@@ -115,7 +170,13 @@ describe("platform administrator approval", () => {
       reason: "Access no longer required",
     });
 
-    await expect(tenancy.findMembership(user("administrator"), business(administrator.businessId))).resolves.toBeNull();
+    await expect(service.approveAdministrator(administrator.membershipId, user("platform-admin"), {}))
+      .rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.INVALID_TRANSITION });
+
+    await expect(tenancy.findMembership(user("administrator"), business(administrator.businessId))).resolves.toMatchObject({
+      status: "revoked",
+      isActive: false,
+    });
     await expect(tenancy.findMembership(user("second-administrator"), second.id)).resolves.toEqual(secondAdministrator);
   });
 

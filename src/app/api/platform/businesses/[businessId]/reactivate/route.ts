@@ -4,6 +4,7 @@ import { z } from "zod";
 import { getCurrentIdentity } from "../../../../../../modules/auth/session";
 import { createPlatformService, PlatformError, PLATFORM_ERROR_CODES, toPlatformBusinessDto } from "../../../../../../modules/platform/platform-service";
 import { getPersistenceContext } from "../../../../../../modules/persistence/repository-factory";
+import { platformRateLimitResponse } from "../../../../../../modules/platform/platform-route-security";
 import type { BusinessId } from "../../../../../../modules/tenancy/types";
 
 const inputSchema = z.object({ reason: z.string().trim().max(1000).optional() }).strict();
@@ -12,6 +13,8 @@ type RouteContext = { params: Promise<{ businessId: string }> };
 export async function POST(request: Request, context: RouteContext) {
   const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
+  const limited = await platformRateLimitResponse(request, identity);
+  if (limited) return limited;
   let body: unknown;
   try { body = await request.json(); } catch { body = {}; }
   const parsed = inputSchema.safeParse(body);

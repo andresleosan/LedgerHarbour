@@ -20,6 +20,8 @@ test("platform approval and suspension gates business administrator access", asy
 
   const platformAdmin = await browser.newPage();
   await signIn(platformAdmin, "platform-admin@example.com");
+  const claim = await platformAdmin.evaluate(async () => (await fetch("/api/platform/businesses")).status);
+  expect(claim).toBe(200);
   const expiry = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
   const approval = await platformAdmin.evaluate(async ({ id, expiry }) => {
     const response = await fetch(`/api/platform/businesses/${id}/approve`, {

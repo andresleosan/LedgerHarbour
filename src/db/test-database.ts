@@ -41,6 +41,11 @@ export async function createTestDatabase(): Promise<{
       "utf8",
     );
     await applyMigration(client, lifecycleMigration);
+    const membershipMigration = await readFile(
+      new URL("./migrations/0004_membership_lifecycle.sql", import.meta.url),
+      "utf8",
+    );
+    await applyMigration(client, membershipMigration);
   } catch (error) {
     await client.close();
     throw error;

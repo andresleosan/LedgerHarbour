@@ -17,24 +17,44 @@ describe("authenticated endpoint rate limit", () => {
     aggregateLimit.mockResolvedValue({ success: true, remaining: 1, resetAt: 1234 });
   });
 
-  it("keys upload limits by authenticated identity, scope, and edge address", async () => {
+  it("keeps identity and address buckets independent", async () => {
     await expect(enforceAuthenticatedRateLimit("upload", "firebase-user-1", new Headers({
       "x-vercel-forwarded-for": "203.0.113.10",
       "x-forwarded-for": "198.51.100.10",
     }))).resolves.toBeUndefined();
 
     expect(createAuthenticatedRateLimiter).toHaveBeenCalledWith("upload");
-    expect(limit).toHaveBeenCalledWith("authenticated:upload:firebase-user-1:203.0.113.10");
+    expect(limit).toHaveBeenCalledWith("authenticated:upload:identity:firebase-user-1");
     expect(createAggregatedRateLimiter).toHaveBeenCalledWith("upload");
     expect(aggregateLimit).toHaveBeenCalledWith("authenticated:upload:address:203.0.113.10");
     expect(aggregateLimit.mock.calls[0]?.[0]).not.toContain("firebase-user-1");
+  });
+
+  it("does not change an identity bucket when the address changes", async () => {
+    await enforceAuthenticatedRateLimit("upload", "firebase-user-1", new Headers({ "x-forwarded-for": "198.51.100.1" }));
+    await enforceAuthenticatedRateLimit("upload", "firebase-user-1", new Headers({ "x-forwarded-for": "198.51.100.2" }));
+
+    expect(limit.mock.calls.map(([key]) => key)).toEqual([
+      "authenticated:upload:identity:firebase-user-1",
+      "authenticated:upload:identity:firebase-user-1",
+    ]);
+  });
+
+  it("keeps identities in the same aggregate address bucket", async () => {
+    await enforceAuthenticatedRateLimit("upload", "firebase-user-1", new Headers({ "x-forwarded-for": "198.51.100.3" }));
+    await enforceAuthenticatedRateLimit("upload", "firebase-user-2", new Headers({ "x-forwarded-for": "198.51.100.3" }));
+
+    expect(aggregateLimit.mock.calls.map(([key]) => key)).toEqual([
+      "authenticated:upload:address:198.51.100.3",
+      "authenticated:upload:address:198.51.100.3",
+    ]);
   });
 
   it("keeps OCR process limits in a separate scope", async () => {
     await enforceAuthenticatedRateLimit("ocr-process", "firebase-user-1", new Headers({ "x-forwarded-for": "198.51.100.20, 198.51.100.21" }));
 
     expect(createAuthenticatedRateLimiter).toHaveBeenCalledWith("ocr-process");
-    expect(limit).toHaveBeenCalledWith("authenticated:ocr-process:firebase-user-1:198.51.100.20");
+    expect(limit).toHaveBeenCalledWith("authenticated:ocr-process:identity:firebase-user-1");
     expect(createAggregatedRateLimiter).toHaveBeenCalledWith("ocr-process");
     expect(aggregateLimit).toHaveBeenCalledWith("authenticated:ocr-process:address:198.51.100.20");
   });
@@ -42,7 +62,7 @@ describe("authenticated endpoint rate limit", () => {
   it("uses x-real-ip as the final address fallback", async () => {
     await enforceAuthenticatedRateLimit("upload", "firebase-user-1", new Headers({ "x-real-ip": "192.0.2.10" }));
 
-    expect(limit).toHaveBeenCalledWith("authenticated:upload:firebase-user-1:192.0.2.10");
+    expect(limit).toHaveBeenCalledWith("authenticated:upload:identity:firebase-user-1");
   });
 
   it("separates abuse 429 from unavailable limiter 503 errors", async () => {
@@ -72,7 +92,7 @@ describe("authenticated endpoint rate limit", () => {
         "x-real-ip": "192.0.2.30",
       }));
 
-      expect(limit).toHaveBeenCalledWith("authenticated:upload:firebase-user-3:edge-unknown");
+      expect(limit).toHaveBeenCalledWith("authenticated:upload:identity:firebase-user-3");
       expect(aggregateLimit).toHaveBeenCalledWith("authenticated:upload:address:edge-unknown");
     } finally {
       vi.unstubAllEnvs();

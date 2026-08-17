@@ -32,7 +32,7 @@ export async function enforceAuthenticatedRateLimit(scope: AuthenticatedRateLimi
   try {
     const address = requestAddress(requestHeaders);
     const [identityResult, aggregateResult] = await Promise.all([
-      createAuthenticatedRateLimiter(scope).limit(`authenticated:${scope}:${identityKey}:${address}`),
+      createAuthenticatedRateLimiter(scope).limit(`authenticated:${scope}:identity:${identityKey}`),
       createAggregatedRateLimiter(scope).limit(`authenticated:${scope}:address:${address}`),
     ]);
     if (!identityResult.success || !aggregateResult.success) throw new AuthenticatedRateLimitError();

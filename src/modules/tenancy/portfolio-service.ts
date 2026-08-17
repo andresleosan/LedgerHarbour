@@ -66,7 +66,9 @@ export async function listUserBusinesses(
   const { tenancy } = repositoryFor(dependencies);
   const userId = await resolveOnboardingActor(tenancy, actor);
   const entries = await tenancy.listBusinessesForUser(userId);
-  return entries.map(({ business, membership }) => businessSummary(business, membership.role));
+  return entries
+    .filter(({ business }) => business.status === "active" && business.isActive)
+    .map(({ business, membership }) => businessSummary(business, membership.role));
 }
 
 export async function getBusinessDashboard(
