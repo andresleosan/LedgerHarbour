@@ -102,6 +102,7 @@ describe("portfolio tenant boundary", () => {
       businessId: active.id,
       role: "administrator",
       isActive: true,
+      status: "active",
     });
     repository.memberships.push({
       membershipId: "membership-hidden-business",
@@ -109,6 +110,7 @@ describe("portfolio tenant boundary", () => {
       businessId: business("hidden-business"),
       role: "general_admin",
       isActive: false,
+      status: "suspended",
     });
 
     await expect(listUserBusinesses(actorId, { tenancyRepository: repository })).resolves.toEqual([

@@ -27,6 +27,7 @@ async function fixture() {
     businessId: created.id,
     role: "administrator",
     isActive: false,
+    status: "pending",
   });
   return { tenancy, platform, service: createPlatformService({ tenancyRepository: tenancy, platformRepository: platform }), created, administrator };
 }
@@ -41,6 +42,7 @@ describe("platform administrator approval", () => {
       businessId: created.id,
       role: "owner_admin",
       isActive: true,
+      status: "active",
     });
     if (status !== "pending") {
       tenancy.businesses.get(created.id)!.status = status;
@@ -163,6 +165,7 @@ describe("platform administrator approval", () => {
       businessId: second.id,
       role: "administrator",
       isActive: true,
+      status: "active",
     });
 
     await service.suspendAdministrator(administrator.membershipId, user("platform-admin"), {

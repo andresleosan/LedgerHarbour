@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { readFile } from "node:fs/promises";
+import { PGlite } from "@electric-sql/pglite";
 
 import { createTestDatabase } from "../../../src/db/test-database";
+import {
+  applyBusinessLifecycleMigration,
+  checkInitialMigration,
+  applyInitialMigration,
+  applyMembershipLifecycleMigration,
+  applyPlatformControlPlaneMigration,
+  checkMembershipLifecycleMigration,
+  rollbackMembershipLifecycleMigration,
+  type MigrationClientFactory,
+} from "../../../src/db/migration-runner";
 
 describe("PGlite test database migrations", () => {
   it("applies platform control plane before business lifecycle", async () => {
@@ -23,30 +33,66 @@ describe("PGlite test database migrations", () => {
     }
   }, 30_000);
 
-  it("applies membership lifecycle 0004 and rolls it back cleanly", async () => {
-    const { db, execute, close } = await createTestDatabase();
+  it("applies, rolls back, and reapplies membership lifecycle 0004 through the runner", async () => {
+    const client = new PGlite();
+    const clientFactory: MigrationClientFactory = async () => ({
+      query: async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+        if (!values && /^(BEGIN|COMMIT|ROLLBACK)\b/i.test(text.trim())) {
+          await client.exec(text);
+          return { rows: [] as Row[], rowCount: 0 };
+        }
+        const result = await client.query<Row>(text, values ? [...values] : undefined);
+        return { rows: result.rows, rowCount: result.rows.length };
+      },
+      exec: (text: string) => client.exec(text),
+      end: async () => undefined,
+    });
     try {
-      await db.execute("CREATE TABLE ledgerharbour_schema_migrations (version text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())");
-      await db.execute("INSERT INTO ledgerharbour_schema_migrations (version) VALUES ('0004_membership_lifecycle')");
-      const ledger = await db.execute<{ version: string }>(`
+      const config = { databaseUrl: "pglite://task4", allowStagingMigration: true as const };
+      await applyInitialMigration(config, clientFactory);
+      await expect(checkInitialMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, ledgerRecordPresent: true });
+      await applyPlatformControlPlaneMigration(config, clientFactory);
+      await applyBusinessLifecycleMigration(config, clientFactory);
+      const applied = await applyMembershipLifecycleMigration(config, clientFactory);
+      expect(applied).toEqual({ version: "0004_membership_lifecycle", applied: true });
+
+      const ledger = await client.query<{ version: string }>(`
         SELECT version FROM ledgerharbour_schema_migrations ORDER BY version
       `);
       expect(ledger.rows.map((row) => row.version)).toContain("0004_membership_lifecycle");
 
-      const rollback = await readFile(new URL("../../../src/db/migrations/rollback/0004_membership_lifecycle_down.sql", import.meta.url), "utf8");
-      await execute(rollback);
+      const constraints = await client.query<{ conname: string }>(`
+        SELECT conname FROM pg_constraint
+        WHERE conname IN ('memberships_status_check', 'memberships_status_activity_consistency_check')
+        ORDER BY conname
+      `);
+      expect(constraints.rows.map((row) => row.conname)).toEqual([
+        "memberships_status_activity_consistency_check",
+        "memberships_status_check",
+      ]);
 
-      const column = await db.execute(`
+      const rollback = await rollbackMembershipLifecycleMigration(config, clientFactory);
+      expect(rollback).toEqual({ version: "0004_membership_lifecycle", applied: true });
+      await expect(checkMembershipLifecycleMigration(config, clientFactory)).resolves.toMatchObject({
+        version: "0004_membership_lifecycle",
+        applied: false,
+        ledgerRecordPresent: false,
+      });
+      const column = await client.query(`
         SELECT column_name FROM information_schema.columns
         WHERE table_schema = 'public' AND table_name = 'memberships' AND column_name = 'status'
       `);
-      const rolledBack = await db.execute<{ version: string }>(`
-        SELECT version FROM ledgerharbour_schema_migrations WHERE version = '0004_membership_lifecycle'
-      `);
       expect(column.rows).toEqual([]);
-      expect(rolledBack.rows).toEqual([]);
+
+      const reapplied = await applyMembershipLifecycleMigration(config, clientFactory);
+      expect(reapplied).toEqual({ version: "0004_membership_lifecycle", applied: true });
+      await expect(checkMembershipLifecycleMigration(config, clientFactory)).resolves.toMatchObject({
+        version: "0004_membership_lifecycle",
+        applied: true,
+        ledgerRecordPresent: true,
+      });
     } finally {
-      await close();
+      await client.close();
     }
   }, 30_000);
 });

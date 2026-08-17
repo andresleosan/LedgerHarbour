@@ -152,6 +152,7 @@ export function createJoinRequestService(repository: OnboardingRepository): Join
             businessId: current.businessId,
             role: "administrator",
             isActive: true,
+            status: "active",
           });
           await transaction.appendAuditEvent({
             businessId: current.businessId,

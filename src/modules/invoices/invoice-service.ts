@@ -217,7 +217,7 @@ async function requireInvoiceAccess(invoice: Invoice, actorId: UserId, input: In
   const resolved = dependencies(input);
   try {
     const membership = await createTenantContext(resolved.tenancyRepository).getMembership(actorId, invoice.businessId);
-    if (!membership?.isActive) throw new AuthorizationError("BUSINESS_ACCESS_DENIED", "Business access denied");
+    if (membership?.status !== "active" || !membership.isActive) throw new AuthorizationError("BUSINESS_ACCESS_DENIED", "Business access denied");
     await requireBusinessOperational(resolved.tenancyRepository, invoice.businessId);
   } catch (error) {
     throw mapBoundaryError(error);

@@ -3,7 +3,7 @@ import type { AuthIdentity } from "../auth/auth-provider";
 import { createJoinRequestService } from "./join-request-service";
 import type { TenantRepository } from "./tenant-context";
 import { createTenantContext } from "./tenant-context";
-import type { BusinessId, BusinessStatus, Membership, MembershipStatus, UserId } from "./types";
+import type { BusinessId, BusinessStatus, Membership, UserId } from "./types";
 
 export const ONBOARDING_ERROR_CODES = {
   INVALID_BUSINESS_NAME: "INVALID_BUSINESS_NAME",
@@ -343,9 +343,8 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
     if (this.memberships.some((candidate) => candidate.userId === membership.userId && candidate.businessId === membership.businessId)) {
       throw new OnboardingError(ONBOARDING_ERROR_CODES.DUPLICATE_MEMBERSHIP);
     }
-    const status: MembershipStatus = membership.status ?? (membership.isActive ? "active" : "pending");
-    if ((status === "active") !== membership.isActive) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
-    const stored = { ...membership, status };
+    if ((membership.status === "active") !== membership.isActive) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+    const stored = { ...membership };
     this.memberships.push(stored);
     return { ...stored };
   }
@@ -359,9 +358,8 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
     if (expected && (current.isActive !== expected.isActive || current.role !== expected.role || current.status !== expected.status)) {
       throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
     }
-    const status: MembershipStatus = membership.status ?? current.status ?? (membership.isActive ? "active" : "pending");
-    if ((status === "active") !== membership.isActive) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
-    this.memberships[index] = { ...membership, status };
+    if ((membership.status === "active") !== membership.isActive) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+    this.memberships[index] = { ...membership };
     return { ...this.memberships[index] };
   }
 
@@ -381,7 +379,7 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
 
   async listBusinessesForUser(userId: UserId): Promise<Array<{ business: Business; membership: Membership }>> {
     return this.memberships
-      .filter((membership) => membership.userId === userId && membership.isActive)
+      .filter((membership) => membership.userId === userId && membership.status === "active" && membership.isActive)
       .flatMap((membership) => {
         const business = this.businesses.get(membership.businessId);
         return business ? [{ business: { ...business, isActive: business.status === "active" && business.isActive }, membership: { ...membership } }] : [];
@@ -413,7 +411,7 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
       throw new OnboardingError(ONBOARDING_ERROR_CODES.INVALID_BUSINESS_TRANSITION);
     }
     validateBusinessStatusTransition(business.status, input.status);
-    if (input.status === "active" && !this.memberships.some((membership) => membership.businessId === businessId && membership.role === "owner_admin" && membership.isActive)) {
+    if (input.status === "active" && !this.memberships.some((membership) => membership.businessId === businessId && membership.role === "owner_admin" && membership.status === "active" && membership.isActive)) {
       throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
     }
     const updated = { ...business, ...input, isActive: input.status === "active" };

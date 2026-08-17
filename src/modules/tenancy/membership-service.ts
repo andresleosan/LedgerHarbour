@@ -85,7 +85,7 @@ function expectedMembershipState(membership: Membership): Pick<Membership, "isAc
   return {
     isActive: membership.isActive,
     role: membership.role,
-    ...(membership.status === undefined ? {} : { status: membership.status }),
+    status: membership.status,
   };
 }
 
@@ -118,7 +118,7 @@ async function requireOwner(repository: OnboardingRepository, businessId: Busine
   } catch {
     throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.INSUFFICIENT_CAPABILITY);
   }
-  if (membership?.role !== "owner_admin" || !membership.isActive) {
+  if (membership?.role !== "owner_admin" || membership.status !== "active" || !membership.isActive) {
     throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.INSUFFICIENT_CAPABILITY);
   }
   return membership;
@@ -176,7 +176,7 @@ export interface MembershipService {
 }
 
 function capabilitiesFor(actor: Membership, target: Membership): readonly MembershipAction[] {
-  if (!actor.isActive || !target.isActive || target.role === "owner_admin") return [];
+  if (actor.status !== "active" || target.status !== "active" || !actor.isActive || !target.isActive || target.role === "owner_admin") return [];
   if (actor.role === "general_admin") {
     return target.role === "administrator" ? ["remove_administrator"] : [];
   }
@@ -193,7 +193,7 @@ export function createMembershipService(repository: OnboardingRepository = defau
       await requireActiveBusiness(repository, input.businessId);
       await requireOwner(repository, input.businessId, actorId);
       const target = await findTarget(repository, input.businessId, input.membershipId);
-      if (target.role !== "administrator" || !target.isActive) {
+        if (target.role !== "administrator" || target.status !== "active" || !target.isActive) {
         throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.INVALID_TARGET);
       }
 
@@ -201,7 +201,7 @@ export function createMembershipService(repository: OnboardingRepository = defau
         await requireOwner(transaction, input.businessId, actorId);
         await ensureOwnerInvariant(transaction, input.businessId);
         const current = await findTarget(transaction, input.businessId, input.membershipId);
-        if (current.role !== "administrator" || !current.isActive) {
+        if (current.role !== "administrator" || current.status !== "active" || !current.isActive) {
           throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.REPOSITORY_CONFLICT);
         }
         const expected = expectedMembershipState(current);
@@ -261,7 +261,7 @@ export function createMembershipService(repository: OnboardingRepository = defau
       }
       validateConfirmation(input, business.name);
       const target = await findTarget(repository, input.businessId, input.targetMembershipId);
-      if (!target.isActive || (target.role !== "administrator" && target.role !== "general_admin")) {
+      if (target.status !== "active" || !target.isActive || (target.role !== "administrator" && target.role !== "general_admin")) {
         throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.INVALID_TARGET);
       }
 
@@ -272,7 +272,7 @@ export function createMembershipService(repository: OnboardingRepository = defau
           (membership) => membership.userId === actorId,
         );
         const currentTarget = await findTarget(transaction, input.businessId, input.targetMembershipId);
-        if (!owner || owner.role !== "owner_admin" || !owner.isActive || !currentTarget.isActive || currentTarget.role === "owner_admin") {
+        if (!owner || owner.role !== "owner_admin" || owner.status !== "active" || !owner.isActive || currentTarget.status !== "active" || !currentTarget.isActive || currentTarget.role === "owner_admin") {
           throw new MembershipAdministrationError(MEMBERSHIP_ERROR_CODES.REPOSITORY_CONFLICT);
         }
         const ownerExpected = expectedMembershipState(owner);

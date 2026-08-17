@@ -49,7 +49,7 @@ describe("membership administration routes and business lifecycle", () => {
   it("covers the member route status matrix and stable public errors", async () => {
     const created = await createApprovedBusiness(defaultOnboardingRepository, "Route Members", identity("owner"));
     const adminId = await defaultOnboardingRepository.upsertUser(identity("admin"));
-    const adminMembership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-admin", userId: adminId, businessId: created.id, role: "administrator", isActive: true });
+    const adminMembership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-admin", userId: adminId, businessId: created.id, role: "administrator", isActive: true, status: "active" });
     const ownerId = await defaultOnboardingRepository.upsertUser(identity("owner"));
     const ownerMembership = (await defaultOnboardingRepository.findMembership(ownerId, created.id))!;
 
@@ -62,7 +62,7 @@ describe("membership administration routes and business lifecycle", () => {
 
     await setCurrentIdentity(identity("owner"));
     const admin2Id = await defaultOnboardingRepository.upsertUser(identity("admin-2"));
-    const admin2Membership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-admin-2", userId: admin2Id, businessId: created.id, role: "administrator", isActive: true });
+    const admin2Membership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-admin-2", userId: admin2Id, businessId: created.id, role: "administrator", isActive: true, status: "active" });
     await expectError(await patchMemberRoute(requestFor({ action: "remove_general_admin" }), contextFor(created.id, admin2Membership.membershipId)), 400, "INVALID_TARGET");
     const success = await patchMemberRoute(requestFor({ action: "remove_administrator" }), contextFor(created.id, adminMembership.membershipId));
     expect(success.status).toBe(200);
@@ -83,7 +83,7 @@ describe("membership administration routes and business lifecycle", () => {
   it("covers ownership confirmation, transfer, and lifecycle status contracts", async () => {
     const created = await createApprovedBusiness(defaultOnboardingRepository, "Route Lifecycle", identity("owner"));
     const targetId = await defaultOnboardingRepository.upsertUser(identity("target"));
-    const targetMembership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-target", userId: targetId, businessId: created.id, role: "administrator", isActive: true });
+    const targetMembership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-target", userId: targetId, businessId: created.id, role: "administrator", isActive: true, status: "active" });
 
     await expectError(await transferOwnershipRoute(requestFor({ targetMembershipId: targetMembership.membershipId }, "POST"), lifecycleContext(created.id)), 401, "IDENTITY_REQUIRED");
     await setCurrentIdentity(identity("owner"));
@@ -105,7 +105,7 @@ describe("membership administration routes and business lifecycle", () => {
   it("covers ownership transfer route 403, 404, 409, invalid target, and stable bodies", async () => {
     const created = await createApprovedBusiness(defaultOnboardingRepository, "Ownership Matrix", identity("owner"));
     const targetId = await defaultOnboardingRepository.upsertUser(identity("target"));
-    const targetMembership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-target-2", userId: targetId, businessId: created.id, role: "administrator", isActive: true });
+    const targetMembership = await defaultOnboardingRepository.createMembership({ membershipId: "membership-target-2", userId: targetId, businessId: created.id, role: "administrator", isActive: true, status: "active" });
     const validConfirmation = {
       targetMembershipId: targetMembership.membershipId,
       confirmationName: "Ownership Matrix",
@@ -151,7 +151,7 @@ describe("membership administration routes and business lifecycle", () => {
   it("denies an ordinary Administrator at service and route lifecycle boundaries", async () => {
     const created = await createApprovedBusiness(defaultOnboardingRepository, "Administrator Boundary", identity("owner"));
     const administratorId = await defaultOnboardingRepository.upsertUser(identity("administrator"));
-    await defaultOnboardingRepository.createMembership({ membershipId: "membership-administrator", userId: administratorId, businessId: created.id, role: "administrator", isActive: true });
+    await defaultOnboardingRepository.createMembership({ membershipId: "membership-administrator", userId: administratorId, businessId: created.id, role: "administrator", isActive: true, status: "active" });
     const lifecycle = createBusinessLifecycleService(defaultOnboardingRepository);
     const membership = createMembershipService(defaultOnboardingRepository);
 
@@ -178,7 +178,7 @@ describe("membership administration routes and business lifecycle", () => {
   it("blocks legacy lifecycle writes and preserves the active business", async () => {
     const repository = createInMemoryOnboardingRepository();
     const created = await createApprovedBusiness(repository, "Soft Lifecycle", user("owner"));
-     repository.memberships.push({ membershipId: "membership-member", userId: user("member"), businessId: created.id, role: "administrator", isActive: true });
+     repository.memberships.push({ membershipId: "membership-member", userId: user("member"), businessId: created.id, role: "administrator", isActive: true, status: "active" });
     const lifecycle = createBusinessLifecycleService(repository);
 
     await expect(lifecycle.deactivateBusiness(created.id, user("owner"), "Wrong Name")).rejects.toMatchObject({ code: LIFECYCLE_ERROR_CODES.PLATFORM_ADMIN_REQUIRED });
@@ -222,6 +222,7 @@ describe("membership administration routes and business lifecycle", () => {
         businessId: created.id,
         role: "administrator",
         isActive: true,
+        status: "active",
       });
       const ownerId = baseRepository.memberships.find((membership) => membership.role === "owner_admin")!.userId;
       return { repository: enforceCas(baseRepository), created, target, ownerId };

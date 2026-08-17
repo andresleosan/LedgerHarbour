@@ -111,6 +111,7 @@ async function fixture() {
     businessId: createdBusiness.id,
     role: "administrator",
     isActive: true,
+    status: "active",
   });
   await state.db.insert(currencies).values({
     id: "currency-gbp",

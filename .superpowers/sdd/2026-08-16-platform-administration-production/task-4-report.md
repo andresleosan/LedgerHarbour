@@ -30,6 +30,36 @@ Implementado directamente sobre `main`. No se crearon ramas ni worktrees.
 - `corepack pnpm audit`: no known vulnerabilities.
 - `git diff --check`: passed.
 
+## Fix Round 3
+
+### Correcciones
+
+- `Membership.status` ahora es obligatorio en el tipo de dominio; se eliminaron los fallbacks que convertían status omitido en `active`.
+- `tenant-context`, `authorize`, membership administration, portfolio, invoice, document y job/worker gates requieren explícitamente `status === "active" && isActive === true`.
+- Se actualizaron fixtures y creaciones de memberships para declarar siempre el estado lifecycle correspondiente; no se relajó el gate por compatibilidad legacy.
+- El migration runner acepta un `MigrationClientFactory` inyectable manteniendo `pg.Client` como default productivo.
+- PGlite ejecuta realmente el flujo del runner para 0001/0002/0003/0004: verifica ledger y constraints, ejecuta rollback 0004, verifica eliminación y reaplica 0004 para verificar nuevamente ledger y columna.
+- Se agregó `rollbackMembershipLifecycleMigration` al runner para probar la reversión real sin insertar manualmente el ledger.
+- E2E compara el email con `item.email?.toLowerCase()` contra `task4-member@example.com`.
+
+### RED/GREEN y verificación
+
+- RED migration: el runner ignoraba el factory inyectado y trataba `pglite://task4` como conexión nativa (`ENOTFOUND task4`).
+- RED authorization: un membership con status omitido atravesaba `getMembership` en `tenant-context`.
+- GREEN focal Fix Round 3: 151 passed.
+- Suite completa: 440 passed, 2 skipped.
+- `corepack pnpm exec playwright test tests/e2e/platform/administrator-approval.spec.ts`: 1 passed.
+- `corepack pnpm exec tsc --noEmit`: passed.
+- `corepack pnpm lint`: passed.
+- `corepack pnpm build`: passed.
+- `corepack pnpm audit`: no known vulnerabilities.
+- `git diff --check`: passed.
+
+### Cobertura nativa
+
+- La prueba nativa PostgreSQL existente permanece honestamente `skip` cuando `TEST_DATABASE_URL` no está configurado.
+- La cobertura efectiva de apply/rollback/reapply de 0004 se ejecutó con PGlite mediante el runner inyectable; no se insertó manualmente ningún registro de ledger.
+
 ## Seguridad
 
 - Autenticación requerida en las tres rutas.

@@ -179,6 +179,10 @@ describe("tenant isolation boundary", () => {
       description: "an inconsistent lifecycle status",
       candidate: { ...membership(userA, businessA, "owner_admin"), status: "suspended" as const, isActive: true },
     },
+    {
+      description: "a missing lifecycle status",
+      candidate: { ...membership(userA, businessA, "owner_admin"), status: undefined } as unknown as Membership,
+    },
   ])("fails closed for $description returned by a defective repository", async ({ candidate }) => {
     const context = createTenantContext(repositoryFor(candidate));
 

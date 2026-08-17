@@ -68,6 +68,7 @@ async function setupAdministrator(isActive = false, suffix = "") {
     businessId: business.id,
     role: "administrator",
     isActive,
+    status: isActive ? "active" : "pending",
   });
   return membership;
 }

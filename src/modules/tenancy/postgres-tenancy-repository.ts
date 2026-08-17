@@ -253,7 +253,7 @@ function createRepository(db: Database, transactionCount: { value: number }): On
           businessId: membership.businessId,
         role: membership.role,
         isActive: membership.isActive,
-        status: membership.status ?? (membership.isActive ? "active" : "pending"),
+        status: membership.status,
         }).returning();
         if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
         return mapMembership(row);
@@ -267,7 +267,7 @@ function createRepository(db: Database, transactionCount: { value: number }): On
         const [row] = await db.update(memberships).set({
           role: membership.role,
           isActive: membership.isActive,
-          status: membership.status ?? (membership.isActive ? "active" : "suspended"),
+          status: membership.status,
           updatedAt: new Date(),
         }).where(and(
           eq(memberships.id, membership.membershipId),
@@ -305,7 +305,7 @@ function createRepository(db: Database, transactionCount: { value: number }): On
       try {
         const rows = await db.select({ business: businesses, membership: memberships }).from(memberships)
           .innerJoin(businesses, eq(memberships.businessId, businesses.id))
-          .where(and(eq(memberships.userId, userId), eq(memberships.isActive, true)));
+          .where(and(eq(memberships.userId, userId), eq(memberships.status, "active"), eq(memberships.isActive, true)));
         const result: Array<{ business: Business; membership: Membership }> = [];
         for (const row of rows) {
           const creator = row.business.createdBy ?? (await db.select({ actorId: auditEvents.actorId }).from(auditEvents).where(and(
@@ -388,6 +388,7 @@ function createRepository(db: Database, transactionCount: { value: number }): On
           const [owner] = await db.select({ id: memberships.id }).from(memberships).where(and(
             eq(memberships.businessId, businessId),
             eq(memberships.role, "owner_admin"),
+            eq(memberships.status, "active"),
             eq(memberships.isActive, true),
           )).limit(1);
           if (!owner) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);

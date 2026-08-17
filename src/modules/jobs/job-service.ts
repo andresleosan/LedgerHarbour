@@ -175,7 +175,7 @@ async function validateDocumentAccess(documentId: DocumentId, actorId: UserId, i
   const document = await deps.documentRepository.findById(documentId);
   if (!document) throw new JobError(JOB_ERROR_CODES.DOCUMENT_NOT_FOUND);
   const membership = await createTenantContext(deps.tenancyRepository).getMembership(actorId, document.businessId);
-  if (!membership?.isActive) throw new JobError(JOB_ERROR_CODES.BUSINESS_ACCESS_DENIED);
+  if (membership?.status !== "active" || !membership.isActive) throw new JobError(JOB_ERROR_CODES.BUSINESS_ACCESS_DENIED);
   try {
     await requireBusinessOperational(deps.tenancyRepository, document.businessId);
   } catch (error) {

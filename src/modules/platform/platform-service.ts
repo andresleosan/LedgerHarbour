@@ -189,7 +189,7 @@ function toPlatformAdministratorDto(entry: AdministratorEntry): PlatformAdminist
     email: entry.email ?? null,
     role: entry.membership.role === "general_admin" ? "general_admin" : "administrator",
     isActive: entry.membership.isActive,
-    status: entry.membership.status ?? (entry.membership.isActive ? "active" : "pending"),
+    status: entry.membership.status,
     businessStatus: entry.business.status,
   };
 }
@@ -273,6 +273,7 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
           businessId,
           role: "owner_admin",
           isActive: true,
+          status: "active",
         });
          let approved: Business;
          try {

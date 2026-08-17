@@ -19,8 +19,8 @@ const user = (value: string) => value as UserId;
 async function fixture() {
   const repository = createInMemoryOnboardingRepository();
   const created = await createApprovedBusiness(repository, "Harbour Books Ltd", user("owner"));
-  const general = await repository.createMembership({ membershipId: "membership-general", userId: user("general"), businessId: created.id, role: "general_admin", isActive: true });
-  const administrator = await repository.createMembership({ membershipId: "membership-administrator", userId: user("administrator"), businessId: created.id, role: "administrator", isActive: true });
+  const general = await repository.createMembership({ membershipId: "membership-general", userId: user("general"), businessId: created.id, role: "general_admin", isActive: true, status: "active" });
+  const administrator = await repository.createMembership({ membershipId: "membership-administrator", userId: user("administrator"), businessId: created.id, role: "administrator", isActive: true, status: "active" });
   return { repository, service: createMembershipService(repository), created, general, administrator };
 }
 
@@ -57,6 +57,7 @@ describe("membership administration", () => {
       businessId: created.id,
       role: "administrator",
       isActive: true,
+      status: "active",
     });
 
     expect(target.membershipId).not.toBe(target.userId);
@@ -78,7 +79,7 @@ describe("membership administration", () => {
     await expect(service.removeAdministrator(regular, user("general"))).resolves.toBeUndefined();
     expect(repository.memberships.some((membership) => membership.userId === user("administrator"))).toBe(false);
 
-    const secondAdministrator = await repository.createMembership({ membershipId: "membership-administrator-2", userId: user("administrator-2"), businessId: created.id, role: "administrator", isActive: true });
+    const secondAdministrator = await repository.createMembership({ membershipId: "membership-administrator-2", userId: user("administrator-2"), businessId: created.id, role: "administrator", isActive: true, status: "active" });
     const owner = (await repository.findMembership(user("owner"), created.id))!;
     const general = (await repository.findMembership(user("general"), created.id))!;
     await expect(service.removeAdministrator({ businessId: created.id, membershipId: owner.membershipId }, user("general")))
@@ -160,7 +161,7 @@ describe("membership administration", () => {
       reauthenticatedAt: new Date().toISOString(),
     }, user("owner"))).rejects.toMatchObject({ code: MEMBERSHIP_ERROR_CODES.MEMBER_NOT_FOUND });
 
-    await repository.createMembership({ membershipId: "membership-second-owner", userId: user("second-owner-copy"), businessId: created.id, role: "owner_admin", isActive: true });
+    await repository.createMembership({ membershipId: "membership-second-owner", userId: user("second-owner-copy"), businessId: created.id, role: "owner_admin", isActive: true, status: "active" });
     await expect(service.setGeneralAdmin({ businessId: created.id, membershipId: administrator.membershipId }, user("owner")))
       .rejects.toMatchObject({ code: MEMBERSHIP_ERROR_CODES.INVARIANT_CONFLICT });
     expect(second.id).not.toBe(created.id);

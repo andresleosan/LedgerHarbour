@@ -15,5 +15,5 @@ export interface Membership {
   businessId: BusinessId;
   role: MembershipRole;
   isActive: boolean;
-  status?: MembershipStatus;
+  status: MembershipStatus;
 }

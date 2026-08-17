@@ -32,7 +32,7 @@ describe("invoice review boundaries", () => {
     documents = createDocumentRepository();
     invoices = createInvoiceRepository();
     business = await createApprovedBusiness(tenancy, "Review Books", user("owner"));
-    await tenancy.createMembership({ membershipId: "membership-reviewer", userId: user("reviewer"), businessId: business.id, role: "administrator", isActive: true });
+    await tenancy.createMembership({ membershipId: "membership-reviewer", userId: user("reviewer"), businessId: business.id, role: "administrator", isActive: true, status: "active" });
     const document: Document = {
       id: "review-document",
       businessId: business.id,
@@ -220,7 +220,7 @@ describe("invoice review boundaries", () => {
 
   it("uses the shared Task 8 document repository for the default review route", async () => {
     const defaultBusiness = await createApprovedBusiness(defaultOnboardingRepository, `Default Review ${Date.now()}`, user("default-owner"));
-    await defaultOnboardingRepository.createMembership({ membershipId: "membership-default-reviewer", userId: user("default-reviewer"), businessId: defaultBusiness.id, role: "administrator", isActive: true });
+      await defaultOnboardingRepository.createMembership({ membershipId: "membership-default-reviewer", userId: user("default-reviewer"), businessId: defaultBusiness.id, role: "administrator", isActive: true, status: "active" });
     const document = { ...((await documents.findById(invoice.documentId)) as Document), id: "default-review-document", businessId: defaultBusiness.id, uploaderId: user("default-reviewer") };
     await resolveDefaultDocumentRepository().create(document);
     const state = globalThis as typeof globalThis & { [key: symbol]: unknown };

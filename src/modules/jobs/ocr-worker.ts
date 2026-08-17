@@ -70,7 +70,7 @@ export function createOcrWorker(input: OcrWorkerDependencies = {}): OcrWorker {
       try {
         if (job.businessId !== document.businessId) throw new Error("job business mismatch");
         const requesterMembership = await createTenantContext(deps.tenancyRepository).getMembership(job.requestedBy, document.businessId);
-        if (!requesterMembership?.isActive) throw new Error("requester membership inactive");
+        if (requesterMembership?.status !== "active" || !requesterMembership.isActive) throw new Error("requester membership inactive");
         await requireBusinessOperational(deps.tenancyRepository, document.businessId);
         processing = await jobs.claim(job.id);
         if (!processing) return;

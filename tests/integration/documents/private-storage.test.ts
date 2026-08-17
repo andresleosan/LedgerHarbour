@@ -52,7 +52,7 @@ describe("private document storage and service boundaries", () => {
   async function setup() {
     const tenancy = createInMemoryOnboardingRepository();
     const created = await createApprovedBusiness(tenancy, "Private Books", user("owner"));
-    await tenancy.createMembership({ membershipId: "membership-member", userId: user("member"), businessId: created.id, role: "administrator", isActive: true });
+    await tenancy.createMembership({ membershipId: "membership-member", userId: user("member"), businessId: created.id, role: "administrator", isActive: true, status: "active" });
     const other = await createApprovedBusiness(tenancy, "Other Books", user("other-owner"));
     return { tenancy, created, other };
   }
@@ -298,7 +298,7 @@ describe("private document storage and service boundaries", () => {
     defaultOnboardingRepository.memberships.splice(0);
     await defaultOnboardingRepository.createMembership({
       membershipId: "membership-route-member",
-      userId: user("other-user"), businessId: "other-business" as typeof created.id, role: "administrator", isActive: true,
+      userId: user("other-user"), businessId: "other-business" as typeof created.id, role: "administrator", isActive: true, status: "active",
     });
     await setCurrentIdentity(identity("other-user"));
     const forbidden = await downloadRoute(new Request("http://localhost"), documentContextFor(createdDto.id));
@@ -307,7 +307,7 @@ describe("private document storage and service boundaries", () => {
 
     await setCurrentIdentity(identity("route-owner"));
     const routeOwnerId = await defaultOnboardingRepository.upsertUser(identity("route-owner"));
-    await defaultOnboardingRepository.createMembership({ membershipId: "membership-route-owner", userId: routeOwnerId, businessId: created.id, role: "owner_admin", isActive: true });
+    await defaultOnboardingRepository.createMembership({ membershipId: "membership-route-owner", userId: routeOwnerId, businessId: created.id, role: "owner_admin", isActive: true, status: "active" });
     defaultOnboardingRepository.businesses.get(created.id)!.isActive = false;
     const inactive = await downloadRoute(new Request("http://localhost"), documentContextFor(createdDto.id));
     expect(inactive.status).toBe(403);

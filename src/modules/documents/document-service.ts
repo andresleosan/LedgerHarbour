@@ -187,7 +187,7 @@ async function requireActiveMembership(
   businessId: BusinessId,
 ): Promise<void> {
   const membership = await createTenantContext(tenancyRepository).getMembership(actorId, businessId);
-  if (!membership?.isActive) {
+  if (membership?.status !== "active" || !membership.isActive) {
     throw new AuthorizationError(AUTHORIZATION_ERROR_CODES.BUSINESS_ACCESS_DENIED, "Business access denied");
   }
 }

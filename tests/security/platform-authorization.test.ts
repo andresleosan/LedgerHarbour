@@ -65,6 +65,7 @@ describe("platform administration authorization", () => {
       businessId: business.id,
       role: "administrator",
       isActive: true,
+      status: "active",
     });
     platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
     const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });

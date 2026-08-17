@@ -83,7 +83,7 @@ describe("OCR workflow boundaries", () => {
     invoices = createInvoiceRepository();
     storage = new MemoryStorage();
     ownerBusiness = await createApprovedBusiness(tenancy, "OCR Books", user("owner"));
-    await tenancy.createMembership({ membershipId: "membership-member", userId: user("member"), businessId: ownerBusiness.id, role: "administrator", isActive: true });
+    await tenancy.createMembership({ membershipId: "membership-member", userId: user("member"), businessId: ownerBusiness.id, role: "administrator", isActive: true, status: "active" });
     const document = await createDocument(
       { businessId: ownerBusiness.id, upload: pdf },
       user("member"),
@@ -785,7 +785,7 @@ async function setupDefaultRouteState(documentId = "route-document"): Promise<{ 
 
   const business = await createApprovedBusiness(defaultOnboardingRepository, "Route OCR Books", identityFor("route-owner"));
   const routeMemberId = await defaultOnboardingRepository.upsertUser(identityFor("route-member"));
-  await defaultOnboardingRepository.createMembership({ membershipId: "membership-route-member", userId: routeMemberId, businessId: business.id, role: "administrator", isActive: true });
+  await defaultOnboardingRepository.createMembership({ membershipId: "membership-route-member", userId: routeMemberId, businessId: business.id, role: "administrator", isActive: true, status: "active" });
   const privateObjectKey = `business/${documentId}/private`;
   const document: Document = {
     id: documentId,

@@ -91,6 +91,7 @@ describe("administrator approval integration", () => {
       businessId: created.id,
       role: "administrator",
       isActive: true,
+      status: "active",
     });
     const originalStatus = tenancy.findBusinessStatus.bind(tenancy);
     let calls = 0;

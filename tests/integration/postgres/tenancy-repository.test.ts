@@ -211,8 +211,9 @@ describe("PostgreSQL onboarding repository contract", () => {
          membershipId: "persisted-membership-id",
          userId: replacementId,
          businessId: created.id,
-         role: "administrator",
-         isActive: true,
+          role: "administrator",
+          isActive: true,
+          status: "active",
        });
        expect(replacementMembership.membershipId).toBe("persisted-membership-id");
       await createMembershipService(repository).transferOwnership({
@@ -310,6 +311,7 @@ describe("PostgreSQL onboarding repository contract", () => {
           businessId: created.id,
           role: "owner_admin",
           isActive: true,
+          status: "active",
         });
       })).rejects.toBeInstanceOf(OnboardingError);
 

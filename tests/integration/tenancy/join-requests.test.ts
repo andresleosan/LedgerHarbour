@@ -73,6 +73,7 @@ describe("in-memory onboarding repository boundary", () => {
       businessId: created.id,
       role: "administrator",
       isActive: true,
+      status: "active",
     }));
   });
 
@@ -156,6 +157,7 @@ describe("in-memory onboarding repository boundary", () => {
       businessId: first.id,
       role: "administrator",
       isActive: true,
+      status: "active",
     });
 
     await expect(services.listJoinRequests(first.id, user("admin"))).rejects.toMatchObject({
@@ -422,6 +424,7 @@ describe("in-memory onboarding repository boundary", () => {
       businessId: created.id as BusinessId,
       role: "administrator",
       isActive: true,
+      status: "active",
     });
 
     await setCurrentIdentity(identity("route-other-business-owner"));
@@ -545,6 +548,7 @@ describe("in-memory onboarding repository boundary", () => {
       businessId: created.id as BusinessId,
       role: "administrator",
       isActive: true,
+      status: "active",
     });
     defaultOnboardingRepository.joinRequests.push({
       id: "matrix-conflict-request",

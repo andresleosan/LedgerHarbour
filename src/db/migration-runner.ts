@@ -25,6 +25,20 @@ const REQUIRED_TABLES = [
 const PLATFORM_REQUIRED_TABLES = ["platform_members", "platform_audit_events"] as const;
 const BUSINESS_LIFECYCLE_REQUIRED_COLUMNS = ["created_by", "status", "activated_at", "service_expires_at", "suspended_at", "suspension_reason"] as const;
 const MEMBERSHIP_LIFECYCLE_REQUIRED_COLUMNS = ["status"] as const;
+const MEMBERSHIP_LIFECYCLE_ROLLBACK_FILE = new URL("./migrations/rollback/0004_membership_lifecycle_down.sql", import.meta.url);
+
+export type MigrationQueryResult<Row = Record<string, unknown>> = {
+  rows: Row[];
+  rowCount: number | null;
+};
+
+export type MigrationClient = {
+  query<Row = Record<string, unknown>>(text: string, values?: readonly unknown[]): Promise<MigrationQueryResult<Row>>;
+  exec?: (text: string) => Promise<unknown>;
+  end(): Promise<void>;
+};
+
+export type MigrationClientFactory = (config: MigrationConfig) => Promise<MigrationClient>;
 
 export type MigrationConfigInput = {
   databaseUrl?: string;
@@ -94,17 +108,23 @@ function withoutTransactionMarkers(sql: string): string {
     .replace(/\s*COMMIT;\s*$/i, "");
 }
 
-async function connect(config: MigrationConfig): Promise<Client> {
+async function connect(config: MigrationConfig): Promise<MigrationClient> {
   const client = new Client({
     connectionString: config.databaseUrl,
     connectionTimeoutMillis: 10_000,
   });
   await client.connect();
   await client.query("SET statement_timeout = '30s'");
-  return client;
+  return {
+    query: async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+      const result = await client.query(text, values ? [...values] : undefined);
+      return { rows: result.rows as Row[], rowCount: result.rowCount };
+    },
+    end: () => client.end(),
+  };
 }
 
-async function ensureMigrationTable(client: Client): Promise<void> {
+async function ensureMigrationTable(client: MigrationClient): Promise<void> {
   await client.query(`
     CREATE TABLE IF NOT EXISTS ledgerharbour_schema_migrations (
       version text PRIMARY KEY,
@@ -113,7 +133,7 @@ async function ensureMigrationTable(client: Client): Promise<void> {
   `);
 }
 
-async function migrationWasApplied(client: Client, version: string): Promise<boolean> {
+async function migrationWasApplied(client: MigrationClient, version: string): Promise<boolean> {
   const result = await client.query<{ version: string }>(
     "SELECT version FROM ledgerharbour_schema_migrations WHERE version = $1",
     [version],
@@ -121,7 +141,7 @@ async function migrationWasApplied(client: Client, version: string): Promise<boo
   return result.rowCount === 1;
 }
 
-async function hasPartialSchema(client: Client, requiredTables: readonly string[] = REQUIRED_TABLES): Promise<boolean> {
+async function hasPartialSchema(client: MigrationClient, requiredTables: readonly string[] = REQUIRED_TABLES): Promise<boolean> {
   const result = await client.query<{ table_name: string }>(
     `SELECT table_name
      FROM information_schema.tables
@@ -131,8 +151,19 @@ async function hasPartialSchema(client: Client, requiredTables: readonly string[
   return result.rowCount !== null && result.rowCount > 0;
 }
 
-export async function applyInitialMigration(config: MigrationConfig): Promise<MigrationResult> {
-  const client = await connect(config);
+async function executeMigration(client: MigrationClient, migrationSql: string): Promise<void> {
+  if (client.exec) {
+    await client.exec(migrationSql);
+    return;
+  }
+  await client.query(migrationSql);
+}
+
+export async function applyInitialMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
 
   try {
     await ensureMigrationTable(client);
@@ -147,7 +178,7 @@ export async function applyInitialMigration(config: MigrationConfig): Promise<Mi
 
     const migrationSql = withoutTransactionMarkers(await readFile(MIGRATION_FILE, "utf8"));
     await client.query("BEGIN");
-    await client.query(migrationSql);
+    await executeMigration(client, migrationSql);
     await client.query(
       "INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)",
       [MIGRATION_VERSION],
@@ -163,8 +194,11 @@ export async function applyInitialMigration(config: MigrationConfig): Promise<Mi
   }
 }
 
-export async function checkInitialMigration(config: MigrationConfig): Promise<MigrationCheck> {
-  const client = await connect(config);
+export async function checkInitialMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationCheck> {
+  const client = await clientFactory(config);
 
   try {
     await ensureMigrationTable(client);
@@ -187,8 +221,11 @@ export async function checkInitialMigration(config: MigrationConfig): Promise<Mi
   }
 }
 
-export async function applyPlatformControlPlaneMigration(config: MigrationConfig): Promise<MigrationResult> {
-  const client = await connect(config);
+export async function applyPlatformControlPlaneMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
 
   try {
     await ensureMigrationTable(client);
@@ -205,7 +242,7 @@ export async function applyPlatformControlPlaneMigration(config: MigrationConfig
 
     const migrationSql = withoutTransactionMarkers(await readFile(PLATFORM_MIGRATION_FILE, "utf8"));
     await client.query("BEGIN");
-    await client.query(migrationSql);
+    await executeMigration(client, migrationSql);
     await client.query(
       "INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)",
       [PLATFORM_MIGRATION_VERSION],
@@ -221,8 +258,11 @@ export async function applyPlatformControlPlaneMigration(config: MigrationConfig
   }
 }
 
-export async function checkPlatformControlPlaneMigration(config: MigrationConfig): Promise<MigrationCheck> {
-  const client = await connect(config);
+export async function checkPlatformControlPlaneMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationCheck> {
+  const client = await clientFactory(config);
 
   try {
     await ensureMigrationTable(client);
@@ -245,8 +285,11 @@ export async function checkPlatformControlPlaneMigration(config: MigrationConfig
   }
 }
 
-export async function applyBusinessLifecycleMigration(config: MigrationConfig): Promise<MigrationResult> {
-  const client = await connect(config);
+export async function applyBusinessLifecycleMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
   try {
     await ensureMigrationTable(client);
     if (!(await migrationWasApplied(client, PLATFORM_MIGRATION_VERSION))) {
@@ -257,7 +300,7 @@ export async function applyBusinessLifecycleMigration(config: MigrationConfig): 
     }
     const migrationSql = withoutTransactionMarkers(await readFile(BUSINESS_LIFECYCLE_MIGRATION_FILE, "utf8"));
     await client.query("BEGIN");
-    await client.query(migrationSql);
+    await executeMigration(client, migrationSql);
     await client.query("INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)", [BUSINESS_LIFECYCLE_MIGRATION_VERSION]);
     await client.query("COMMIT");
     return { version: BUSINESS_LIFECYCLE_MIGRATION_VERSION, applied: true };
@@ -269,8 +312,11 @@ export async function applyBusinessLifecycleMigration(config: MigrationConfig): 
   }
 }
 
-export async function checkBusinessLifecycleMigration(config: MigrationConfig): Promise<MigrationCheck> {
-  const client = await connect(config);
+export async function checkBusinessLifecycleMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationCheck> {
+  const client = await clientFactory(config);
   try {
     await ensureMigrationTable(client);
     const applied = await migrationWasApplied(client, BUSINESS_LIFECYCLE_MIGRATION_VERSION);
@@ -289,8 +335,11 @@ export async function checkBusinessLifecycleMigration(config: MigrationConfig): 
   }
 }
 
-export async function applyMembershipLifecycleMigration(config: MigrationConfig): Promise<MigrationResult> {
-  const client = await connect(config);
+export async function applyMembershipLifecycleMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
   try {
     await ensureMigrationTable(client);
     if (!(await migrationWasApplied(client, BUSINESS_LIFECYCLE_MIGRATION_VERSION))) {
@@ -301,7 +350,7 @@ export async function applyMembershipLifecycleMigration(config: MigrationConfig)
     }
     const migrationSql = withoutTransactionMarkers(await readFile(MEMBERSHIP_LIFECYCLE_MIGRATION_FILE, "utf8"));
     await client.query("BEGIN");
-    await client.query(migrationSql);
+    await executeMigration(client, migrationSql);
     await client.query("INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)", [MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION]);
     await client.query("COMMIT");
     return { version: MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION, applied: true };
@@ -313,8 +362,34 @@ export async function applyMembershipLifecycleMigration(config: MigrationConfig)
   }
 }
 
-export async function checkMembershipLifecycleMigration(config: MigrationConfig): Promise<MigrationCheck> {
-  const client = await connect(config);
+export async function rollbackMembershipLifecycleMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION))) {
+      return { version: MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION, applied: false };
+    }
+    const rollbackSql = withoutTransactionMarkers(await readFile(MEMBERSHIP_LIFECYCLE_ROLLBACK_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, rollbackSql);
+    await client.query("COMMIT");
+    return { version: MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function checkMembershipLifecycleMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationCheck> {
+  const client = await clientFactory(config);
   try {
     await ensureMigrationTable(client);
     const applied = await migrationWasApplied(client, MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION);

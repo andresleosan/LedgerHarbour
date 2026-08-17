@@ -4,7 +4,7 @@ import {
   InfrastructureAuthorizationError,
 } from "../permissions/authorize";
 import { MembershipRole } from "../permissions/roles";
-import type { BusinessId, BusinessStatus, Membership, UserId } from "./types";
+import { MembershipStatus, type BusinessId, type BusinessStatus, type Membership, type UserId } from "./types";
 
 export const BUSINESS_ACCESS_DENIAL_REASONS = {
   BUSINESS_NOT_FOUND: "business_not_found",
@@ -95,7 +95,8 @@ function isMembershipForRequest(
     membership.businessId === businessId &&
     MembershipRole.includes(membership.role) &&
     typeof membership.isActive === "boolean" &&
-    (membership.status === undefined || (membership.status === "active") === membership.isActive)
+    MembershipStatus.includes(membership.status) &&
+    (membership.status === "active") === membership.isActive
   );
 }
 
