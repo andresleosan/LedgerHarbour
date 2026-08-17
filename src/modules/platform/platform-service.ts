@@ -130,7 +130,7 @@ export function toPlatformBusinessDto(business: Business): PlatformBusinessDto {
   };
 }
 
-async function requirePlatformMember(
+export async function requirePlatformMember(
   actor: OnboardingActor,
   tenancy: OnboardingRepository,
   platform: PlatformRepository,

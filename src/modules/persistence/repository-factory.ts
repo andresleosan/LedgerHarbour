@@ -12,6 +12,8 @@ import { resolveDefaultStorage } from "../invoices/invoice-service";
 import { createPostgresOnboardingRepository } from "../tenancy/postgres-tenancy-repository";
 import { defaultOnboardingRepository, type OnboardingRepository } from "../tenancy/business-service";
 import { createPostgresPlatformRepository, defaultPlatformRepository } from "../platform/platform-service";
+import { createPostgresProjectRepository, defaultProjectRepository } from "../projects/project-service";
+import type { ProjectRepository } from "../projects/project-repository";
 import type { PlatformRepository } from "../platform/platform-repository";
 import type { DocumentRepository } from "../documents/document-service";
 import type { InvoiceRepository } from "../invoices/invoice-service";
@@ -25,6 +27,7 @@ export type PersistenceContext = {
   mode: PersistenceMode;
   tenancyRepository: OnboardingRepository;
   platformRepository: PlatformRepository;
+  projectRepository: ProjectRepository;
   documentRepository: DocumentRepository;
   invoiceRepository: InvoiceRepository;
   jobRepository: JobRepository;
@@ -75,6 +78,7 @@ export function createPersistenceContext(input: PersistenceInput = {}): Persiste
       mode,
       tenancyRepository: defaultOnboardingRepository,
       platformRepository: defaultPlatformRepository,
+      projectRepository: defaultProjectRepository,
       documentRepository: resolveDefaultDocumentRepository(),
       invoiceRepository: resolveDefaultInvoiceRepository(),
       jobRepository: resolveDefaultJobRepository(),
@@ -103,6 +107,7 @@ function postgresContext(database: Database, pool: Pool | undefined, storage: St
     mode: "postgres",
     tenancyRepository: createPostgresOnboardingRepository(database),
     platformRepository: createPostgresPlatformRepository(database),
+    projectRepository: createPostgresProjectRepository(database),
     documentRepository: createPostgresDocumentRepository(database),
     invoiceRepository: createPostgresInvoiceRepository(database),
     jobRepository: createPostgresJobRepository(database),

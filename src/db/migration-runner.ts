@@ -10,6 +10,8 @@ const BUSINESS_LIFECYCLE_MIGRATION_VERSION = "0003_business_lifecycle";
 const BUSINESS_LIFECYCLE_MIGRATION_FILE = new URL("./migrations/0003_business_lifecycle.sql", import.meta.url);
 const MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION = "0004_membership_lifecycle";
 const MEMBERSHIP_LIFECYCLE_MIGRATION_FILE = new URL("./migrations/0004_membership_lifecycle.sql", import.meta.url);
+const PROJECTS_MIGRATION_VERSION = "0005_projects";
+const PROJECTS_MIGRATION_FILE = new URL("./migrations/0005_projects.sql", import.meta.url);
 const REQUIRED_TABLES = [
   "users",
   "businesses",
@@ -25,7 +27,9 @@ const REQUIRED_TABLES = [
 const PLATFORM_REQUIRED_TABLES = ["platform_members", "platform_audit_events"] as const;
 const BUSINESS_LIFECYCLE_REQUIRED_COLUMNS = ["created_by", "status", "activated_at", "service_expires_at", "suspended_at", "suspension_reason"] as const;
 const MEMBERSHIP_LIFECYCLE_REQUIRED_COLUMNS = ["status"] as const;
+const PROJECTS_REQUIRED_TABLES = ["projects", "project_memberships"] as const;
 const MEMBERSHIP_LIFECYCLE_ROLLBACK_FILE = new URL("./migrations/rollback/0004_membership_lifecycle_down.sql", import.meta.url);
+const PROJECTS_ROLLBACK_FILE = new URL("./migrations/rollback/0005_projects_down.sql", import.meta.url);
 
 export type MigrationQueryResult<Row = Record<string, unknown>> = {
   rows: Row[];
@@ -65,6 +69,7 @@ export function assertRequiredMigrations(
   platform: MigrationCheck,
   lifecycle?: MigrationCheck,
   membershipLifecycle?: MigrationCheck,
+  projects?: MigrationCheck,
 ): void {
   if (
     initial.version !== MIGRATION_VERSION
@@ -89,6 +94,9 @@ export function assertRequiredMigrations(
   }
   if (membershipLifecycle && (!membershipLifecycle.applied || membershipLifecycle.version !== MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION || membershipLifecycle.requiredTableCount !== MEMBERSHIP_LIFECYCLE_REQUIRED_COLUMNS.length)) {
     throw new Error("Required PostgreSQL membership lifecycle migration is not applied");
+  }
+  if (projects && (!projects.applied || projects.version !== PROJECTS_MIGRATION_VERSION || projects.requiredTableCount !== PROJECTS_REQUIRED_TABLES.length)) {
+    throw new Error("Required PostgreSQL projects migration is not applied");
   }
 }
 
@@ -401,6 +409,84 @@ export async function checkMembershipLifecycleMigration(
       version: MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION,
       applied,
       requiredTableCount: columns.rowCount ?? 0,
+      ledgerRecordPresent: applied,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
+export async function applyProjectsMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION))) {
+      throw new Error("Membership lifecycle migration must be applied before projects migration");
+    }
+    if (await migrationWasApplied(client, PROJECTS_MIGRATION_VERSION)) {
+      return { version: PROJECTS_MIGRATION_VERSION, applied: false };
+    }
+    if (await hasPartialSchema(client, PROJECTS_REQUIRED_TABLES)) {
+      throw new Error("Database has project schema tables without a migration record");
+    }
+    const migrationSql = withoutTransactionMarkers(await readFile(PROJECTS_MIGRATION_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, migrationSql);
+    await client.query("INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)", [PROJECTS_MIGRATION_VERSION]);
+    await client.query("COMMIT");
+    return { version: PROJECTS_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function rollbackProjectsMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, PROJECTS_MIGRATION_VERSION))) {
+      return { version: PROJECTS_MIGRATION_VERSION, applied: false };
+    }
+    const rollbackSql = withoutTransactionMarkers(await readFile(PROJECTS_ROLLBACK_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, rollbackSql);
+    await client.query("COMMIT");
+    return { version: PROJECTS_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function checkProjectsMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationCheck> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    const applied = await migrationWasApplied(client, PROJECTS_MIGRATION_VERSION);
+    const tables = await client.query<{ table_name: string }>(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = ANY($1::text[])`,
+      [PROJECTS_REQUIRED_TABLES],
+    );
+    return {
+      version: PROJECTS_MIGRATION_VERSION,
+      applied,
+      requiredTableCount: tables.rowCount ?? 0,
       ledgerRecordPresent: applied,
     };
   } finally {

@@ -7,9 +7,12 @@ import {
   checkInitialMigration,
   applyInitialMigration,
   applyMembershipLifecycleMigration,
+  applyProjectsMigration,
   applyPlatformControlPlaneMigration,
   checkMembershipLifecycleMigration,
+  checkProjectsMigration,
   rollbackMembershipLifecycleMigration,
+  rollbackProjectsMigration,
   type MigrationClientFactory,
 } from "../../../src/db/migration-runner";
 
@@ -91,6 +94,37 @@ describe("PGlite test database migrations", () => {
         applied: true,
         ledgerRecordPresent: true,
       });
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("applies, rolls back, and reapplies projects 0005 after membership lifecycle", async () => {
+    const client = new PGlite();
+    const clientFactory: MigrationClientFactory = async () => ({
+      query: async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+        if (!values && /^(BEGIN|COMMIT|ROLLBACK)\b/i.test(text.trim())) {
+          await client.exec(text);
+          return { rows: [] as Row[], rowCount: 0 };
+        }
+        const result = await client.query<Row>(text, values ? [...values] : undefined);
+        return { rows: result.rows, rowCount: result.rows.length };
+      },
+      exec: (text: string) => client.exec(text),
+      end: async () => undefined,
+    });
+    try {
+      const config = { databaseUrl: "pglite://task5", allowStagingMigration: true as const };
+      await applyInitialMigration(config, clientFactory);
+      await applyPlatformControlPlaneMigration(config, clientFactory);
+      await applyBusinessLifecycleMigration(config, clientFactory);
+      await applyMembershipLifecycleMigration(config, clientFactory);
+      await expect(applyProjectsMigration(config, clientFactory)).resolves.toEqual({ version: "0005_projects", applied: true });
+      await expect(checkProjectsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 2, ledgerRecordPresent: true });
+      await expect(rollbackProjectsMigration(config, clientFactory)).resolves.toEqual({ version: "0005_projects", applied: true });
+      await expect(checkProjectsMigration(config, clientFactory)).resolves.toMatchObject({ applied: false, requiredTableCount: 0, ledgerRecordPresent: false });
+      await expect(applyProjectsMigration(config, clientFactory)).resolves.toEqual({ version: "0005_projects", applied: true });
+      await expect(checkProjectsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 2, ledgerRecordPresent: true });
     } finally {
       await client.close();
     }

@@ -9,6 +9,7 @@ export const Capability = [
   "transfer_ownership",
   "deactivate_business",
   "reactivate_business",
+  "manage_projects",
 ] as const;
 
 export type Capability = (typeof Capability)[number];

@@ -19,6 +19,8 @@ import {
   memberships,
   MembershipRole,
   ownerAdminInvariant,
+  projectMemberships,
+  projects,
   schema,
   users,
 } from "../../../src/db/schema";
@@ -115,6 +117,8 @@ describe("relational domain schema", () => {
       "jobs",
       "platformMembers",
       "platformAuditEvents",
+      "projects",
+      "projectMemberships",
     ]);
     expect([
       users,
@@ -129,6 +133,8 @@ describe("relational domain schema", () => {
       jobs,
       schema.platformMembers,
       schema.platformAuditEvents,
+      projects,
+      projectMemberships,
     ].map(getTableName)).toEqual([
       "users",
       "businesses",
@@ -142,6 +148,8 @@ describe("relational domain schema", () => {
       "jobs",
       "platform_members",
       "platform_audit_events",
+      "projects",
+      "project_memberships",
     ]);
   });
 
@@ -155,6 +163,7 @@ describe("relational domain schema", () => {
       currencies,
       auditEvents,
       jobs,
+      projects,
     ]) {
       expect(getTableColumns(table).businessId.notNull).toBe(true);
     }

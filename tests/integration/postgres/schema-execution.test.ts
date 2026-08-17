@@ -27,6 +27,8 @@ describe("PostgreSQL initial migration", () => {
         "memberships",
         "platform_audit_events",
         "platform_members",
+        "project_memberships",
+        "projects",
         "users",
       ]);
 

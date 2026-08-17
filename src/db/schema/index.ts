@@ -20,6 +20,8 @@ export { auditEvents, AuditActorType, auditActorTypeEnum } from "./audit-events"
 export { jobs, JobStatus, jobStatusEnum } from "./jobs";
 export { PlatformRole, platformMembers, platformRoleEnum } from "./platform-members";
 export { platformAuditEvents } from "./platform-audit-events";
+export { projects } from "./projects";
+export { projectMemberships } from "./project-memberships";
 
 import { auditEvents } from "./audit-events";
 import { businesses } from "./businesses";
@@ -33,6 +35,8 @@ import { memberships } from "./memberships";
 import { users } from "./users";
 import { platformAuditEvents } from "./platform-audit-events";
 import { platformMembers } from "./platform-members";
+import { projects } from "./projects";
+import { projectMemberships } from "./project-memberships";
 
 export const schema = {
   users,
@@ -47,4 +51,6 @@ export const schema = {
   jobs,
   platformMembers,
   platformAuditEvents,
+  projects,
+  projectMemberships,
 };
