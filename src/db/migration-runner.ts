@@ -37,6 +37,7 @@ export type MigrationResult = {
 
 export type MigrationCheck = MigrationResult & {
   requiredTableCount: number;
+  ledgerRecordPresent: boolean;
 };
 
 export function assertRequiredMigrations(
@@ -46,17 +47,19 @@ export function assertRequiredMigrations(
   if (
     initial.version !== MIGRATION_VERSION
     || !initial.applied
-    || initial.requiredTableCount < REQUIRED_TABLES.length
+    || initial.requiredTableCount !== REQUIRED_TABLES.length
+    || !initial.ledgerRecordPresent
   ) {
     throw new Error("Required PostgreSQL initial migration is not applied");
   }
   if (
     platform.version !== PLATFORM_MIGRATION_VERSION
     || !platform.applied
+    || !platform.ledgerRecordPresent
   ) {
     throw new Error("Required PostgreSQL platform control-plane migration is not applied");
   }
-  if (platform.requiredTableCount < PLATFORM_REQUIRED_TABLES.length) {
+  if (platform.requiredTableCount !== PLATFORM_REQUIRED_TABLES.length) {
     throw new Error("Required PostgreSQL platform control-plane tables are missing");
   }
 }
@@ -162,7 +165,8 @@ export async function checkInitialMigration(config: MigrationConfig): Promise<Mi
     return {
       version: MIGRATION_VERSION,
       applied,
-      requiredTableCount: (tables.rowCount ?? 0) + (applied ? 1 : 0),
+      requiredTableCount: tables.rowCount ?? 0,
+      ledgerRecordPresent: applied,
     };
   } finally {
     await client.end();
@@ -220,6 +224,7 @@ export async function checkPlatformControlPlaneMigration(config: MigrationConfig
       version: PLATFORM_MIGRATION_VERSION,
       applied,
       requiredTableCount: tables.rowCount ?? 0,
+      ledgerRecordPresent: applied,
     };
   } finally {
     await client.end();

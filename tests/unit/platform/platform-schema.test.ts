@@ -119,12 +119,12 @@ describe("platform control-plane schema", () => {
 
   it("fails the migration check when platform migration or tables are missing", () => {
     expect(() => assertRequiredMigrations(
-      { version: "0001_initial", applied: true, requiredTableCount: 11 },
-      { version: "0002_platform_control_plane", applied: false, requiredTableCount: 0 },
+      { version: "0001_initial", applied: true, requiredTableCount: 10, ledgerRecordPresent: true },
+      { version: "0002_platform_control_plane", applied: false, requiredTableCount: 0, ledgerRecordPresent: false },
     )).toThrow("platform control-plane migration");
     expect(() => assertRequiredMigrations(
-      { version: "0001_initial", applied: true, requiredTableCount: 11 },
-      { version: "0002_platform_control_plane", applied: true, requiredTableCount: 1 },
+      { version: "0001_initial", applied: true, requiredTableCount: 10, ledgerRecordPresent: true },
+      { version: "0002_platform_control_plane", applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
     )).toThrow("platform control-plane tables");
   });
 });

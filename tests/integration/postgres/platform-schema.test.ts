@@ -10,6 +10,7 @@ import {
 import {
   applyInitialMigration,
   applyPlatformControlPlaneMigration,
+  assertRequiredMigrations,
   checkPlatformControlPlaneMigration,
   type MigrationConfig,
 } from "../../../src/db/migration-runner";
@@ -113,6 +114,39 @@ describe("PostgreSQL platform control-plane migration", () => {
       await close();
     }
   }, 30_000);
+
+  it("fails the initial migration check when a required table is missing", async () => {
+    const { db, close, execute } = await createTestDatabase();
+
+    try {
+      await applyPlatformMigration(db, execute);
+      await db.execute("DROP TABLE jobs");
+      const tables = await db.execute<{ table_name: string }>(`
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = 'public'
+          AND table_name = ANY(ARRAY['users', 'businesses', 'memberships', 'documents', 'invoices', 'jobs', 'categories', 'currencies', 'join_requests', 'audit_events'])
+      `);
+
+      expect(tables.rows).toHaveLength(9);
+      expect(() => assertRequiredMigrations(
+        {
+          version: "0001_initial",
+          applied: true,
+          requiredTableCount: tables.rows.length,
+          ledgerRecordPresent: true,
+        },
+        {
+          version: "0002_platform_control_plane",
+          applied: true,
+          requiredTableCount: 2,
+          ledgerRecordPresent: true,
+        },
+      )).toThrow("initial migration");
+    } finally {
+      await close();
+    }
+  }, 30_000);
 });
 
 const nativeDatabaseUrl = process.env.TEST_DATABASE_URL?.trim();
@@ -142,6 +176,7 @@ describe.skipIf(!nativeDatabaseUrl)("native PostgreSQL platform migration runner
         version: "0002_platform_control_plane",
         applied: false,
         requiredTableCount: 0,
+        ledgerRecordPresent: false,
       });
     } finally {
       await client.end();
