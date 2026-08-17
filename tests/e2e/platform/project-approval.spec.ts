@@ -11,7 +11,9 @@ async function createProjectFromTenantView(page: import("@playwright/test").Page
   await page.goto(`/business/${businessId}/projects`);
   await page.getByLabel("Project name").fill(name);
   await page.getByRole("button", { name: "Submit request" }).click();
-  await expect(page.getByText("Pending approval")).toBeVisible();
+  const projectCard = page.locator("li.project-row").filter({ hasText: name });
+  await expect(projectCard.getByRole("heading", { name, exact: true })).toBeVisible();
+  await expect(projectCard.locator(".project-status")).toHaveText("Pending approval");
 }
 
 test("creates a pending project, approves it globally, and applies parent suspension", async ({ browser }) => {
