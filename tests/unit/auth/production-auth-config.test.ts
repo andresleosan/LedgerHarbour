@@ -1,7 +1,8 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
 
 import { createAuthProvider } from "../../../src/modules/auth/dev-auth-provider";
+import { navigateAfterSuccessfulLogin } from "../../../src/ui/auth/post-login-navigation";
 
 const source = (relativePath: string) =>
   readFileSync(new URL(`../../../src/${relativePath}`, import.meta.url), "utf8");
@@ -45,5 +46,81 @@ describe("production authentication boundary", () => {
     expect(source("ui/auth/AuthForm.tsx")).not.toContain("googleSimulation");
     expect(source("i18n/messages/en.json")).not.toContain("Development simulation");
     expect(source("i18n/messages/es.json")).not.toContain("Simulación de desarrollo");
+  });
+
+  it("wires both production login flows through the executable navigation policy", () => {
+    const authForm = source("ui/auth/AuthForm.tsx");
+
+    expect(authForm).toMatch(/navigateAfterSuccessfulLogin\(\{\s*flow: "googleRedirectCompletion"/);
+    expect(authForm).toMatch(/navigateAfterSuccessfulLogin\(\{\s*flow: "email"/);
+  });
+
+  it("navigates Google redirect completion through the server continuation boundary", () => {
+    const replace = vi.fn();
+
+    navigateAfterSuccessfulLogin({
+      flow: "googleRedirectCompletion",
+      mode: "login",
+      authMode: "firebase",
+      isDeterministicFirebaseTest: false,
+    }, replace);
+
+    expect(replace).toHaveBeenCalledOnce();
+    expect(replace).toHaveBeenCalledWith("/auth/continue");
+  });
+
+  it("navigates email login through the server continuation boundary", () => {
+    const replace = vi.fn();
+
+    navigateAfterSuccessfulLogin({
+      flow: "email",
+      mode: "login",
+      authMode: "firebase",
+      isDeterministicFirebaseTest: false,
+    }, replace);
+
+    expect(replace).toHaveBeenCalledOnce();
+    expect(replace).toHaveBeenCalledWith("/auth/continue");
+  });
+
+  it.each(["googleRedirectCompletion", "email"] as const)(
+    "keeps deterministic %s login from navigating automatically",
+    (flow) => {
+      const replace = vi.fn();
+
+      navigateAfterSuccessfulLogin({
+        flow,
+        mode: "login",
+        authMode: "firebase",
+        isDeterministicFirebaseTest: true,
+      }, replace);
+
+      expect(replace).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps Firebase registration from navigating automatically", () => {
+    const replace = vi.fn();
+
+    navigateAfterSuccessfulLogin({
+      flow: "email",
+      mode: "register",
+      authMode: "firebase",
+      isDeterministicFirebaseTest: false,
+    }, replace);
+
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("provides the authenticated server continuation route", () => {
+    const continuationUrl = new URL("../../../src/app/(auth)/auth/continue/page.tsx", import.meta.url);
+
+    expect(existsSync(continuationUrl)).toBe(true);
+    if (!existsSync(continuationUrl)) return;
+
+    const continuation = readFileSync(continuationUrl, "utf8");
+    expect(continuation).toContain("getCurrentIdentity");
+    expect(continuation).toContain("resolvePostLoginDestination");
+    expect(continuation).toContain('redirect("/login")');
   });
 });

@@ -19,6 +19,7 @@ import {
   type FirebaseClientConfig,
 } from "@/modules/auth/firebase-client";
 import { messages, type SupportedLocale } from "@/i18n/config";
+import { navigateAfterSuccessfulLogin } from "./post-login-navigation";
 
 type AuthFormMode = "login" | "register";
 type Feedback = { type: "signedIn" | "created"; email: string } | null;
@@ -67,7 +68,12 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
           return;
         }
         setFeedback({ type: "signedIn", email: identity.email });
-        if (!isDeterministicFirebaseTest) router.replace("/onboarding");
+        navigateAfterSuccessfulLogin({
+          flow: "googleRedirectCompletion",
+          mode,
+          authMode,
+          isDeterministicFirebaseTest,
+        }, (destination) => router.replace(destination));
       })
       .catch((error) => {
         if (!cancelled) {
@@ -78,7 +84,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
       });
 
     return () => { cancelled = true; };
-  }, [firebaseConfig, isFirebase, isLogin, provider, router]);
+  }, [authMode, firebaseConfig, isDeterministicFirebaseTest, isFirebase, isLogin, mode, provider, router]);
 
   const clearFeedback = () => {
     setFeedback(null);
@@ -107,7 +113,12 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
       if (!isLogin) await provider.signOut();
 
       setFeedback({ type: isLogin ? "signedIn" : "created", email: identity.email });
-      if (isFirebase && isLogin && !isDeterministicFirebaseTest) router.replace("/onboarding");
+      navigateAfterSuccessfulLogin({
+        flow: "email",
+        mode,
+        authMode,
+        isDeterministicFirebaseTest,
+      }, (destination) => router.replace(destination));
     } catch (error) {
       const authError = toAuthError(error);
       setErrorKey(

@@ -31,6 +31,49 @@ test("allows only active platform administrators into the global panel", async (
   await platformAdmin.close();
 });
 
+test("redirects an anonymous continuation request to login", async ({ browser }) => {
+  const anonymous = await browser.newPage();
+
+  await anonymous.goto("/auth/continue");
+
+  await expect(anonymous).toHaveURL(/\/login(?:\?|$)/);
+  await anonymous.close();
+});
+
+test("rejects an invalid Firebase session cookie and redirects continuation to login", async ({ browser }) => {
+  const invalidSession = await browser.newPage();
+  await invalidSession.context().addCookies([{
+    name: "ledgerharbour_firebase_session",
+    value: "invalid-firebase-session",
+    url: "http://127.0.0.1:3100",
+    httpOnly: true,
+    sameSite: "Lax",
+  }]);
+  await expect.poll(async () => (
+    await invalidSession.context().cookies()
+  ).find(({ name }) => name === "ledgerharbour_firebase_session")?.value).toBe("invalid-firebase-session");
+
+  await invalidSession.goto("/auth/continue");
+
+  await expect(invalidSession).toHaveURL(/\/login(?:\?|$)/);
+  await invalidSession.close();
+});
+
+test("continues platform administrators to admin and ordinary users to onboarding", async ({ browser }) => {
+  const admin = await browser.newPage();
+  await signIn(admin, "platform-admin-panel@example.com");
+  await admin.goto("/auth/continue");
+  await expect(admin).toHaveURL(/\/admin(?:\?|$)/);
+  await expect(admin.getByRole("heading", { name: "Platform administration" })).toBeVisible();
+  await admin.close();
+
+  const ordinary = await browser.newPage();
+  await signIn(ordinary, "post-login-ordinary@example.com");
+  await ordinary.goto("/auth/continue");
+  await expect(ordinary).toHaveURL(/\/onboarding(?:\?|$)/);
+  await ordinary.close();
+});
+
 test("confirms a business status action and refreshes the safe server DTO", async ({ browser }) => {
   const requester = await browser.newPage();
   await signIn(requester, "task6-requester@example.com");
