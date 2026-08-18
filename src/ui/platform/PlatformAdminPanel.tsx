@@ -266,6 +266,7 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
         expirationLabel={copy.serviceExpiration}
         requiresReason={dialog.requiresReason}
         requiresExpiration={dialog.requiresExpiration}
+        busy={busy}
         onCancel={() => { if (!busy) setDialog(null); }}
         onConfirm={(values) => { if (!busy) void submitAction(values); }}
       />}

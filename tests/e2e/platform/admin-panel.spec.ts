@@ -60,7 +60,23 @@ test("confirms a business status action and refreshes the safe server DTO", asyn
   await expect(dialog.getByLabel(/service expiration/i)).toBeFocused();
   await dialog.getByLabel(/service expiration/i).fill("2030-01-01");
   await dialog.getByLabel("Reason").fill("Initial approval review");
+  let requestCount = 0;
+  let requestSeen!: () => void;
+  let releaseRequest!: () => void;
+  const requestStarted = new Promise<void>((resolve) => { requestSeen = resolve; });
+  const requestRelease = new Promise<void>((resolve) => { releaseRequest = resolve; });
+  await platformAdmin.route("**/api/platform/businesses/*/approve", async (route) => {
+    requestCount += 1;
+    requestSeen();
+    await requestRelease;
+    await route.continue();
+  });
   await dialog.getByRole("button", { name: /Confirm/ }).click();
+  await requestStarted;
+  await platformAdmin.keyboard.press("Escape");
+  await expect(dialog).toBeVisible();
+  expect(requestCount).toBe(1);
+  releaseRequest();
   await expect(businessCard).toContainText("Active");
   await expect(businessCard).toContainText("Requester");
   await requester.close();

@@ -18,6 +18,7 @@ interface ActionDialogProps {
   expirationLabel: string;
   requiresReason: boolean;
   requiresExpiration: boolean;
+  busy: boolean;
   onCancel: () => void;
   onConfirm: (values: ActionDialogValues) => void;
 }
@@ -33,6 +34,7 @@ export default function ActionDialog({
   expirationLabel,
   requiresReason,
   requiresExpiration,
+  busy,
   onCancel,
   onConfirm,
 }: ActionDialogProps) {
@@ -40,6 +42,10 @@ export default function ActionDialog({
   const [serviceExpiresAt, setServiceExpiresAt] = useState("");
   const dialogRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
+  const onCancelRef = useRef(onCancel);
+  const busyRef = useRef(busy);
+  onCancelRef.current = onCancel;
+  busyRef.current = busy;
 
   useEffect(() => {
     if (!open) return;
@@ -51,7 +57,7 @@ export default function ActionDialog({
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         event.preventDefault();
-        onCancel();
+        if (!busyRef.current) onCancelRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -96,8 +102,8 @@ export default function ActionDialog({
             </label>
           )}
           <div className="platform-dialog-actions">
-            <button type="button" className="platform-button platform-button-muted" onClick={onCancel}>{cancelLabel}</button>
-            <button type="submit" className="platform-button platform-button-primary">{actionLabel}</button>
+            <button type="button" className="platform-button platform-button-muted" onClick={() => { if (!busy) onCancelRef.current(); }} disabled={busy}>{cancelLabel}</button>
+            <button type="submit" className="platform-button platform-button-primary" disabled={busy}>{actionLabel}</button>
           </div>
         </form>
       </div>
