@@ -62,12 +62,13 @@ function repositoryFor(dependencies: PortfolioDependencies = {}) {
 export async function listUserBusinesses(
   actor: OnboardingActor,
   dependencies: PortfolioDependencies = {},
+  includeInactive = false,
 ): Promise<BusinessSummary[]> {
   const { tenancy } = repositoryFor(dependencies);
   const userId = await resolveOnboardingActor(tenancy, actor);
   const entries = await tenancy.listBusinessesForUser(userId);
   return entries
-    .filter(({ business }) => business.status === "active" && business.isActive)
+    .filter(({ business }) => includeInactive || (business.status === "active" && business.isActive))
     .map(({ business, membership }) => businessSummary(business, membership.role));
 }
 

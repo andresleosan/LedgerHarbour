@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { getCurrentIdentity } from "@/modules/auth/session";
 import { getFirebaseClientConfig } from "@/modules/auth/firebase-config";
 import { listUserBusinesses } from "@/modules/tenancy/portfolio-service";
+import { resolveOnboardingActor } from "@/modules/tenancy/business-service";
 import { getPersistenceContext } from "@/modules/persistence/repository-factory";
 import { signOutAction } from "@/app/onboarding/actions";
 import AppShell from "@/ui/AppShell";
@@ -17,11 +18,13 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     tenancyRepository: persistence.tenancyRepository,
     documentRepository: persistence.documentRepository,
     invoiceRepository: persistence.invoiceRepository,
-  });
+  }, true);
+  const userId = await resolveOnboardingActor(persistence.tenancyRepository, identity);
+  const platformAdmin = Boolean(await persistence.platformRepository.findActiveMemberByUserId(userId));
   const locale = "en" as const;
   const firebaseConfig = process.env.AUTH_MODE === "firebase"
     ? getFirebaseClientConfig()
     : undefined;
 
-  return <AppShell identity={identity} businesses={businesses} locale={locale} firebaseConfig={firebaseConfig} signOutAction={signOutAction}>{children}</AppShell>;
+  return <AppShell identity={identity} businesses={businesses} locale={locale} platformAdmin={platformAdmin} firebaseConfig={firebaseConfig} signOutAction={signOutAction}>{children}</AppShell>;
 }

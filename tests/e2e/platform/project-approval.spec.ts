@@ -43,27 +43,31 @@ test("creates a pending project, approves it globally, and applies parent suspen
   await createProjectFromTenantView(requester, businessId, "E2E Rejected Project");
 
   await admin.goto("/admin/projects");
-  const rejectedRow = admin.locator("li").filter({ hasText: "E2E Rejected Project" });
-  await rejectedRow.getByLabel("Reason to reject E2E Rejected Project").fill("E2E rejection reason");
+  const rejectedRow = admin.getByRole("row").filter({ hasText: "E2E Rejected Project" });
   await rejectedRow.getByRole("button", { name: "Reject E2E Rejected Project" }).click();
-  await expect(rejectedRow).toContainText("rejected");
+  await admin.getByRole("dialog").getByLabel("Reason").fill("E2E rejection reason");
+  await admin.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
+  await expect(rejectedRow).toContainText("Rejected");
 
-  const pendingRow = admin.locator("li").filter({ hasText: "E2E Pending Project" });
+  const pendingRow = admin.getByRole("row").filter({ hasText: "E2E Pending Project" });
   await pendingRow.getByRole("button", { name: "Approve E2E Pending Project" }).click();
-  await expect(pendingRow).toContainText("active");
+  await admin.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
+  await expect(pendingRow).toContainText("Active");
 
   await createProjectFromTenantView(requester, businessId, "E2E Lifecycle Project");
 
   await admin.goto("/admin/projects");
-  const lifecycleRow = admin.locator("li").filter({ hasText: "E2E Lifecycle Project" });
+  const lifecycleRow = admin.getByRole("row").filter({ hasText: "E2E Lifecycle Project" });
   await lifecycleRow.getByRole("button", { name: "Approve E2E Lifecycle Project" }).click();
-  await expect(lifecycleRow).toContainText("active");
-  await lifecycleRow.getByLabel("Reason to suspend E2E Lifecycle Project").fill("E2E suspension reason");
+  await admin.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
+  await expect(lifecycleRow).toContainText("Active");
   await lifecycleRow.getByRole("button", { name: "Suspend E2E Lifecycle Project" }).click();
-  await expect(lifecycleRow).toContainText("suspended");
-  await lifecycleRow.getByLabel("Reason to reactivate E2E Lifecycle Project").fill("E2E reactivation reason");
+  await admin.getByRole("dialog").getByLabel("Reason").fill("E2E suspension reason");
+  await admin.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
+  await expect(lifecycleRow).toContainText("Suspended");
   await lifecycleRow.getByRole("button", { name: "Reactivate E2E Lifecycle Project" }).click();
-  await expect(lifecycleRow).toContainText("active");
+  await admin.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
+  await expect(lifecycleRow).toContainText("Active");
 
   const suspension = await admin.evaluate(async (id) => {
     const response = await fetch(`/api/platform/businesses/${id}/suspend`, {

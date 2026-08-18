@@ -14,11 +14,12 @@ interface AppShellProps {
   identity: AuthIdentity;
   businesses: readonly BusinessSummary[];
   locale: "en" | "es";
+  platformAdmin?: boolean;
   firebaseConfig?: FirebaseClientConfig;
   signOutAction: () => Promise<never>;
 }
 
-export default function AppShell({ children, identity, businesses, locale, firebaseConfig, signOutAction }: AppShellProps) {
+export default function AppShell({ children, identity, businesses, locale, platformAdmin = false, firebaseConfig, signOutAction }: AppShellProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeLocale = searchParams.get("locale") === "es" ? "es" : locale;
@@ -39,7 +40,8 @@ export default function AppShell({ children, identity, businesses, locale, fireb
         unavailable: "No disponible aún",
         settings: "Configuración",
         signOut: "Cerrar sesión",
-        workspace: "Espacio de trabajo",
+         workspace: "Espacio de trabajo",
+         platform: "Administración",
       }
     : {
         portfolio: "Portfolio",
@@ -49,7 +51,8 @@ export default function AppShell({ children, identity, businesses, locale, fireb
         unavailable: "Not available yet",
         settings: "Settings",
         signOut: "Sign out",
-        workspace: "Workspace",
+         workspace: "Workspace",
+         platform: "Administration",
       };
 
   return (
@@ -175,7 +178,8 @@ export default function AppShell({ children, identity, businesses, locale, fireb
       <header className="shell-header">
           <a className="shell-brand" href={hrefFor("/portfolio")} aria-label="LedgerHarbour"><img className="shell-brand-logo" src="/brand/ledgerharbour-logo.png" alt="LedgerHarbour" width={142} height={95} /></a>
          <nav className="shell-nav" aria-label={copy.workspace}>
-           <a href={hrefFor("/portfolio")} aria-current={pathname === "/portfolio" ? "page" : undefined}>{copy.portfolio}</a>
+            <a href={hrefFor("/portfolio")} aria-current={pathname === "/portfolio" ? "page" : undefined}>{copy.portfolio}</a>
+            {platformAdmin && <a href={hrefFor("/admin")} aria-current={pathname.startsWith("/admin") ? "page" : undefined}>{copy.platform}</a>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/upload`)}>{copy.upload}</a> : <span className="shell-nav-disabled">{copy.upload}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/invoices`)}>{copy.invoices}</a> : <span className="shell-nav-disabled">{copy.invoices}</span>}
            <span className="shell-nav-disabled" aria-disabled="true" title={copy.unavailable}>{copy.documents}</span>

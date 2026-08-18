@@ -33,6 +33,7 @@ export interface PlatformRepository {
   linkMemberToUser(memberId: string, userId: UserId): Promise<PlatformMember | null>;
   appendAuditEvent(event: Omit<PlatformAuditEvent, "id" | "createdAt">): Promise<PlatformAuditEvent>;
   listAuditEvents(targetId: string): Promise<PlatformAuditEvent[]>;
+  listAllAuditEvents(): Promise<PlatformAuditEvent[]>;
 }
 
 export interface InMemoryPlatformRepository extends PlatformRepository {
@@ -107,6 +108,10 @@ class MemoryPlatformRepository implements InMemoryPlatformRepository {
 
   async listAuditEvents(targetId: string): Promise<PlatformAuditEvent[]> {
     return this.auditEvents.filter((event) => event.targetId === targetId).map((event) => ({ ...event }));
+  }
+
+  async listAllAuditEvents(): Promise<PlatformAuditEvent[]> {
+    return this.auditEvents.map((event) => ({ ...event }));
   }
 }
 
@@ -199,6 +204,12 @@ export function createPostgresPlatformRepository(db: Database): PlatformReposito
     async listAuditEvents(targetId) {
       const rows = await databaseForOperation(db).select().from(platformAuditEvents)
         .where(eq(platformAuditEvents.targetId, targetId))
+        .orderBy(asc(platformAuditEvents.createdAt), asc(platformAuditEvents.id));
+      return rows.map(mapAudit);
+    },
+
+    async listAllAuditEvents() {
+      const rows = await databaseForOperation(db).select().from(platformAuditEvents)
         .orderBy(asc(platformAuditEvents.createdAt), asc(platformAuditEvents.id));
       return rows.map(mapAudit);
     },

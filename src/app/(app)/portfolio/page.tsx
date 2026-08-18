@@ -15,7 +15,7 @@ export default async function PortfolioPage({ searchParams }: { searchParams?: P
     tenancyRepository: persistence.tenancyRepository,
     documentRepository: persistence.documentRepository,
     invoiceRepository: persistence.invoiceRepository,
-  });
+  }, true);
   const copy = locale === "es"
     ? { eyebrow: "Espacio multiempresa", title: "Portfolio", description: "Elige un negocio autorizado para continuar.", empty: "Aún no tienes negocios autorizados.", active: "Activo", inactive: "Inactivo", open: "Abrir negocio", role: "Rol" }
     : { eyebrow: "Multi-business workspace", title: "Portfolio", description: "Choose an authorized business to continue.", empty: "You do not have any authorized businesses yet.", active: "Active", inactive: "Inactive", open: "Open business", role: "Role" };
