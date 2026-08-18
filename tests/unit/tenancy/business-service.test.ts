@@ -34,7 +34,11 @@ describe("business onboarding service", () => {
     });
     expect(repository.memberships).toHaveLength(0);
     expect(repository.categories.filter((category) => category.businessId === created.id)).toHaveLength(5);
-    expect(repository.auditEvents).toHaveLength(0);
+    expect(repository.auditEvents).toEqual([expect.objectContaining({
+      actorId: created.createdBy,
+      type: "business_requested",
+      entityId: created.id,
+    })]);
     expect(repository.transactionCount).toBe(1);
   });
 

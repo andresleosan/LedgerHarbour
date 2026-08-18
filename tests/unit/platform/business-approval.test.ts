@@ -62,6 +62,16 @@ describe("business approval lifecycle", () => {
       beforeStatus: "pending",
       afterStatus: "active",
     }));
+    expect(tenancy.auditEvents).toContainEqual(expect.objectContaining({
+      actorId: user("requester"),
+      entityId: created.id,
+      type: "business_requested",
+    }));
+    expect(tenancy.auditEvents).not.toContainEqual(expect.objectContaining({
+      actorId: user("requester"),
+      entityId: created.id,
+      type: "business_created",
+    }));
     expect(tenancy.transactionCount).toBe(2);
   });
 

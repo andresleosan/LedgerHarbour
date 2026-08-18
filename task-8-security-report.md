@@ -132,3 +132,42 @@ La evidencia detallada queda en `.superpowers/sdd/2026-08-16-platform-administra
 - Seguridad/integracion focalizadas: `14` archivos y `61` tests pasan; PGlite migration apply/check/rollback/reapply `4/4` pasan.
 - PostgreSQL nativo: skip honesto porque `TEST_DATABASE_URL` no esta configurado.
 - Warning no bloqueante: `?mine=true` devuelve `400 INACTIVE_BUSINESS` bajo suspension, aunque el acceso queda denegado; se conserva fuera de alcance.
+
+## Fix Wave final - findings de revisión global
+
+Fecha: 2026-08-17
+Alcance: gate de membresías de proyecto, administración autenticada de `platform_admin`, y auditoría de solicitudes/aprobaciones.
+
+### Correcciones
+
+- **P1, project members gate:** `GET/POST /api/businesses/[businessId]/projects/[projectId]/members` ahora exige negocio activo y proyecto `active`/`isActive` dentro de una transacción. Proyectos `pending`, `rejected` y `suspended`, y negocios `pending`, `rejected` y `suspended`, devuelven 403 sin listar ni crear membresías. La fila del proyecto queda bloqueada durante el gate PostgreSQL; conflictos de repositorio/duplicados devuelven 409.
+- **P1, platform administrator management:** `POST /api/platform/administrators` agrega un registro `platform_admin` activo y no enlazado después de autorización server-side de un administrador activo. `DELETE /api/platform/administrators/[membershipId]` desactiva mediante CAS, exige motivo, bloquea los administradores activos durante la operación y rechaza retirar el último administrador activo. El email se valida y normaliza sólo al alta; el claim posterior sigue requiriendo Firebase verificado y enlaza una sola vez. Los permisos continúan basados en `user_id` enlazado y todos los `platform_admin` comparten la misma capacidad.
+- **Administrators UI:** la sección muestra operadores globales, permite alta con email/motivo y permite desactivación con diálogo y motivo. Los DTOs no contienen secretos ni credenciales.
+- **Auditoría:** la creación de una solicitud emite `business_requested` con el requester. La aprobación emite `business_approved` con el actor `platform_admin`; se eliminó el `business_created` atribuido al requester durante aprobación. La migración reversible `0006_business_request_audit` permite auditar la solicitud antes de que exista membresía, sin aplicarla en producción.
+
+### Tests añadidos/modificados
+
+- Unit: `tests/unit/projects/project-service.test.ts`, `tests/unit/platform/platform-admin-management.test.ts`, `tests/unit/platform/business-approval.test.ts`.
+- Integración/HTTP: `tests/integration/projects/project-routes.test.ts`, `tests/integration/platform/administrator-routes.test.ts`, `tests/integration/tenancy/business-approval.test.ts`, `tests/integration/postgres/tenancy-repository.test.ts`.
+- Seguridad: `tests/security/project-isolation.test.ts`, `tests/security/platform-admin-management.test.ts`.
+- E2E: `tests/e2e/platform/platform-administrator-management.spec.ts`.
+
+### Evidencia Fix Wave final
+
+| Verificación | Resultado |
+|---|---|
+| RED focalizado | Ejecutado antes de implementar: 15 tests fallaron por métodos/rutas ausentes, gates omitidos y auditoría no registrada. |
+| GREEN focalizado | `corepack pnpm exec vitest run tests/unit/projects/project-service.test.ts tests/security/project-isolation.test.ts tests/unit/platform/platform-admin-management.test.ts tests/security/platform-admin-management.test.ts tests/integration/projects/project-routes.test.ts tests/integration/platform/administrator-routes.test.ts tests/integration/tenancy/business-approval.test.ts` - 7 archivos, 38 tests pasan. |
+| Suite completa | `corepack pnpm test` - 61 archivos pasan, 2 skipped; 528 tests pasan, 3 skipped. |
+| E2E focalizado | `corepack pnpm exec playwright test tests/e2e/platform/platform-administrator-management.spec.ts` - 1/1 pasa. |
+| E2E completo | `corepack pnpm test:e2e` - 33/33 pasan. |
+| Typecheck | `corepack pnpm exec tsc --noEmit` - exit 0. |
+| Lint | `corepack pnpm lint` - exit 0, sin errores. |
+| Build | `corepack pnpm build` - exit 0; Next genera 18/18 páginas estáticas y las rutas dinámicas. |
+| Audit de dependencias | `corepack pnpm audit --json` - 0 info, 0 low, 0 moderate, 0 high, 0 critical; 556 dependencias. |
+
+### Concerns Fix Wave final
+
+- `TEST_DATABASE_URL` sigue sin configurarse, por lo que la prueba PostgreSQL nativa permanece skipped; PGlite aplica y verifica la secuencia hasta `0006_business_request_audit` y sus rollback SQL sólo se prueban localmente.
+- No se aplicó `0006_business_request_audit` ni ninguna migración en producción, no se hizo deploy, no se activó billing/OCR pago y no se leyeron ni escribieron secretos.
+- Upstash/Redis real y la configuración operativa del header de edge continúan siendo concerns heredados del reporte anterior.

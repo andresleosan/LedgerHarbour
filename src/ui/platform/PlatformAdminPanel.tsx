@@ -4,17 +4,17 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { messages, type SupportedLocale } from "@/i18n/config";
-import type { PlatformAdministratorDto, PlatformBusinessDto } from "@/modules/platform/platform-service";
+import type { PlatformAdminMemberDto, PlatformAdministratorDto, PlatformBusinessDto } from "@/modules/platform/platform-service";
 import type { PlatformSummaryDto } from "@/modules/platform/platform-summary";
 import type { ProjectDto } from "@/modules/projects/types";
 import ActionDialog, { type ActionDialogValues } from "@/ui/platform/ActionDialog";
 import StatusBadge from "@/ui/platform/StatusBadge";
 
 type Section = "all" | "businesses" | "projects" | "administrators";
-type Action = "approve" | "reject" | "suspend" | "reactivate" | "revoke";
+type Action = "approve" | "reject" | "suspend" | "reactivate" | "revoke" | "remove";
 
 interface DialogState {
-  kind: "business" | "project" | "administrator";
+  kind: "business" | "project" | "administrator" | "platformAdministrator";
   id: string;
   name: string;
   action: Action;
@@ -40,6 +40,8 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [platformAdminEmail, setPlatformAdminEmail] = useState("");
+  const [platformAdminReason, setPlatformAdminReason] = useState("");
 
   const statusLabel = (value: string) => copy[value as keyof typeof copy] ?? value;
   const matchesStatus = (value: string) => status === "all" || status === value;
@@ -67,17 +69,23 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
         ? `/api/platform/businesses/${dialog.id}`
         : dialog.kind === "project"
           ? `/api/platform/projects/${dialog.id}`
+          : dialog.kind === "platformAdministrator"
+            ? `/api/platform/administrators/${dialog.id}`
           : `/api/platform/administrators/${dialog.id}`;
-      const endpointAction = dialog.kind === "administrator" && (dialog.action === "revoke" || dialog.action === "suspend")
+      const endpointAction = dialog.kind === "platformAdministrator"
+        ? ""
+        : dialog.kind === "administrator" && (dialog.action === "revoke" || dialog.action === "suspend")
         ? "suspend"
         : dialog.action;
-      const body = dialog.kind === "administrator"
+      const body = dialog.kind === "platformAdministrator"
+        ? { reason: values.reason }
+        : dialog.kind === "administrator"
         ? dialog.action === "approve" ? { reason: values.reason } : { action: dialog.action, reason: values.reason }
         : dialog.action === "approve" && dialog.kind === "business"
           ? { serviceExpiresAt: values.serviceExpiresAt ? new Date(`${values.serviceExpiresAt}T23:59:59.000Z`).toISOString() : undefined, reason: values.reason }
           : { reason: values.reason };
-      const response = await fetch(`${basePath}/${endpointAction}`, {
-        method: "POST",
+      const response = await fetch(`${basePath}${endpointAction ? `/${endpointAction}` : ""}`, {
+        method: dialog.kind === "platformAdministrator" ? "DELETE" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
@@ -113,11 +121,13 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
     return [];
   };
 
+  const actionsForPlatformAdministrator = (administrator: PlatformAdminMemberDto): Action[] => administrator.isActive ? ["remove"] : [];
+
   const actionButtons = (kind: DialogState["kind"], id: string, name: string, actions: Action[]) => (
     <div className="platform-row-actions">
       {actions.length === 0 ? <span className="platform-no-actions">{copy.noActions}</span> : actions.map((action) => (
         <button
-          className={`platform-button ${action === "reject" || action === "suspend" || action === "revoke" ? "platform-button-danger" : "platform-button-primary"}`}
+           className={`platform-button ${action === "reject" || action === "suspend" || action === "revoke" || action === "remove" ? "platform-button-danger" : "platform-button-primary"}`}
           key={action}
           type="button"
           onClick={() => openAction(kind, id, name, action)}
@@ -140,6 +150,30 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
   const businessRows = summary.businesses.filter((business) => matchesStatus(business.status));
   const projectRows = summary.projects.filter((project) => matchesStatus(project.status));
   const administratorRows = summary.administrators.filter((administrator) => matchesStatus(administrator.status));
+  const platformAdministratorRows = summary.platformAdministrators.filter((administrator) => matchesStatus(administrator.isActive ? "active" : "inactive"));
+
+  const addPlatformAdministrator = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/platform/administrators", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: platformAdminEmail, reason: platformAdminReason }),
+      });
+      const payload = await response.json().catch(() => null) as { error?: { message?: string } } | null;
+      if (!response.ok) throw new Error(payload?.error?.message ?? copy.actionError);
+      setPlatformAdminEmail("");
+      setPlatformAdminReason("");
+      setFeedback(copy.saved);
+      router.refresh();
+    } catch (actionError) {
+      setError(actionError instanceof Error ? actionError.message : copy.actionError);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <div className="platform-panel">
@@ -159,7 +193,13 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
         .platform-section-header { display: flex; justify-content: space-between; align-items: start; gap: 16px; margin-bottom: 18px; }
         .platform-section-header h2 { margin: 0; color: #17313b; font-size: 1.35rem; letter-spacing: -.03em; }
         .platform-section-header p { margin: 7px 0 0; color: #49636b; line-height: 1.5; }
-        .platform-section-count { display: grid; min-width: 38px; height: 38px; place-items: center; border-radius: 12px; background: #d9eeea; color: #075b57; font-weight: 850; }
+         .platform-section-count { display: grid; min-width: 38px; height: 38px; place-items: center; border-radius: 12px; background: #d9eeea; color: #075b57; font-weight: 850; }
+         .platform-subsection { margin-bottom: 24px; padding-bottom: 22px; border-bottom: 1px solid #e0e9e5; }
+         .platform-subsection > p:first-child { margin: 0; color: #17313b; font-size: 1.05rem; }
+         .platform-subsection > p { margin: 7px 0 0; color: #49636b; line-height: 1.5; }
+         .platform-admin-form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(180px, 1fr) auto; align-items: end; gap: 10px; margin: 12px 0 18px; }
+         .platform-admin-form .platform-field { margin-top: 0; }
+         .platform-admin-form .platform-button { min-height: 44px; white-space: nowrap; }
         .platform-table-wrap { width: 100%; }
         .platform-table { width: 100%; border-collapse: collapse; }
         .platform-table th { padding: 10px 9px; border-bottom: 1px solid #9fbab1; color: #55716f; font-size: .7rem; letter-spacing: .08em; text-align: left; text-transform: uppercase; }
@@ -174,7 +214,7 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
         .platform-empty { margin: 12px 0 0; color: #49636b; }
         .platform-feedback { margin: 0 0 14px; color: #075b57; font-weight: 800; }
         .platform-error { margin: 0 0 14px; color: #913f35; font-weight: 800; }
-        @media (max-width: 850px) { .platform-overview { align-items: stretch; flex-direction: column; } .platform-filter { width: min(100%, 260px); } .platform-summary-cards { grid-template-columns: 1fr 1fr; } }
+         @media (max-width: 850px) { .platform-overview { align-items: stretch; flex-direction: column; } .platform-filter { width: min(100%, 260px); } .platform-summary-cards { grid-template-columns: 1fr 1fr; } .platform-admin-form { grid-template-columns: 1fr 1fr; } .platform-admin-form .platform-button { grid-column: 1 / -1; justify-self: start; } }
         @media (max-width: 650px) { .platform-summary-cards { grid-template-columns: 1fr; } .platform-section { padding: 18px 14px; } .platform-table, .platform-table thead, .platform-table tbody, .platform-table tr, .platform-table td { display: block; } .platform-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .platform-table tr { margin-bottom: 12px; padding: 12px; border: 1px solid #d7e3de; border-radius: 12px; background: #fff; } .platform-table tr:last-child { margin-bottom: 0; } .platform-table td { display: grid; grid-template-columns: minmax(90px, 34%) minmax(0, 1fr); gap: 9px; padding: 7px 0; border: 0; overflow-wrap: anywhere; } .platform-table td::before { content: attr(data-label); color: #55716f; font-size: .7rem; font-weight: 850; letter-spacing: .05em; text-transform: uppercase; } .platform-table td[colspan] { display: block; } .platform-table td[colspan]::before { display: none; } .platform-row-actions { justify-content: flex-start; } }
       `}</style>
       <div className="platform-overview">
@@ -199,9 +239,10 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
         <article className="platform-summary-card"><strong>{summary.counts.businesses}</strong><span>{copy.businesses} · {summary.counts.pendingBusinesses} {copy.pending.toLowerCase()}</span></article>
         <article className="platform-summary-card"><strong>{summary.counts.projects}</strong><span>{copy.projects} · {summary.counts.pendingProjects} {copy.pending.toLowerCase()}</span></article>
         <article className="platform-summary-card"><strong>{summary.counts.administrators}</strong><span>{copy.administrators} · {summary.counts.pendingAdministrators} {copy.pending.toLowerCase()}</span></article>
+        <article className="platform-summary-card"><strong>{summary.counts.platformAdministrators}</strong><span>{copy.platformAdministrators}</span></article>
       </div>
       {feedback && <p className="platform-feedback" role="status">{feedback}</p>}
-      {error && <p className="platform-error" role="alert">{error}</p>}
+       {error && <p className="platform-error" role="alert">{error}</p>}
 
       {(section === "all" || section === "businesses") && (
         <section className="platform-section" aria-labelledby="platform-businesses-title">
@@ -239,6 +280,27 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
       {(section === "all" || section === "administrators") && (
         <section className="platform-section" aria-labelledby="platform-administrators-title">
           {sectionHeader("platform-administrators-title", copy.administrators, copy.administratorSectionDescription, administratorRows.length)}
+          <div className="platform-subsection">
+            <p><strong>{copy.platformAdministrators}</strong></p>
+            <p>{copy.platformAdministratorSectionDescription}</p>
+            <form className="platform-admin-form" onSubmit={addPlatformAdministrator}>
+              <label className="platform-field" htmlFor="platform-admin-email">{copy.email}
+                <input id="platform-admin-email" type="email" value={platformAdminEmail} onChange={(event) => setPlatformAdminEmail(event.target.value)} maxLength={320} required />
+              </label>
+              <label className="platform-field" htmlFor="platform-admin-reason">{copy.reason}
+                <input id="platform-admin-reason" value={platformAdminReason} onChange={(event) => setPlatformAdminReason(event.target.value)} maxLength={1000} required />
+              </label>
+              <button className="platform-button platform-button-primary" type="submit" disabled={busy}>{copy.addAdministrator}</button>
+            </form>
+            <div className="platform-table-wrap"><table className="platform-table" aria-label={copy.globalOperators}>
+              <thead><tr><th>{copy.email}</th><th>{copy.statusFilter}</th><th>{copy.actions}</th></tr></thead>
+              <tbody>{platformAdministratorRows.length === 0 ? <tr><td colSpan={3}>{copy.empty}</td></tr> : platformAdministratorRows.map((administrator) => <tr data-testid="platform-admin-record" key={administrator.id}>
+                <td data-label={copy.email}><strong>{administrator.email}</strong><small>{administrator.userId ?? copy.unlinked}</small></td>
+                <td data-label={copy.statusFilter}><StatusBadge status={administrator.isActive ? "active" : "inactive"} label={administrator.isActive ? copy.active : copy.inactive} /></td>
+                <td data-label={copy.actions}>{actionButtons("platformAdministrator", administrator.id, administrator.email, actionsForPlatformAdministrator(administrator))}</td>
+              </tr>)}</tbody>
+            </table></div>
+          </div>
           <div className="platform-table-wrap"><table className="platform-table" aria-label={copy.administrators}>
             <thead><tr><th>{copy.administrator}</th><th>{copy.business}</th><th>{copy.role}</th><th>{copy.statusFilter}</th><th>{copy.actions}</th></tr></thead>
             <tbody>{administratorRows.length === 0 ? <tr><td colSpan={5}>{copy.empty}</td></tr> : administratorRows.map((administrator) => {

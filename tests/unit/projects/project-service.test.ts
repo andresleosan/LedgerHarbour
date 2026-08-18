@@ -147,11 +147,49 @@ describe("project approval lifecycle", () => {
     const setup = await approvedBusiness();
     const service = serviceFor(setup);
     const project = await service.createProjectRequest(setup.business.id, setup.requester, { name: "Member Validation Project" });
+    await service.approveProject(project.id, user("platform-admin"), { reason: "Activate member validation project" });
 
     await expect(service.addProjectMember(setup.business.id, project.id, setup.requester, {
       userId: user("unknown-user"),
       role: "member",
     })).rejects.toMatchObject({ code: PROJECT_ERROR_CODES.INVALID_MEMBER });
+  });
+
+  it.each(["pending", "rejected", "suspended"] as const)("denies membership operations for a %s project", async (status) => {
+    const setup = await approvedBusiness();
+    const service = serviceFor(setup);
+    const project = await service.createProjectRequest(setup.business.id, setup.requester, { name: `${status} Membership Project` });
+
+    if (status === "rejected") await service.rejectProject(project.id, user("platform-admin"), { reason: "Rejected for membership gate" });
+    if (status === "suspended") {
+      await service.approveProject(project.id, user("platform-admin"), { reason: "Approved before suspension" });
+      await service.suspendProject(project.id, user("platform-admin"), { reason: "Suspended for membership gate" });
+    }
+
+    await expect(service.listProjectMembers(setup.business.id, project.id, setup.requester)).rejects.toMatchObject({
+      code: "PROJECT_ACCESS_DENIED",
+    });
+    await expect(service.addProjectMember(setup.business.id, project.id, setup.requester, {
+      userId: setup.requester,
+      role: "member",
+    })).rejects.toMatchObject({ code: "PROJECT_ACCESS_DENIED" });
+  });
+
+  it("denies membership operations when the parent business is inactive", async () => {
+    const setup = await approvedBusiness();
+    const service = serviceFor(setup);
+    const project = await service.createProjectRequest(setup.business.id, setup.requester, { name: "Inactive Business Membership Project" });
+    await service.approveProject(project.id, user("platform-admin"), { reason: "Business gate setup" });
+    await createPlatformService({ tenancyRepository: setup.tenancy, platformRepository: setup.platform })
+      .suspendBusiness(setup.business.id, user("platform-admin"), { reason: "Business gate" });
+
+    await expect(service.listProjectMembers(setup.business.id, project.id, setup.requester)).rejects.toMatchObject({
+      code: "BUSINESS_INACTIVE",
+    });
+    await expect(service.addProjectMember(setup.business.id, project.id, setup.requester, {
+      userId: setup.requester,
+      role: "member",
+    })).rejects.toMatchObject({ code: "BUSINESS_INACTIVE" });
   });
 
   it("serializes effective access with a concurrent parent-business suspension", async () => {

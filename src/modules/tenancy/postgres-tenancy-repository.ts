@@ -310,7 +310,7 @@ function createRepository(db: Database, transactionCount: { value: number }): On
         for (const row of rows) {
           const creator = row.business.createdBy ?? (await db.select({ actorId: auditEvents.actorId }).from(auditEvents).where(and(
             eq(auditEvents.businessId, row.business.id),
-            eq(auditEvents.action, "business_created"),
+             eq(auditEvents.action, "business_requested"),
             eq(auditEvents.entityId, row.business.id),
           )).limit(1))[0]?.actorId;
           if (!creator) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
@@ -361,7 +361,7 @@ function createRepository(db: Database, transactionCount: { value: number }): On
         if (!row) return null;
         const creator = row.createdBy ?? (await db.select({ actorId: auditEvents.actorId }).from(auditEvents).where(and(
           eq(auditEvents.businessId, businessId),
-          eq(auditEvents.action, "business_created"),
+           eq(auditEvents.action, "business_requested"),
           eq(auditEvents.entityId, businessId),
         )).limit(1))[0]?.actorId;
         if (!creator) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);

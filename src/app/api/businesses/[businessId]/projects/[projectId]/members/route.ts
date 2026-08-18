@@ -13,6 +13,8 @@ type RouteContext = { params: Promise<{ businessId: string; projectId: string }>
 function errorResponse(error: unknown): NextResponse {
   if (error instanceof ProjectError) {
     const status = error.code === PROJECT_ERROR_CODES.BUSINESS_ACCESS_DENIED ? 403 :
+      error.code === PROJECT_ERROR_CODES.BUSINESS_INACTIVE ? 403 :
+      error.code === PROJECT_ERROR_CODES.PROJECT_ACCESS_DENIED ? 403 :
       error.code === PROJECT_ERROR_CODES.PROJECT_NOT_FOUND ? 404 :
       error.code === PROJECT_ERROR_CODES.REPOSITORY_CONFLICT ? 409 : 400;
     return NextResponse.json({ error: { code: error.code, message: error.message } }, { status });

@@ -49,4 +49,26 @@ describe("project tenant isolation", () => {
     await expect(service.listProjects("owner" as UserId)).rejects.toMatchObject({ code: PROJECT_ERROR_CODES.PLATFORM_ACCESS_DENIED });
     await expect(service.approveProject(project.id, "owner" as UserId, { reason: "Unauthorized approval" })).rejects.toMatchObject({ code: PROJECT_ERROR_CODES.PLATFORM_ACCESS_DENIED });
   });
+
+  it.each(["pending", "rejected", "suspended"] as const)("does not expose %s project memberships", async (status) => {
+    const tenancy = createInMemoryOnboardingRepository();
+    const platform = createInMemoryPlatformRepository();
+    const projects = createInMemoryProjectRepository();
+    const admin = "platform-admin" as UserId;
+    platform.addMember({ id: `platform-${status}`, userId: admin, normalizedEmail: `${status}@platform.example` });
+    const business = await createBusinessRequest({ name: `${status} Membership Harbour` }, "owner" as UserId, tenancy);
+    const platformService = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
+    await platformService.approveBusiness(business.id, admin, { serviceExpiresAt: testServiceExpiresAt(), reason: "Membership security setup" });
+    const service = createProjectService({ tenancyRepository: tenancy, projectRepository: projects, platformRepository: platform });
+    const project = await service.createProjectRequest(business.id, "owner" as UserId, { name: `${status} Project` });
+    if (status === "rejected") await service.rejectProject(project.id, admin, { reason: "Security test" });
+    if (status === "suspended") {
+      await service.approveProject(project.id, admin, { reason: "Security setup" });
+      await service.suspendProject(project.id, admin, { reason: "Security test" });
+    }
+
+    await expect(service.listProjectMembers(business.id, project.id, "owner" as UserId)).rejects.toMatchObject({
+      code: "PROJECT_ACCESS_DENIED",
+    });
+  });
 });

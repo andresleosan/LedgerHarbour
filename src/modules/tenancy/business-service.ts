@@ -626,6 +626,12 @@ async function createBusinessWithStatus(
       createdBy: actorId,
     });
     await transaction.provisionDefaultCategories(business.id);
+    await transaction.appendAuditEvent({
+      businessId: business.id,
+      actorId,
+      type: "business_requested",
+      entityId: business.id,
+    });
     return business;
   });
 }

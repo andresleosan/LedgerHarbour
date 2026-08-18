@@ -38,6 +38,7 @@ export const PROJECT_ERROR_CODES = {
   REASON_REQUIRED: "PROJECT_REASON_REQUIRED",
   REPOSITORY_CONFLICT: "PROJECT_REPOSITORY_CONFLICT",
   BUSINESS_INACTIVE: "BUSINESS_INACTIVE",
+  PROJECT_ACCESS_DENIED: "PROJECT_ACCESS_DENIED",
 } as const;
 
 export type ProjectErrorCode = (typeof PROJECT_ERROR_CODES)[keyof typeof PROJECT_ERROR_CODES];
@@ -53,6 +54,7 @@ const messages: Record<ProjectErrorCode, string> = {
   PROJECT_REASON_REQUIRED: "A reason is required for this action.",
   PROJECT_REPOSITORY_CONFLICT: "The project state changed elsewhere.",
   BUSINESS_INACTIVE: "This business is not active.",
+  PROJECT_ACCESS_DENIED: "Project membership operations require an active project.",
 };
 
 export class ProjectError extends Error {
@@ -146,18 +148,27 @@ async function requireBusinessProjectManager(
   return actorId;
 }
 
-async function findProjectForBusiness(repository: ProjectRepository, businessId: BusinessId, projectId: string): Promise<Project> {
-  const project = await repository.findProject(projectId);
-  if (!project || project.businessId !== businessId) throw new ProjectError(PROJECT_ERROR_CODES.PROJECT_NOT_FOUND);
-  return project;
-}
-
 function statusReasonForBusiness(status: string | null): EffectiveProjectAccess["reason"] | null {
   if (status === null) return "business_not_found";
   if (status === "pending") return "business_pending";
   if (status === "rejected") return "business_rejected";
   if (status === "suspended" || status === "inactive") return "business_suspended";
   return null;
+}
+
+async function requireActiveProjectForMembershipOperations(
+  tenancy: OnboardingRepository,
+  projects: ProjectRepository,
+  businessId: BusinessId,
+  projectId: string,
+): Promise<Project> {
+  await projects.lockProject(projectId);
+  const project = await projects.findProject(projectId);
+  if (!project || project.businessId !== businessId) throw new ProjectError(PROJECT_ERROR_CODES.PROJECT_NOT_FOUND);
+  const businessStatus = await tenancy.findBusinessStatus(businessId);
+  if (businessStatus !== "active") throw new ProjectError(PROJECT_ERROR_CODES.BUSINESS_INACTIVE);
+  if (project.status !== "active" || !project.isActive) throw new ProjectError(PROJECT_ERROR_CODES.PROJECT_ACCESS_DENIED);
+  return project;
 }
 
 function transitionUpdate(status: (typeof ProjectStatus)[number], reason: string | null): ProjectLifecycleUpdate {
@@ -270,31 +281,37 @@ export function createProjectService(dependencies: ProjectServiceDependencies): 
     },
 
     async addProjectMember(businessId, projectId, actor, input) {
+      if (await tenancy.findBusinessStatus(businessId) !== "active") throw new ProjectError(PROJECT_ERROR_CODES.BUSINESS_INACTIVE);
       await requireBusinessProjectManager(tenancy, businessId, actor);
       if (!input || typeof input.userId !== "string" || !input.userId.trim() || input.role !== "member") {
         throw new ProjectError(PROJECT_ERROR_CODES.INVALID_MEMBER);
       }
-      await findProjectForBusiness(projects, businessId, projectId);
-      if (tenancy.findUserById && !(await tenancy.findUserById(input.userId))) {
-        throw new ProjectError(PROJECT_ERROR_CODES.INVALID_MEMBER);
-      }
       try {
-        return await projects.createProjectMembership({
-          projectId,
-          userId: input.userId,
-          role: "member",
-          isActive: true,
-          status: "active",
-        });
+        return await tenancy.transaction(async (transactionTenancy) => projects.transaction(async (transactionProjects) => {
+          await requireActiveProjectForMembershipOperations(transactionTenancy, transactionProjects, businessId, projectId);
+          if (transactionTenancy.findUserById && !(await transactionTenancy.findUserById(input.userId))) {
+            throw new ProjectError(PROJECT_ERROR_CODES.INVALID_MEMBER);
+          }
+          return transactionProjects.createProjectMembership({
+            projectId,
+            userId: input.userId,
+            role: "member",
+            isActive: true,
+            status: "active",
+          });
+        }));
       } catch (error) {
         return mapRepositoryError(error);
       }
     },
 
     async listProjectMembers(businessId, projectId, actor) {
+      if (await tenancy.findBusinessStatus(businessId) !== "active") throw new ProjectError(PROJECT_ERROR_CODES.BUSINESS_INACTIVE);
       await requireBusinessProjectManager(tenancy, businessId, actor);
-      await findProjectForBusiness(projects, businessId, projectId);
-      return projects.listProjectMemberships(projectId);
+      return tenancy.transaction(async (transactionTenancy) => projects.transaction(async (transactionProjects) => {
+        await requireActiveProjectForMembershipOperations(transactionTenancy, transactionProjects, businessId, projectId);
+        return transactionProjects.listProjectMemberships(projectId);
+      }));
     },
 
     approveProject(projectId, actor, input) {

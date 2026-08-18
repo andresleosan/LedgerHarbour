@@ -32,8 +32,11 @@ describe("PostgreSQL business approval lifecycle", () => {
         emailVerified: true,
       } as const;
 
-      const created = await onboarding.createBusinessRequest({ name: "Postgres Pending Harbour" }, requester);
-      await expect(tenancy.listMemberships(created.id)).resolves.toEqual([]);
+       const created = await onboarding.createBusinessRequest({ name: "Postgres Pending Harbour" }, requester);
+       await expect(tenancy.listMemberships(created.id)).resolves.toEqual([]);
+       await expect(tenancy.listAuditEvents(created.id)).resolves.toEqual([
+         expect.objectContaining({ type: "business_requested", actorId: created.createdBy, entityId: created.id }),
+       ]);
       await platform.bootstrapMember("platform-admin-1", admin.email);
 
       const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
@@ -45,9 +48,12 @@ describe("PostgreSQL business approval lifecycle", () => {
       await expect(tenancy.listMemberships(created.id)).resolves.toEqual([
         expect.objectContaining({ userId: created.createdBy, role: "owner_admin", isActive: true }),
       ]);
-      await expect(platform.listAuditEvents(created.id)).resolves.toEqual([
-        expect.objectContaining({ action: "business_approved", targetId: created.id }),
-      ]);
+       await expect(tenancy.listAuditEvents(created.id)).resolves.toEqual([
+         expect.objectContaining({ type: "business_requested", actorId: created.createdBy, entityId: created.id }),
+       ]);
+       await expect(platform.listAuditEvents(created.id)).resolves.toEqual([
+         expect.objectContaining({ action: "business_approved", targetId: created.id, actorId: expect.any(String) }),
+       ]);
     } finally {
       await close();
     }

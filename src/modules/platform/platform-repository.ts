@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, count, eq, isNull, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/client";
 import { databaseForOperation, transactionWithDatabase } from "../../db/transaction-scope";
@@ -17,7 +17,7 @@ export interface PlatformAuditEvent {
   id: string;
   actorId: string;
   action: string;
-  targetType: "business" | "membership" | "project";
+  targetType: "business" | "membership" | "project" | "platform_member";
   targetId: string;
   beforeStatus: string | null;
   afterStatus: string | null;
@@ -28,12 +28,21 @@ export interface PlatformAuditEvent {
 export interface PlatformRepository {
   transaction?<T>(operation: (repository: PlatformRepository) => Promise<T>): Promise<T>;
   findActiveMemberByUserId(userId: UserId): Promise<PlatformMember | null>;
+  listMembers(): Promise<PlatformMember[]>;
   findMemberForClaimByEmail(normalizedEmail: string): Promise<PlatformMember | null>;
+  createMember(input: { id: string; normalizedEmail: string }): Promise<PlatformMember>;
+  updateMemberStatus(memberId: string, isActive: boolean, expectedIsActive: boolean): Promise<PlatformMember>;
+  countActiveMembers(): Promise<number>;
+  lockActiveMembers(): Promise<void>;
   claimMemberByEmail(normalizedEmail: string, userId: UserId): Promise<PlatformMember | null>;
   linkMemberToUser(memberId: string, userId: UserId): Promise<PlatformMember | null>;
   appendAuditEvent(event: Omit<PlatformAuditEvent, "id" | "createdAt">): Promise<PlatformAuditEvent>;
   listAuditEvents(targetId: string): Promise<PlatformAuditEvent[]>;
   listAllAuditEvents(): Promise<PlatformAuditEvent[]>;
+}
+
+export class PlatformRepositoryConflictError extends Error {
+  readonly name = "PlatformRepositoryConflictError";
 }
 
 export interface InMemoryPlatformRepository extends PlatformRepository {
@@ -78,9 +87,36 @@ class MemoryPlatformRepository implements InMemoryPlatformRepository {
     return this.platformMembers.find((member) => member.userId === userId && member.isActive) ?? null;
   }
 
+  async listMembers(): Promise<PlatformMember[]> {
+    return this.platformMembers.map((member) => ({ ...member }));
+  }
+
   async findMemberForClaimByEmail(normalizedEmail: string): Promise<PlatformMember | null> {
     return this.platformMembers.find((member) => member.normalizedEmail === normalizeEmail(normalizedEmail) && member.isActive) ?? null;
   }
+
+  async createMember(input: { id: string; normalizedEmail: string }): Promise<PlatformMember> {
+    const normalized = normalizeEmail(input.normalizedEmail);
+    if (this.platformMembers.some((member) => member.normalizedEmail === normalized)) {
+      throw new PlatformRepositoryConflictError("Platform administrator email already exists");
+    }
+    const member: PlatformMember = { id: input.id, userId: null, normalizedEmail: normalized, role: "platform_admin", isActive: true };
+    this.platformMembers.push(member);
+    return { ...member };
+  }
+
+  async updateMemberStatus(memberId: string, isActive: boolean, expectedIsActive: boolean): Promise<PlatformMember> {
+    const member = this.platformMembers.find((candidate) => candidate.id === memberId && candidate.isActive === expectedIsActive);
+    if (!member) throw new PlatformRepositoryConflictError("Platform administrator state changed elsewhere");
+    member.isActive = isActive;
+    return { ...member };
+  }
+
+  async countActiveMembers(): Promise<number> {
+    return this.platformMembers.filter((member) => member.isActive).length;
+  }
+
+  async lockActiveMembers(): Promise<void> {}
 
   async claimMemberByEmail(normalizedEmail: string, userId: UserId): Promise<PlatformMember | null> {
     const member = this.platformMembers.find((candidate) =>
@@ -134,7 +170,7 @@ function mapAudit(row: typeof platformAuditEvents.$inferSelect): PlatformAuditEv
     id: row.id,
     actorId: row.actorId,
     action: row.action,
-    targetType: row.targetType as "business" | "membership" | "project",
+  targetType: row.targetType as "business" | "membership" | "project" | "platform_member",
     targetId: row.targetId,
     beforeStatus: row.beforeStatus,
     afterStatus: row.afterStatus,
@@ -159,12 +195,57 @@ export function createPostgresPlatformRepository(db: Database): PlatformReposito
       return row ? mapMember(row) : null;
     },
 
+    async listMembers() {
+      const rows = await databaseForOperation(db).select().from(platformMembers).orderBy(asc(platformMembers.createdAt), asc(platformMembers.id));
+      return rows.map(mapMember);
+    },
+
     async findMemberForClaimByEmail(email) {
       const [row] = await databaseForOperation(db).select().from(platformMembers).where(and(
         eq(platformMembers.normalizedEmail, normalizeEmail(email)),
         eq(platformMembers.isActive, true),
       )).limit(1);
       return row ? mapMember(row) : null;
+    },
+
+    async createMember(input) {
+      try {
+        const [row] = await databaseForOperation(db).insert(platformMembers).values({
+          id: input.id,
+          normalizedEmail: normalizeEmail(input.normalizedEmail),
+          userId: null,
+          role: "platform_admin",
+          isActive: true,
+        }).returning();
+        if (!row) throw new PlatformRepositoryConflictError("Platform administrator was not created");
+        return mapMember(row);
+      } catch (error) {
+        if (error instanceof PlatformRepositoryConflictError) throw error;
+        throw new PlatformRepositoryConflictError("Platform administrator email already exists");
+      }
+    },
+
+    async updateMemberStatus(memberId, isActive, expectedIsActive) {
+      try {
+        const [row] = await databaseForOperation(db).update(platformMembers)
+          .set({ isActive, updatedAt: new Date() })
+          .where(and(eq(platformMembers.id, memberId), eq(platformMembers.isActive, expectedIsActive)))
+          .returning();
+        if (!row) throw new PlatformRepositoryConflictError("Platform administrator state changed elsewhere");
+        return mapMember(row);
+      } catch (error) {
+        if (error instanceof PlatformRepositoryConflictError) throw error;
+        throw new PlatformRepositoryConflictError("Platform administrator could not be updated");
+      }
+    },
+
+    async countActiveMembers() {
+      const [row] = await databaseForOperation(db).select({ count: count() }).from(platformMembers).where(eq(platformMembers.isActive, true));
+      return Number(row?.count ?? 0);
+    },
+
+    async lockActiveMembers() {
+      await databaseForOperation(db).execute(sql`SELECT id FROM platform_members WHERE is_active = true ORDER BY id FOR UPDATE`);
     },
 
     async claimMemberByEmail(email, userId) {

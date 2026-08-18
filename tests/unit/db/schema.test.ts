@@ -203,7 +203,7 @@ describe("relational domain schema", () => {
     });
   });
 
-  it("attributes document uploaders and user audit actors to an active membership", () => {
+  it("attributes document uploaders and user audit actors to users", () => {
     const documentForeignKeys = getTableConfig(documents).foreignKeys.map((foreignKey) => ({
       name: foreignKey.getName(),
       localColumns: foreignKey.reference().columns.map((column) => column.name),
@@ -221,9 +221,9 @@ describe("relational domain schema", () => {
       foreignColumns: ["user_id", "business_id"],
     });
     expect(auditForeignKeys).toContainEqual({
-      name: "audit_events_user_actor_business_fk",
-      localColumns: ["actor_id", "business_id"],
-      foreignColumns: ["user_id", "business_id"],
+      name: "audit_events_user_actor_fk",
+      localColumns: ["actor_id"],
+      foreignColumns: ["id"],
     });
     expect(getTableColumns(auditEvents).actorType.notNull).toBe(true);
     expect(getTableColumns(auditEvents).actorId.notNull).toBe(false);

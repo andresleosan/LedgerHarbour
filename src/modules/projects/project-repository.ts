@@ -1,4 +1,4 @@
-import { and, asc, eq } from "drizzle-orm";
+import { and, asc, eq, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/client";
 import { databaseForOperation, transactionWithDatabase } from "../../db/transaction-scope";
@@ -37,6 +37,7 @@ export interface ProjectRepository {
   transaction<T>(operation: (repository: ProjectRepository) => Promise<T>): Promise<T>;
   createProject(input: NewProject): Promise<Project>;
   findProject(projectId: string): Promise<Project | null>;
+  lockProject(projectId: string): Promise<void>;
   listProjects(): Promise<Project[]>;
   listProjectsForBusiness(businessId: BusinessId): Promise<Project[]>;
   updateProjectLifecycle(projectId: string, input: ProjectLifecycleUpdate, expectedStatus?: ProjectStatus): Promise<Project>;
@@ -136,6 +137,8 @@ class MemoryProjectRepository implements InMemoryProjectRepository {
     const project = this.projects.find((candidate) => candidate.id === projectId);
     return project ? cloneProject(project) : null;
   }
+
+  async lockProject(): Promise<void> {}
 
   async listProjects(): Promise<Project[]> {
     return this.projects.map(cloneProject);
@@ -252,6 +255,10 @@ export function createPostgresProjectRepository(db: Database): ProjectRepository
     async findProject(projectId) {
       const [row] = await databaseForOperation(db).select().from(projects).where(eq(projects.id, projectId)).limit(1);
       return row ? mapProject(row) : null;
+    },
+
+    async lockProject(projectId) {
+      await databaseForOperation(db).execute(sql`SELECT id FROM projects WHERE id = ${projectId} FOR UPDATE`);
     },
 
     async listProjects() {

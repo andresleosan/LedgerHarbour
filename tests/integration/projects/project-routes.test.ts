@@ -15,6 +15,7 @@ import { POST as approveProject } from "../../../src/app/api/platform/projects/[
 import { POST as rejectProject } from "../../../src/app/api/platform/projects/[projectId]/reject/route";
 import { POST as suspendProject } from "../../../src/app/api/platform/projects/[projectId]/suspend/route";
 import { POST as reactivateProject } from "../../../src/app/api/platform/projects/[projectId]/reactivate/route";
+import { GET as listProjectMembers, POST as addProjectMember } from "../../../src/app/api/businesses/[businessId]/projects/[projectId]/members/route";
 
 const mockedIdentity = vi.mocked(getCurrentIdentity);
 const requester: AuthIdentity = {
@@ -131,5 +132,42 @@ describe("project HTTP contracts", () => {
     expect(rejectResponse.status).toBe(404);
     expect(suspendResponse.status).toBe(404);
     expect(reactivateResponse.status).toBe(404);
+  });
+
+  it("returns 403 for membership reads and writes on a pending project", async () => {
+    const business = await createBusinessRequest({ name: "HTTP Membership Gate Harbour" }, requester, defaultOnboardingRepository);
+    const platformUserId = await defaultOnboardingRepository.upsertUser(platformAdmin);
+    defaultPlatformRepository.addMember({ id: "task5-membership-platform", userId: platformUserId, normalizedEmail: platformAdmin.email });
+    await createPlatformService({ tenancyRepository: defaultOnboardingRepository, platformRepository: defaultPlatformRepository })
+      .approveBusiness(business.id, platformAdmin, { serviceExpiresAt: testServiceExpiresAt(), reason: "Membership gate setup" });
+    mockedIdentity.mockResolvedValue(requester);
+    const projectResponse = await createProject(request({ name: "HTTP Pending Membership Project" }), { params: Promise.resolve({ businessId: business.id }) });
+    const project = await projectResponse.json() as { id: string };
+    const context = { params: Promise.resolve({ businessId: business.id, projectId: project.id }) };
+
+    const listed = await listProjectMembers(request(undefined, "GET"), context);
+    const added = await addProjectMember(request({ userId: "unknown-user", role: "member" }), context);
+    expect(listed.status).toBe(403);
+    expect(added.status).toBe(403);
+  });
+
+  it("returns 409 for duplicate membership after the active gates pass", async () => {
+    const business = await createBusinessRequest({ name: "HTTP Duplicate Membership Harbour" }, requester, defaultOnboardingRepository);
+    const platformUserId = await defaultOnboardingRepository.upsertUser(platformAdmin);
+    const targetUserId = await defaultOnboardingRepository.upsertUser(ordinary);
+    defaultPlatformRepository.addMember({ id: "task5-duplicate-platform", userId: platformUserId, normalizedEmail: platformAdmin.email });
+    await createPlatformService({ tenancyRepository: defaultOnboardingRepository, platformRepository: defaultPlatformRepository })
+      .approveBusiness(business.id, platformAdmin, { serviceExpiresAt: testServiceExpiresAt(), reason: "Duplicate membership setup" });
+    mockedIdentity.mockResolvedValue(requester);
+    const projectResponse = await createProject(request({ name: "HTTP Duplicate Membership Project" }), { params: Promise.resolve({ businessId: business.id }) });
+    const project = await projectResponse.json() as { id: string };
+    mockedIdentity.mockResolvedValue(platformAdmin);
+    await approveProject(new Request("http://localhost/api/platform/projects/approve", { method: "POST", headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.97" }, body: JSON.stringify({ reason: "Activate membership test" }) }), { params: Promise.resolve({ projectId: project.id }) });
+    mockedIdentity.mockResolvedValue(requester);
+    const context = { params: Promise.resolve({ businessId: business.id, projectId: project.id }) };
+    const first = await addProjectMember(request({ userId: targetUserId, role: "member" }), context);
+    const second = await addProjectMember(request({ userId: targetUserId, role: "member" }), context);
+    expect(first.status).toBe(201);
+    expect(second.status).toBe(409);
   });
 });

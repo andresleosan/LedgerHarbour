@@ -68,7 +68,11 @@ describe("PostgreSQL onboarding repository contract", () => {
       }]);
       expect(memberships.rows).toEqual([]);
       expect(categories.rows).toHaveLength(5);
-      expect(audit.rows).toEqual([]);
+      expect(audit.rows).toEqual([expect.objectContaining({
+        action: "business_requested",
+        entity_id: created.id,
+        entity_type: "business",
+      })]);
       expect(created.createdBy).not.toBe(owner.providerUserId);
     } finally {
       await close();

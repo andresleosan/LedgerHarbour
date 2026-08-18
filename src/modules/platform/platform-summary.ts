@@ -1,6 +1,6 @@
 import type { AuthIdentity } from "../auth/auth-provider";
 import { resolveOnboardingActor, type OnboardingActor, type OnboardingRepository } from "../tenancy/business-service";
-import { createPlatformService, PlatformError, PLATFORM_ERROR_CODES, requirePlatformMember, type PlatformAdministratorDto, type PlatformBusinessDto } from "./platform-service";
+import { createPlatformService, PlatformError, PLATFORM_ERROR_CODES, requirePlatformMember, type PlatformAdminMemberDto, type PlatformAdministratorDto, type PlatformBusinessDto } from "./platform-service";
 import type { PlatformAuditEvent, PlatformRepository } from "./platform-repository";
 import { createProjectService } from "../projects/project-service";
 import type { ProjectDto, ProjectStatus } from "../projects/types";
@@ -13,10 +13,12 @@ export interface PlatformSummaryDto {
     pendingProjects: number;
     administrators: number;
     pendingAdministrators: number;
+    platformAdministrators: number;
   };
   businesses: PlatformBusinessDto[];
   projects: ProjectDto[];
   administrators: PlatformAdministratorDto[];
+  platformAdministrators: PlatformAdminMemberDto[];
 }
 
 export interface PlatformSummaryDependencies {
@@ -40,10 +42,11 @@ export async function getPlatformSummary(
     const linked = await dependencies.platformRepository.findActiveMemberByUserId(userId);
     if (!linked) throw error;
   }
-  const [businesses, projectRows, administrators] = await Promise.all([
+  const [businesses, projectRows, administrators, platformAdministrators] = await Promise.all([
     platform.listBusinesses(actor),
     projects.listProjects(actor),
     platform.listAdministrators(actor),
+    platform.listPlatformAdministrators(actor),
   ]);
 
   return {
@@ -52,12 +55,14 @@ export async function getPlatformSummary(
       pendingBusinesses: businesses.filter((business) => business.status === "pending").length,
       projects: projectRows.length,
       pendingProjects: projectRows.filter((project) => project.status === "pending").length,
-      administrators: administrators.length,
-      pendingAdministrators: administrators.filter((administrator) => administrator.status === "pending").length,
+        administrators: administrators.length,
+        pendingAdministrators: administrators.filter((administrator) => administrator.status === "pending").length,
+        platformAdministrators: platformAdministrators.length,
     },
     businesses,
     projects: projectRows,
     administrators,
+    platformAdministrators,
   };
 }
 

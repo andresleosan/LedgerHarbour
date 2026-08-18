@@ -14,6 +14,7 @@ import {
 import type { BusinessId, BusinessStatus, MembershipStatus, UserId } from "../tenancy/types";
 import {
   createInMemoryPlatformRepository,
+  PlatformRepositoryConflictError,
   type InMemoryPlatformRepository,
   type PlatformMember,
   type PlatformRepository,
@@ -29,6 +30,10 @@ export const PLATFORM_ERROR_CODES = {
   INVALID_DATE: "INVALID_SERVICE_DATE",
   REPOSITORY_CONFLICT: "PLATFORM_REPOSITORY_CONFLICT",
   ADMINISTRATOR_NOT_FOUND: "ADMINISTRATOR_NOT_FOUND",
+  INVALID_PLATFORM_ADMIN_EMAIL: "INVALID_PLATFORM_ADMIN_EMAIL",
+  DUPLICATE_PLATFORM_ADMIN: "DUPLICATE_PLATFORM_ADMIN",
+  PLATFORM_ADMIN_NOT_FOUND: "PLATFORM_ADMIN_NOT_FOUND",
+  LAST_PLATFORM_ADMIN: "LAST_PLATFORM_ADMIN",
 } as const;
 
 export type PlatformErrorCode = (typeof PLATFORM_ERROR_CODES)[keyof typeof PLATFORM_ERROR_CODES];
@@ -41,6 +46,10 @@ const messages: Record<PlatformErrorCode, string> = {
   INVALID_SERVICE_DATE: "The service expiration date is invalid.",
   PLATFORM_REPOSITORY_CONFLICT: "The business state changed elsewhere.",
   ADMINISTRATOR_NOT_FOUND: "Administrator not found.",
+  INVALID_PLATFORM_ADMIN_EMAIL: "The platform administrator email is invalid.",
+  DUPLICATE_PLATFORM_ADMIN: "That platform administrator already exists.",
+  PLATFORM_ADMIN_NOT_FOUND: "Platform administrator not found.",
+  LAST_PLATFORM_ADMIN: "At least one active platform administrator is required.",
 };
 
 export class PlatformError extends Error {
@@ -87,6 +96,23 @@ export interface AdministratorActionInput {
   reason: string;
 }
 
+export interface PlatformAdminMemberDto {
+  id: string;
+  userId: UserId | null;
+  email: string;
+  role: "platform_admin";
+  isActive: boolean;
+}
+
+export interface AddPlatformAdministratorInput {
+  email: string;
+  reason: string;
+}
+
+export interface RemovePlatformAdministratorInput {
+  reason: string;
+}
+
 function requireReason(reason: string | undefined): string {
   if (typeof reason !== "string" || !reason.trim()) throw new PlatformError(PLATFORM_ERROR_CODES.REASON_REQUIRED);
   return reason.trim();
@@ -97,6 +123,25 @@ function serviceExpirationDate(value: unknown): string {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime()) || parsed.getTime() <= Date.now()) throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_DATE);
   return parsed.toISOString();
+}
+
+function normalizePlatformAdminEmail(value: unknown): string {
+  if (typeof value !== "string") throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_PLATFORM_ADMIN_EMAIL);
+  const normalized = value.trim().toLocaleLowerCase("en-US");
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized) || normalized.length > 320) {
+    throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_PLATFORM_ADMIN_EMAIL);
+  }
+  return normalized;
+}
+
+function toPlatformAdministratorRecord(member: PlatformMember): PlatformAdminMemberDto {
+  return {
+    id: member.id,
+    userId: member.userId,
+    email: member.normalizedEmail,
+    role: member.role,
+    isActive: member.isActive,
+  };
 }
 
 async function claimPlatformMemberForActor(
@@ -210,6 +255,9 @@ export interface PlatformService {
   listAdministrators(actor: OnboardingActor): Promise<PlatformAdministratorDto[]>;
   approveAdministrator(membershipId: string, actor: OnboardingActor, input: ReasonInput): Promise<PlatformAdministratorDto>;
   suspendAdministrator(membershipId: string, actor: OnboardingActor, input: AdministratorActionInput): Promise<PlatformAdministratorDto>;
+  listPlatformAdministrators(actor: OnboardingActor): Promise<PlatformAdminMemberDto[]>;
+  addPlatformAdministrator(actor: OnboardingActor, input: AddPlatformAdministratorInput): Promise<PlatformAdminMemberDto>;
+  removePlatformAdministrator(platformMemberId: string, actor: OnboardingActor, input: RemovePlatformAdministratorInput): Promise<PlatformAdminMemberDto>;
 }
 
 export function createPlatformService(dependencies: PlatformServiceDependencies): PlatformService {
@@ -260,6 +308,70 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
       return claimPlatformMemberForActor(actor, tenancy, platform);
     },
 
+    async listPlatformAdministrators(actor) {
+      await requirePlatformMember(actor, tenancy, platform);
+      return (await platform.listMembers()).map(toPlatformAdministratorRecord);
+    },
+
+    async addPlatformAdministrator(actor, input) {
+      const member = await requirePlatformMember(actor, tenancy, platform);
+      const normalizedEmail = normalizePlatformAdminEmail(input?.email);
+      const reason = requireReason(input?.reason);
+      const execute = async (transactionPlatform: PlatformRepository): Promise<PlatformAdminMemberDto> => {
+        if ((await transactionPlatform.listMembers()).some((candidate) => candidate.normalizedEmail === normalizedEmail)) {
+          throw new PlatformError(PLATFORM_ERROR_CODES.DUPLICATE_PLATFORM_ADMIN);
+        }
+        let added: PlatformMember;
+        try {
+          added = await transactionPlatform.createMember({ id: randomUUID(), normalizedEmail });
+        } catch (error) {
+          if (error instanceof PlatformRepositoryConflictError) throw new PlatformError(PLATFORM_ERROR_CODES.DUPLICATE_PLATFORM_ADMIN);
+          throw error;
+        }
+        await transactionPlatform.appendAuditEvent({
+          actorId: member.id,
+          action: "platform_admin_added",
+          targetType: "platform_member",
+          targetId: added.id,
+          beforeStatus: null,
+          afterStatus: "active",
+          reason,
+        });
+        return toPlatformAdministratorRecord(added);
+      };
+      return platform.transaction ? platform.transaction(execute) : execute(platform);
+    },
+
+    async removePlatformAdministrator(platformMemberId, actor, input) {
+      const member = await requirePlatformMember(actor, tenancy, platform);
+      const reason = requireReason(input?.reason);
+      const execute = async (transactionPlatform: PlatformRepository): Promise<PlatformAdminMemberDto> => {
+        await transactionPlatform.lockActiveMembers();
+        const target = (await transactionPlatform.listMembers()).find((candidate) => candidate.id === platformMemberId);
+        if (!target) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ADMIN_NOT_FOUND);
+        if (!target.isActive) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+        if (await transactionPlatform.countActiveMembers() <= 1) throw new PlatformError(PLATFORM_ERROR_CODES.LAST_PLATFORM_ADMIN);
+        let removed: PlatformMember;
+        try {
+          removed = await transactionPlatform.updateMemberStatus(platformMemberId, false, true);
+        } catch (error) {
+          if (error instanceof PlatformRepositoryConflictError) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+          throw error;
+        }
+        await transactionPlatform.appendAuditEvent({
+          actorId: member.id,
+          action: "platform_admin_removed",
+          targetType: "platform_member",
+          targetId: removed.id,
+          beforeStatus: "active",
+          afterStatus: "inactive",
+          reason,
+        });
+        return toPlatformAdministratorRecord(removed);
+      };
+      return platform.transaction ? platform.transaction(execute) : execute(platform);
+    },
+
     async approveBusiness(businessId, actor, input) {
       const member = await requirePlatformMember(actor, tenancy, platform);
       const serviceExpiresAt = serviceExpirationDate(input.serviceExpiresAt);
@@ -295,8 +407,7 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
            if (error instanceof OnboardingError) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
            throw error;
          }
-        await transaction.appendAuditEvent({ businessId, actorId: current.createdBy, type: "business_created", entityId: businessId });
-        await transactionPlatform.appendAuditEvent({
+         await transactionPlatform.appendAuditEvent({
           actorId: member.id,
           action: "business_approved",
           targetType: "business",

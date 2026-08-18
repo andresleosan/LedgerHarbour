@@ -20,6 +20,8 @@ vi.mock("../../../src/modules/auth/session", () => ({
 import { GET as listAdministrators } from "../../../src/app/api/platform/administrators/route";
 import { POST as approveAdministrator } from "../../../src/app/api/platform/administrators/[membershipId]/approve/route";
 import { POST as suspendAdministrator } from "../../../src/app/api/platform/administrators/[membershipId]/suspend/route";
+import { POST as addPlatformAdministrator } from "../../../src/app/api/platform/administrators/route";
+import { DELETE as removePlatformAdministrator } from "../../../src/app/api/platform/administrators/[membershipId]/route";
 import { POST as rejectBusiness } from "../../../src/app/api/platform/businesses/[businessId]/reject/route";
 import { POST as suspendBusiness } from "../../../src/app/api/platform/businesses/[businessId]/suspend/route";
 import { POST as reactivateBusiness } from "../../../src/app/api/platform/businesses/[businessId]/reactivate/route";
@@ -163,5 +165,45 @@ describe("platform administrator HTTP contracts", () => {
     const rejected = await rejectBusiness(request({ reason: "HTTP rejection" }), { params: Promise.resolve({ businessId: pending.id }) });
     expect(rejected.status).toBe(200);
     await expect(rejected.json()).resolves.toMatchObject({ business: { id: pending.id, status: "rejected" } });
+  });
+
+  it("adds and removes platform administrators through authenticated HTTP operations", async () => {
+    mockedIdentity.mockResolvedValue(platformIdentity);
+    await defaultOnboardingRepository.upsertUser(platformIdentity);
+    defaultPlatformRepository.addMember({ id: "route-platform-management", userId: await defaultOnboardingRepository.upsertUser(platformIdentity), normalizedEmail: platformIdentity.email });
+
+    const added = await addPlatformAdministrator(request({ email: "  Added.Admin@Example.COM ", reason: "HTTP operator onboarding" }));
+    expect(added.status).toBe(201);
+    const addedBody = await added.json() as { platformAdministrator?: { id: string; email: string; userId: string | null; role: string; isActive: boolean } };
+    expect(addedBody).toMatchObject({ platformAdministrator: {
+      email: "added.admin@example.com",
+      userId: null,
+      role: "platform_admin",
+      isActive: true,
+    } });
+    const memberId = addedBody.platformAdministrator?.id;
+    expect(memberId).toBeTruthy();
+
+    const duplicate = await addPlatformAdministrator(request({ email: "ADDED.ADMIN@example.com", reason: "Duplicate operator" }));
+    expect(duplicate.status).toBe(409);
+    const removed = await removePlatformAdministrator(request({ reason: "HTTP operator offboarding" }), { params: Promise.resolve({ membershipId: memberId! }) });
+    expect(removed.status).toBe(200);
+    await expect(removed.json()).resolves.toMatchObject({ platformAdministrator: { id: memberId, isActive: false } });
+    expect(defaultPlatformRepository.auditEvents).toContainEqual(expect.objectContaining({
+      action: "platform_admin_removed",
+      targetId: memberId,
+      reason: "HTTP operator offboarding",
+    }));
+  });
+
+  it("denies platform administrator management to ordinary identities and protects the last admin", async () => {
+    mockedIdentity.mockResolvedValue(ordinaryIdentity);
+    expect((await addPlatformAdministrator(request({ email: "denied@example.com", reason: "Denied" }))).status).toBe(403);
+
+    mockedIdentity.mockResolvedValue(platformIdentity);
+    const platformUserId = await defaultOnboardingRepository.upsertUser(platformIdentity);
+    defaultPlatformRepository.addMember({ id: "route-platform-last", userId: platformUserId, normalizedEmail: platformIdentity.email });
+    const last = await removePlatformAdministrator(request({ reason: "Last administrator" }), { params: Promise.resolve({ membershipId: "route-platform-last" }) });
+    expect(last.status).toBe(409);
   });
 });

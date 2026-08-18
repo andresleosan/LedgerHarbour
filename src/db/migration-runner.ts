@@ -12,6 +12,8 @@ const MEMBERSHIP_LIFECYCLE_MIGRATION_VERSION = "0004_membership_lifecycle";
 const MEMBERSHIP_LIFECYCLE_MIGRATION_FILE = new URL("./migrations/0004_membership_lifecycle.sql", import.meta.url);
 const PROJECTS_MIGRATION_VERSION = "0005_projects";
 const PROJECTS_MIGRATION_FILE = new URL("./migrations/0005_projects.sql", import.meta.url);
+const BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION = "0006_business_request_audit";
+const BUSINESS_REQUEST_AUDIT_MIGRATION_FILE = new URL("./migrations/0006_business_request_audit.sql", import.meta.url);
 const REQUIRED_TABLES = [
   "users",
   "businesses",
@@ -30,6 +32,7 @@ const MEMBERSHIP_LIFECYCLE_REQUIRED_COLUMNS = ["status"] as const;
 const PROJECTS_REQUIRED_TABLES = ["projects", "project_memberships"] as const;
 const MEMBERSHIP_LIFECYCLE_ROLLBACK_FILE = new URL("./migrations/rollback/0004_membership_lifecycle_down.sql", import.meta.url);
 const PROJECTS_ROLLBACK_FILE = new URL("./migrations/rollback/0005_projects_down.sql", import.meta.url);
+const BUSINESS_REQUEST_AUDIT_ROLLBACK_FILE = new URL("./migrations/rollback/0006_business_request_audit_down.sql", import.meta.url);
 
 export type MigrationQueryResult<Row = Record<string, unknown>> = {
   rows: Row[];
@@ -70,6 +73,7 @@ export type MigrationSequence<T> = {
   lifecycle: T;
   membershipLifecycle: T;
   projects: T;
+  businessRequestAudit: T;
 };
 
 export function assertRequiredMigrations(
@@ -78,6 +82,7 @@ export function assertRequiredMigrations(
   lifecycle?: MigrationCheck,
   membershipLifecycle?: MigrationCheck,
   projects?: MigrationCheck,
+  businessRequestAudit?: MigrationCheck,
 ): void {
   if (
     initial.version !== MIGRATION_VERSION
@@ -105,6 +110,9 @@ export function assertRequiredMigrations(
   }
   if (projects && (!projects.applied || projects.version !== PROJECTS_MIGRATION_VERSION || projects.requiredTableCount !== PROJECTS_REQUIRED_TABLES.length)) {
     throw new Error("Required PostgreSQL projects migration is not applied");
+  }
+  if (businessRequestAudit && (!businessRequestAudit.applied || businessRequestAudit.version !== BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION)) {
+    throw new Error("Required PostgreSQL business request audit migration is not applied");
   }
 }
 
@@ -502,6 +510,71 @@ export async function checkProjectsMigration(
   }
 }
 
+export async function applyBusinessRequestAuditMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, PROJECTS_MIGRATION_VERSION))) {
+      throw new Error("Projects migration must be applied before business request audit migration");
+    }
+    if (await migrationWasApplied(client, BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION)) {
+      return { version: BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION, applied: false };
+    }
+    const migrationSql = withoutTransactionMarkers(await readFile(BUSINESS_REQUEST_AUDIT_MIGRATION_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, migrationSql);
+    await client.query("INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)", [BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION]);
+    await client.query("COMMIT");
+    return { version: BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function rollbackBusinessRequestAuditMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION))) {
+      return { version: BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION, applied: false };
+    }
+    const rollbackSql = withoutTransactionMarkers(await readFile(BUSINESS_REQUEST_AUDIT_ROLLBACK_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, rollbackSql);
+    await client.query("DELETE FROM ledgerharbour_schema_migrations WHERE version = $1", [BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION]);
+    await client.query("COMMIT");
+    return { version: BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function checkBusinessRequestAuditMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationCheck> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    const applied = await migrationWasApplied(client, BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION);
+    return { version: BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION, applied, requiredTableCount: 1, ledgerRecordPresent: applied };
+  } finally {
+    await client.end();
+  }
+}
+
 export async function applyAllMigrations(
   config: MigrationConfig,
   clientFactory: MigrationClientFactory = connect,
@@ -511,7 +584,8 @@ export async function applyAllMigrations(
   const lifecycle = await applyBusinessLifecycleMigration(config, clientFactory);
   const membershipLifecycle = await applyMembershipLifecycleMigration(config, clientFactory);
   const projects = await applyProjectsMigration(config, clientFactory);
-  return { initial, platform, lifecycle, membershipLifecycle, projects };
+  const businessRequestAudit = await applyBusinessRequestAuditMigration(config, clientFactory);
+  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit };
 }
 
 export async function checkAllMigrations(
@@ -523,6 +597,7 @@ export async function checkAllMigrations(
   const lifecycle = await checkBusinessLifecycleMigration(config, clientFactory);
   const membershipLifecycle = await checkMembershipLifecycleMigration(config, clientFactory);
   const projects = await checkProjectsMigration(config, clientFactory);
-  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects);
-  return { initial, platform, lifecycle, membershipLifecycle, projects };
+  const businessRequestAudit = await checkBusinessRequestAuditMigration(config, clientFactory);
+  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit);
+  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit };
 }
