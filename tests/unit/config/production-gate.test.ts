@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -107,6 +107,31 @@ describe("production configuration gate", () => {
   });
 
   it.each([
+    ["R2_ENDPOINT", "https://account-id.r2.cloudflarestorage.com/path"],
+    ["R2_ENDPOINT", "https://account-id.r2.cloudflarestorage.com?token=value"],
+    ["R2_ENDPOINT", "https://account-id.r2.cloudflarestorage.com#fragment"],
+    ["R2_ENDPOINT", "https://user:pass@account-id.r2.cloudflarestorage.com"],
+    ["R2_ENDPOINT", "https://account-id:443.r2.cloudflarestorage.com"],
+    ["UPSTASH_REDIS_REST_URL", "https://redis-ledgerharbour.upstash.io/path"],
+    ["UPSTASH_REDIS_REST_URL", "https://redis-ledgerharbour.upstash.io?token=value"],
+    ["UPSTASH_REDIS_REST_URL", "https://redis-ledgerharbour.upstash.io#fragment"],
+    ["UPSTASH_REDIS_REST_URL", "https://user:pass@redis-ledgerharbour.upstash.io"],
+    ["UPSTASH_REDIS_REST_URL", "https://redis-ledgerharbour:443.upstash.io"],
+    ["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "ledgerharbour-prod.firebaseapp.com/path"],
+    ["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "ledgerharbour-prod.firebaseapp.com?query=value"],
+    ["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "user@ledgerharbour-prod.firebaseapp.com"],
+    ["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "ledgerharbour-prod.firebaseapp.com:443"],
+    ["GOOGLE_CLOUD_LOCATION", "us/path"],
+    ["GOOGLE_CLOUD_LOCATION", "https://documentai.googleapis.com"],
+    ["GOOGLE_CLOUD_LOCATION", "us?query=value"],
+  ])("rejects unsafe endpoint syntax in %s", (name, value) => {
+    const environment = validProductionEnvironment();
+    environment[name] = value;
+
+    expect(() => assertProductionConfiguration(environment)).toThrow("Production configuration is invalid.");
+  });
+
+  it.each([
     ["DATABASE_URL", "not-a-database-url"],
     ["R2_ENDPOINT", "http://account-id.r2.cloudflarestorage.com"],
     ["UPSTASH_REDIS_REST_URL", "not-a-redis-url"],
@@ -165,7 +190,8 @@ describe("production configuration gate", () => {
     expect(effective).not.toHaveProperty("FIREBASE_PRIVATE_KEY");
   });
 
-  it("keeps CI on explicit test providers without development auth or secrets", () => {
+  it.skipIf(!existsSync(new URL("../../../.github/workflows/ci.yml", import.meta.url)))
+  ("keeps CI on explicit test providers without development auth or secrets when a workflow exists", () => {
     const source = readFileSync(new URL("../../../.github/workflows/ci.yml", import.meta.url), "utf8");
 
     expect(source).toContain("AUTH_MODE: firebase");

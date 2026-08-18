@@ -88,6 +88,22 @@ function isValidHttpsUrl(value: string | null, hostnameSuffix?: string): boolean
   }
 }
 
+function isValidHttpsEndpoint(value: string | null, hostnamePattern: RegExp): boolean {
+  if (!isValidHttpsUrl(value)) return false;
+  try {
+    const url = new URL(value!);
+    return hostnamePattern.test(url.hostname) &&
+      url.pathname === "/" &&
+      !url.search &&
+      !url.hash &&
+      !url.username &&
+      !url.password &&
+      !url.port;
+  } catch {
+    return false;
+  }
+}
+
 function isValidDatabaseUrl(value: string | null): boolean {
   if (!value || isPlaceholder(value)) return false;
   try {
@@ -99,21 +115,11 @@ function isValidDatabaseUrl(value: string | null): boolean {
 }
 
 function isValidR2Endpoint(value: string | null): boolean {
-  if (!isValidHttpsUrl(value)) return false;
-  try {
-    return R2_HOST_PATTERN.test(new URL(value!).hostname);
-  } catch {
-    return false;
-  }
+  return isValidHttpsEndpoint(value, R2_HOST_PATTERN);
 }
 
 function isValidUpstashEndpoint(value: string | null): boolean {
-  if (!isValidHttpsUrl(value)) return false;
-  try {
-    return UPSTASH_HOST_PATTERN.test(new URL(value!).hostname);
-  } catch {
-    return false;
-  }
+  return isValidHttpsEndpoint(value, UPSTASH_HOST_PATTERN);
 }
 
 function isValidPrivateKey(value: string | null): boolean {

@@ -5,17 +5,31 @@ const forbiddenCopy = /open demo|demo account|development simulation|simulated g
 test("public landing and auth pages contain no demo copy", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: "Less inbox. More control." })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(forbiddenCopy);
   await page.getByRole("link", { name: "ES", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Menos bandeja de entrada. Mas control." })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(forbiddenCopy);
+  await page.getByRole("link", { name: "EN", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Less inbox. More control." })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(forbiddenCopy);
 
   await page.goto("/login");
+  await expect(page.getByRole("heading", { name: "Bring clarity to every ledger." })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(forbiddenCopy);
   await page.getByRole("button", { name: "Espanol" }).click();
   await expect(page.getByRole("heading", { name: "Claridad para cada libro contable." })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(forbiddenCopy);
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("heading", { name: "Bring clarity to every ledger." })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(forbiddenCopy);
 
   await page.goto("/register");
+  await expect(page.getByRole("heading", { name: "Start with a clear workspace." })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(forbiddenCopy);
   await page.getByRole("button", { name: "Espanol" }).click();
   await expect(page.getByRole("heading", { name: "Empieza con un espacio claro." })).toBeVisible();
+  await expect(page.locator("body")).not.toContainText(forbiddenCopy);
+  await page.getByRole("button", { name: "English" }).click();
+  await expect(page.getByRole("heading", { name: "Start with a clear workspace." })).toBeVisible();
   await expect(page.locator("body")).not.toContainText(forbiddenCopy);
 });

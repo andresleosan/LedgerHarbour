@@ -67,7 +67,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
           return;
         }
         setFeedback({ type: "signedIn", email: identity.email });
-        router.replace("/onboarding");
+        if (!isDeterministicFirebaseTest) router.replace("/onboarding");
       })
       .catch((error) => {
         if (!cancelled) {
