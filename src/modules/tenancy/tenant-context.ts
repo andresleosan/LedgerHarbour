@@ -25,6 +25,8 @@ export type EffectiveBusinessAccess =
 export interface TenantRepository {
   findMembership(userId: UserId, businessId: BusinessId): Promise<Membership | null>;
   findBusinessStatus(businessId: BusinessId): Promise<BusinessStatus | "inactive" | null>;
+  lockMembership?(userId: UserId, businessId: BusinessId): Promise<void>;
+  lockBusiness?(businessId: BusinessId): Promise<void>;
   findUserById?(userId: UserId): Promise<{ email: string } | null>;
 }
 

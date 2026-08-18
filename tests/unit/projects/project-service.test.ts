@@ -13,6 +13,8 @@ import {
   createProjectService,
   PROJECT_ERROR_CODES,
 } from "../../../src/modules/projects/project-service";
+import { createMembershipService } from "../../../src/modules/tenancy/membership-service";
+import type { AuthIdentity } from "../../../src/modules/auth/auth-provider";
 import type { BusinessId, UserId } from "../../../src/modules/tenancy/types";
 import { testServiceExpiresAt } from "../../helpers/business-fixtures";
 
@@ -226,5 +228,116 @@ describe("project approval lifecycle", () => {
       allowed: false,
       reason: "business_suspended",
     });
+  });
+
+  it("rejects a member add when the business actor is revoked during authorization", async () => {
+    const setup = await approvedBusiness();
+    const service = serviceFor(setup);
+    const actorIdentity: AuthIdentity = {
+      provider: "firebase",
+      providerUserId: "project-race-actor",
+      email: "project-race-actor@example.com",
+      displayName: "Project Race Actor",
+      emailVerified: true,
+    };
+    const actorId = await setup.tenancy.upsertUser(actorIdentity);
+    await setup.tenancy.createMembership({
+      membershipId: "project-race-actor-membership",
+      userId: actorId,
+      businessId: setup.business.id,
+      role: "administrator",
+      isActive: true,
+      status: "active",
+    });
+    await createMembershipService(setup.tenancy).setGeneralAdmin({
+      businessId: setup.business.id,
+      membershipId: "project-race-actor-membership",
+    }, setup.requester);
+    const project = await service.createProjectRequest(setup.business.id, setup.requester, { name: "Actor Revocation Add Project" });
+    await service.approveProject(project.id, user("platform-admin"), { reason: "Activate project" });
+
+    let releaseInitialCheck!: () => void;
+    const initialCheck = new Promise<void>((resolve) => { releaseInitialCheck = resolve; });
+    let initialCheckStarted!: () => void;
+    const initialCheckReached = new Promise<void>((resolve) => { initialCheckStarted = resolve; });
+    const findMembership = setup.tenancy.findMembership.bind(setup.tenancy);
+    let firstCheck = true;
+    setup.tenancy.findMembership = async (userId, businessId) => {
+      const membership = await findMembership(userId, businessId);
+      if (firstCheck && userId === actorId && businessId === setup.business.id) {
+        firstCheck = false;
+        initialCheckStarted();
+        await initialCheck;
+      }
+      return membership;
+    };
+
+    const addPromise = service.addProjectMember(setup.business.id, project.id, actorId, {
+      userId: actorId,
+      role: "member",
+    });
+    await initialCheckReached;
+    await createMembershipService(setup.tenancy).removeAdministrator({
+      businessId: setup.business.id,
+      membershipId: "project-race-actor-membership",
+    }, setup.requester, "general_admin");
+    releaseInitialCheck();
+
+    await expect(addPromise).rejects.toMatchObject({ code: PROJECT_ERROR_CODES.BUSINESS_ACCESS_DENIED });
+    await expect(setup.projectRepository.listProjectMemberships(project.id)).resolves.toHaveLength(1);
+  });
+
+  it("rejects a member list when the business actor is revoked during authorization", async () => {
+    const setup = await approvedBusiness();
+    const service = serviceFor(setup);
+    const actorIdentity: AuthIdentity = {
+      provider: "firebase",
+      providerUserId: "project-list-race-actor",
+      email: "project-list-race-actor@example.com",
+      displayName: "Project List Race Actor",
+      emailVerified: true,
+    };
+    const actorId = await setup.tenancy.upsertUser(actorIdentity);
+    await setup.tenancy.createMembership({
+      membershipId: "project-list-race-actor-membership",
+      userId: actorId,
+      businessId: setup.business.id,
+      role: "administrator",
+      isActive: true,
+      status: "active",
+    });
+    await createMembershipService(setup.tenancy).setGeneralAdmin({
+      businessId: setup.business.id,
+      membershipId: "project-list-race-actor-membership",
+    }, setup.requester);
+    const project = await service.createProjectRequest(setup.business.id, setup.requester, { name: "Actor Revocation List Project" });
+    await service.approveProject(project.id, user("platform-admin"), { reason: "Activate project" });
+    await service.addProjectMember(setup.business.id, project.id, setup.requester, { userId: actorId, role: "member" });
+
+    let releaseInitialCheck!: () => void;
+    const initialCheck = new Promise<void>((resolve) => { releaseInitialCheck = resolve; });
+    let initialCheckStarted!: () => void;
+    const initialCheckReached = new Promise<void>((resolve) => { initialCheckStarted = resolve; });
+    const findMembership = setup.tenancy.findMembership.bind(setup.tenancy);
+    let firstCheck = true;
+    setup.tenancy.findMembership = async (userId, businessId) => {
+      const membership = await findMembership(userId, businessId);
+      if (firstCheck && userId === actorId && businessId === setup.business.id) {
+        firstCheck = false;
+        initialCheckStarted();
+        await initialCheck;
+      }
+      return membership;
+    };
+
+    const listPromise = service.listProjectMembers(setup.business.id, project.id, actorId);
+    await initialCheckReached;
+    await createMembershipService(setup.tenancy).removeAdministrator({
+      businessId: setup.business.id,
+      membershipId: "project-list-race-actor-membership",
+    }, setup.requester, "general_admin");
+    releaseInitialCheck();
+
+    await expect(listPromise).rejects.toMatchObject({ code: PROJECT_ERROR_CODES.BUSINESS_ACCESS_DENIED });
   });
 });

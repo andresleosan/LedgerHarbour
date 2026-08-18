@@ -59,3 +59,37 @@ Estado: revision completada con warnings operativos; sin activacion de produccio
 ## Estado de commit
 
 Cambios de Task 8: prueba E2E integral y este informe. No se hizo deploy, migracion productiva, billing, OCR pago, lectura/escritura de secretos ni push.
+
+## Ronda adicional autorizada - cierre de P1 concurrentes
+
+Fecha: 2026-08-18
+Alcance: revalidacion transaccional del actor en administracion de `platform_admin` y membresias de proyecto.
+
+### Correcciones
+
+- `addPlatformAdministrator` y `removePlatformAdministrator` ahora bloquean la lista de administradores activos y revalidan dentro de la misma transaccion el `user_id`, estado activo y capability actual del actor. Si el actor fue desactivado durante la ventana, la operacion devuelve `PLATFORM_ACCESS_DENIED` sin mutacion ni auditoria de la operacion rechazada.
+- `addProjectMember` y `listProjectMembers` ahora bloquean negocio, proyecto y membresia del actor dentro del mismo flujo transaccional. La membresia y `manage_projects` se vuelven a evaluar despues de los locks y antes de escribir o listar. Un actor revocado durante la ventana recibe `BUSINESS_ACCESS_DENIED`, sin alta ni listado.
+- PostgreSQL implementa `SELECT ... FOR UPDATE` para negocio y membresia; el repositorio in-memory conserva la serializacion transaccional determinista. No se agregaron migraciones.
+- Se mantuvo la proteccion del ultimo `platform_admin`, el CAS de la baja, el claim Firebase, la autorizacion por `user_id` y la normalizacion de email solamente para el alta.
+
+### Pruebas deterministas
+
+- RED: `corepack pnpm exec vitest run tests/unit/platform/platform-admin-management.test.ts tests/unit/projects/project-service.test.ts` - 4 pruebas de carrera fallaron contra la implementacion anterior: alta/baja de `platform_admin` mutaban con el actor ya desactivado y alta/listado de proyecto continuaban con el actor revocado.
+- GREEN focalizado: el mismo comando - 2 archivos, `19/19` tests pasan.
+- Integracion/seguridad focalizada: `corepack pnpm exec vitest run tests/integration/projects/project-routes.test.ts tests/integration/platform/administrator-routes.test.ts tests/security/project-isolation.test.ts tests/security/platform-admin-management.test.ts tests/integration/postgres/tenancy-repository.test.ts tests/integration/postgres/test-database-migrations.test.ts` - 6 archivos, `31/31` tests pasan; conserva casos normales y contratos `403/409`.
+
+### Verificacion completa
+
+| Comando | Resultado exacto |
+|---|---|
+| `corepack pnpm test` | Exit 0; `61` archivos pasan, `2` skipped; `532` tests pasan, `3` skipped. |
+| `corepack pnpm lint` | Exit 0; sin errores. |
+| `corepack pnpm exec tsc --noEmit` | Exit 0; sin salida de errores. |
+| `corepack pnpm build` | Exit 0; Next.js compilo correctamente y genero `18/18` paginas estaticas. |
+| `corepack pnpm audit --json` | Exit 0; `0` info, `0` low, `0` moderate, `0` high, `0` critical; `556` dependencias totales. |
+| `corepack pnpm test:e2e` | Exit 0; `33/33` pruebas pasan en aproximadamente `3.5m`. |
+
+### Concerns de esta ronda
+
+- PostgreSQL nativo continua sin ejecutarse porque `TEST_DATABASE_URL` no esta configurado; la ruta SQL de locks queda cubierta por typecheck/build y el esquema por las pruebas PGlite/migracion existentes, no por una base PostgreSQL externa.
+- No se hizo deploy, migracion productiva, billing, OCR pago, lectura/escritura de secretos ni push.

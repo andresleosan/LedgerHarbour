@@ -162,6 +162,7 @@ async function requireActiveProjectForMembershipOperations(
   businessId: BusinessId,
   projectId: string,
 ): Promise<Project> {
+  await tenancy.lockBusiness?.(businessId);
   await projects.lockProject(projectId);
   const project = await projects.findProject(projectId);
   if (!project || project.businessId !== businessId) throw new ProjectError(PROJECT_ERROR_CODES.PROJECT_NOT_FOUND);
@@ -169,6 +170,20 @@ async function requireActiveProjectForMembershipOperations(
   if (businessStatus !== "active") throw new ProjectError(PROJECT_ERROR_CODES.BUSINESS_INACTIVE);
   if (project.status !== "active" || !project.isActive) throw new ProjectError(PROJECT_ERROR_CODES.PROJECT_ACCESS_DENIED);
   return project;
+}
+
+async function requireTransactionalBusinessProjectManager(
+  tenancy: OnboardingRepository,
+  businessId: BusinessId,
+  actorId: UserId,
+): Promise<void> {
+  await tenancy.lockMembership?.(actorId, businessId);
+  try {
+    const membership = await createTenantContext(tenancy).requireBusinessAccess(actorId, businessId);
+    requireCapability(membership, "manage_projects");
+  } catch {
+    throw new ProjectError(PROJECT_ERROR_CODES.BUSINESS_ACCESS_DENIED);
+  }
 }
 
 function transitionUpdate(status: (typeof ProjectStatus)[number], reason: string | null): ProjectLifecycleUpdate {
@@ -282,13 +297,14 @@ export function createProjectService(dependencies: ProjectServiceDependencies): 
 
     async addProjectMember(businessId, projectId, actor, input) {
       if (await tenancy.findBusinessStatus(businessId) !== "active") throw new ProjectError(PROJECT_ERROR_CODES.BUSINESS_INACTIVE);
-      await requireBusinessProjectManager(tenancy, businessId, actor);
+      const actorId = await requireBusinessProjectManager(tenancy, businessId, actor);
       if (!input || typeof input.userId !== "string" || !input.userId.trim() || input.role !== "member") {
         throw new ProjectError(PROJECT_ERROR_CODES.INVALID_MEMBER);
       }
       try {
         return await tenancy.transaction(async (transactionTenancy) => projects.transaction(async (transactionProjects) => {
           await requireActiveProjectForMembershipOperations(transactionTenancy, transactionProjects, businessId, projectId);
+          await requireTransactionalBusinessProjectManager(transactionTenancy, businessId, actorId);
           if (transactionTenancy.findUserById && !(await transactionTenancy.findUserById(input.userId))) {
             throw new ProjectError(PROJECT_ERROR_CODES.INVALID_MEMBER);
           }
@@ -307,9 +323,10 @@ export function createProjectService(dependencies: ProjectServiceDependencies): 
 
     async listProjectMembers(businessId, projectId, actor) {
       if (await tenancy.findBusinessStatus(businessId) !== "active") throw new ProjectError(PROJECT_ERROR_CODES.BUSINESS_INACTIVE);
-      await requireBusinessProjectManager(tenancy, businessId, actor);
+      const actorId = await requireBusinessProjectManager(tenancy, businessId, actor);
       return tenancy.transaction(async (transactionTenancy) => projects.transaction(async (transactionProjects) => {
         await requireActiveProjectForMembershipOperations(transactionTenancy, transactionProjects, businessId, projectId);
+        await requireTransactionalBusinessProjectManager(transactionTenancy, businessId, actorId);
         return transactionProjects.listProjectMemberships(projectId);
       }));
     },

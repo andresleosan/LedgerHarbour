@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, desc, eq, like } from "drizzle-orm";
+import { and, asc, desc, eq, like, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/client";
 import { databaseForOperation, transactionWithDatabase } from "../../db/transaction-scope";
@@ -189,6 +189,22 @@ function createRepository(db: Database, transactionCount: { value: number }): On
           eq(memberships.businessId, businessId),
         )).limit(1);
         return row ? mapMembership(row) : null;
+      } catch (error) {
+        return preserveOrMap(error);
+      }
+    },
+
+    async lockMembership(userId, businessId) {
+      try {
+        await db.execute(sql`SELECT id FROM memberships WHERE user_id = ${userId} AND business_id = ${businessId} FOR UPDATE`);
+      } catch (error) {
+        return preserveOrMap(error);
+      }
+    },
+
+    async lockBusiness(businessId) {
+      try {
+        await db.execute(sql`SELECT id FROM businesses WHERE id = ${businessId} FOR UPDATE`);
       } catch (error) {
         return preserveOrMap(error);
       }

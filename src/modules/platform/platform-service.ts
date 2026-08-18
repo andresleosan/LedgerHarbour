@@ -201,6 +201,19 @@ function requirePlatformCapability(
   if (!can(member.role, capability)) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
 }
 
+async function requireCurrentPlatformMember(
+  actorId: UserId,
+  platform: PlatformRepository,
+  capability: "approve_administrator" | "suspend_administrator" | "revoke_administrator",
+): Promise<PlatformMember> {
+  const member = await platform.findActiveMemberByUserId(actorId);
+  if (!member || member.role !== "platform_admin" || !member.isActive || member.userId !== actorId) {
+    throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
+  }
+  requirePlatformCapability(member, capability);
+  return member;
+}
+
 type AdministratorEntry = {
   membership: Awaited<ReturnType<OnboardingRepository["listMemberships"]>>[number];
   business: Business;
@@ -315,9 +328,14 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
 
     async addPlatformAdministrator(actor, input) {
       const member = await requirePlatformMember(actor, tenancy, platform);
+      requirePlatformCapability(member, "approve_administrator");
+      if (!member.userId) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
+      const actorId = member.userId;
       const normalizedEmail = normalizePlatformAdminEmail(input?.email);
       const reason = requireReason(input?.reason);
       const execute = async (transactionPlatform: PlatformRepository): Promise<PlatformAdminMemberDto> => {
+        await transactionPlatform.lockActiveMembers();
+        const currentMember = await requireCurrentPlatformMember(actorId, transactionPlatform, "approve_administrator");
         if ((await transactionPlatform.listMembers()).some((candidate) => candidate.normalizedEmail === normalizedEmail)) {
           throw new PlatformError(PLATFORM_ERROR_CODES.DUPLICATE_PLATFORM_ADMIN);
         }
@@ -329,7 +347,7 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
           throw error;
         }
         await transactionPlatform.appendAuditEvent({
-          actorId: member.id,
+          actorId: currentMember.id,
           action: "platform_admin_added",
           targetType: "platform_member",
           targetId: added.id,
@@ -344,9 +362,13 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
 
     async removePlatformAdministrator(platformMemberId, actor, input) {
       const member = await requirePlatformMember(actor, tenancy, platform);
+      requirePlatformCapability(member, "revoke_administrator");
+      if (!member.userId) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED);
+      const actorId = member.userId;
       const reason = requireReason(input?.reason);
       const execute = async (transactionPlatform: PlatformRepository): Promise<PlatformAdminMemberDto> => {
         await transactionPlatform.lockActiveMembers();
+        const currentMember = await requireCurrentPlatformMember(actorId, transactionPlatform, "revoke_administrator");
         const target = (await transactionPlatform.listMembers()).find((candidate) => candidate.id === platformMemberId);
         if (!target) throw new PlatformError(PLATFORM_ERROR_CODES.PLATFORM_ADMIN_NOT_FOUND);
         if (!target.isActive) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
@@ -359,7 +381,7 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
           throw error;
         }
         await transactionPlatform.appendAuditEvent({
-          actorId: member.id,
+          actorId: currentMember.id,
           action: "platform_admin_removed",
           targetType: "platform_member",
           targetId: removed.id,

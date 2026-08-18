@@ -297,6 +297,10 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
     ) ?? null;
   }
 
+  async lockMembership(): Promise<void> {}
+
+  async lockBusiness(): Promise<void> {}
+
   async findUserById(userId: UserId): Promise<{ email: string } | null> {
     const providerId = [...this.userIdsByProvider.entries()].find(([, id]) => id === userId)?.[0];
     const email = providerId ? this.normalizedEmailsByProvider.get(providerId) : undefined;
