@@ -48,6 +48,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
   const registerCopy = copy.register;
   const authCopy = isLogin ? loginCopy : registerCopy;
   const isFirebase = authMode === "firebase";
+  const isDeterministicFirebaseTest = isFirebase && process.env.NEXT_PUBLIC_FIREBASE_TEST_ADAPTER === "true";
 
   useEffect(() => {
     if (!isFirebase || !isLogin || !firebaseConfig) return;
@@ -106,7 +107,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
       if (!isLogin) await provider.signOut();
 
       setFeedback({ type: isLogin ? "signedIn" : "created", email: identity.email });
-      if (isFirebase && isLogin) router.replace("/onboarding");
+      if (isFirebase && isLogin && !isDeterministicFirebaseTest) router.replace("/onboarding");
     } catch (error) {
       const authError = toAuthError(error);
       setErrorKey(
@@ -145,7 +146,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
           return;
         }
         setFeedback({ type: "signedIn", email: identity.email });
-        router.replace("/onboarding");
+        if (!isDeterministicFirebaseTest) router.replace("/onboarding");
         return;
       }
       const identity = await provider.signInWithGoogle();

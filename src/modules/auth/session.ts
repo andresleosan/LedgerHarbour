@@ -4,6 +4,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { AuthIdentity } from "./auth-provider";
 import { FirebaseAuthProvider } from "./firebase-auth-provider";
+import { createDeterministicFirebaseAdminAuth, deterministicFirebaseToken } from "./firebase-test-adapter";
+import { FIREBASE_SESSION_MAX_AGE, firebaseSessionStore } from "./firebase-session";
 import { isDeterministicTestRuntime } from "./runtime-mode";
 
 export const DEV_SESSION_COOKIE = "ledgerharbour_dev_session";
@@ -84,6 +86,15 @@ function decodeSession(value: string): StoredSession | null {
 }
 
 export async function setCurrentIdentity(identity: AuthIdentity): Promise<void> {
+  if (process.env.NODE_ENV === "test" && process.env.AUTH_MODE === "firebase") {
+    const auth = createDeterministicFirebaseAdminAuth();
+    const session = await auth.createSessionCookie(deterministicFirebaseToken(identity.email, identity.providerUserId), {
+      expiresIn: FIREBASE_SESSION_MAX_AGE * 1000,
+    });
+    await firebaseSessionStore.set(session);
+    return;
+  }
+
   if (!isDevelopmentMode()) {
     return;
   }

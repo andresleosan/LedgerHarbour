@@ -5,6 +5,7 @@ import {
   createAuthenticatedRateLimiter,
   createAuthRateLimiter,
   InMemoryRateLimiter,
+  resetRateLimitersForTests,
 } from "../../src/modules/security/rate-limit";
 
 describe("InMemoryRateLimiter", () => {
@@ -66,6 +67,21 @@ describe("InMemoryRateLimiter", () => {
 
     expect(createAggregatedRateLimiter("upload")).not.toBe(createAuthenticatedRateLimiter("upload"));
     expect(createAggregatedRateLimiter("ocr-process")).not.toBe(createAuthenticatedRateLimiter("ocr-process"));
+    vi.unstubAllEnvs();
+  });
+
+  it("does not exhaust the shared test auth limiter during a browser suite", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("RATE_LIMIT_MODE", "memory");
+    vi.stubEnv("LEDGERHARBOUR_PLAYWRIGHT_HARNESS", "true");
+    resetRateLimitersForTests();
+    const limiter = createAuthRateLimiter();
+
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await expect(limiter.limit("auth:test-browser")).resolves.toMatchObject({ success: true });
+    }
+
+    resetRateLimitersForTests();
     vi.unstubAllEnvs();
   });
 });

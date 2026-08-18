@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { createFirebaseAdminAuth } from "../../../src/modules/auth/firebase-admin";
 import { createDeterministicFirebaseAdminAuth } from "../../../src/modules/auth/firebase-test-adapter";
+import { clearCurrentIdentity, getCurrentIdentity, setCurrentIdentity } from "../../../src/modules/auth/session";
 
 describe("deterministic Firebase test adapter", () => {
   it("verifies deterministic email tokens and session cookies only in test", async () => {
@@ -33,6 +34,28 @@ describe("deterministic Firebase test adapter", () => {
 
     expect(() => createDeterministicFirebaseAdminAuth()).toThrow("NODE_ENV=test");
     expect(() => createFirebaseAdminAuth()).toThrow("FIREBASE_PROJECT_ID");
+    vi.unstubAllEnvs();
+  });
+
+  it("supports route session fixtures with Firebase test auth and no development mode", async () => {
+    vi.stubEnv("NODE_ENV", "test");
+    vi.stubEnv("AUTH_MODE", "firebase");
+
+    await setCurrentIdentity({
+      provider: "firebase",
+      providerUserId: "fixture-user",
+      email: "fixture@example.com",
+      displayName: "Fixture User",
+      emailVerified: true,
+    });
+
+    await expect(getCurrentIdentity()).resolves.toMatchObject({
+      provider: "firebase",
+      email: "fixture@example.com",
+      emailVerified: true,
+    });
+    await clearCurrentIdentity();
+    await expect(getCurrentIdentity()).resolves.toBeNull();
     vi.unstubAllEnvs();
   });
 });

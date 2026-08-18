@@ -74,7 +74,7 @@ describe("OCR workflow boundaries", () => {
   let documentId = "" as DocumentId;
 
   beforeEach(async () => {
-    process.env.AUTH_MODE = "development";
+    process.env.AUTH_MODE = "firebase";
     process.env.OCR_PROVIDER = "fake";
     resetRateLimitersForTests();
     tenancy = createInMemoryOnboardingRepository();

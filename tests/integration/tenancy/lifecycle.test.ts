@@ -36,7 +36,7 @@ async function expectError(response: Response, status: number, code: string) {
 
 describe("membership administration routes and business lifecycle", () => {
   beforeEach(() => {
-    process.env.AUTH_MODE = "development";
+    process.env.AUTH_MODE = "firebase";
     defaultOnboardingRepository.businesses.clear();
     defaultOnboardingRepository.memberships.splice(0);
     defaultOnboardingRepository.categories.splice(0);

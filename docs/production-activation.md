@@ -14,7 +14,7 @@ Configura en el gestor de secretos del entorno, nunca en Git:
 - Upstash: `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`.
 - Document AI: `GOOGLE_CLOUD_PROJECT_ID`, `GOOGLE_CLOUD_LOCATION`, `GOOGLE_DOCUMENT_AI_PROCESSOR_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON`.
 
-El gate solo comprueba presencia no vacia y los modos. Cada adapter agrega sus validaciones de formato, HTTPS, IAM y credenciales. Ningun error debe imprimir valores de entorno.
+El gate valida estructura, formatos, hosts permitidos, consistencia y campos obligatorios sin imprimir valores de entorno. No puede probar offline que una credencial real sea autentica, que tenga IAM efectivo, que el processor exista o que el token tenga cuota: esas comprobaciones se realizan manualmente durante la activacion controlada del entorno.
 
 ## Procedimiento del operador
 

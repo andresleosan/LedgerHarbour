@@ -1,5 +1,4 @@
-process.env.AUTH_MODE ??= "development";
-process.env.DEV_SESSION_SECRET ??= "ledgerharbour-vitest-test-only";
+process.env.AUTH_MODE ??= "firebase";
 
 // Test-only cookie boundary: production session code must never use process-global identity state.
 import { beforeEach, vi } from "vitest";

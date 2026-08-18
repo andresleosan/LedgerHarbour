@@ -5,6 +5,8 @@ const PRIVATE_KEY_PATTERN = /-----BEGIN (?:RSA )?PRIVATE KEY-----[\s\S]+-----END
 const APP_ID_PATTERN = /^1:\d+:web:[a-z0-9]+$/;
 const PROCESSOR_ID_PATTERN = /^[a-zA-Z0-9-]{3,128}$/;
 const BUCKET_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?$/;
+const R2_HOST_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.r2\.cloudflarestorage\.com$/;
+const UPSTASH_HOST_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.upstash\.io$/;
 
 const requiredProductionModes = {
   AUTH_MODE: "firebase",
@@ -57,6 +59,8 @@ function isPlaceholder(value: string): boolean {
     normalized.includes("replace_with") ||
     normalized.includes("changeme") ||
     normalized.includes("change-me") ||
+    normalized.includes("placeholder") ||
+    /(?:^|[-_.:/])(?:synthetic|dummy|sample|fake|example|test)(?:$|[-_.:/])/i.test(normalized) ||
     normalized.includes("<account-id>") ||
     normalized.includes("<your-") ||
     normalized.includes("your-secret");
@@ -89,6 +93,24 @@ function isValidDatabaseUrl(value: string | null): boolean {
   try {
     const url = new URL(value);
     return (url.protocol === "postgres:" || url.protocol === "postgresql:") && Boolean(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isValidR2Endpoint(value: string | null): boolean {
+  if (!isValidHttpsUrl(value)) return false;
+  try {
+    return R2_HOST_PATTERN.test(new URL(value!).hostname);
+  } catch {
+    return false;
+  }
+}
+
+function isValidUpstashEndpoint(value: string | null): boolean {
+  if (!isValidHttpsUrl(value)) return false;
+  try {
+    return UPSTASH_HOST_PATTERN.test(new URL(value!).hostname);
   } catch {
     return false;
   }
@@ -152,11 +174,11 @@ export function parseProductionConfiguration(
     !publicAppId ||
     !APP_ID_PATTERN.test(publicAppId) ||
     !isValidDatabaseUrl(requiredValue(environment, "DATABASE_URL")) ||
-    !isValidHttpsUrl(requiredValue(environment, "R2_ENDPOINT")) ||
+    !isValidR2Endpoint(requiredValue(environment, "R2_ENDPOINT")) ||
     !BUCKET_NAME_PATTERN.test(requiredValue(environment, "R2_BUCKET_NAME") ?? "") ||
     !requiredValue(environment, "R2_ACCESS_KEY_ID") ||
     !requiredValue(environment, "R2_SECRET_ACCESS_KEY") ||
-    !isValidHttpsUrl(requiredValue(environment, "UPSTASH_REDIS_REST_URL"), ".upstash.io") ||
+    !isValidUpstashEndpoint(requiredValue(environment, "UPSTASH_REDIS_REST_URL")) ||
     !requiredValue(environment, "UPSTASH_REDIS_REST_TOKEN") ||
     !["us", "eu"].includes(googleLocation ?? "") ||
     !processorId ||

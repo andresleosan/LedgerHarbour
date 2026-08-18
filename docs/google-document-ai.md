@@ -39,7 +39,7 @@ El worker conserva estos resultados operativos:
 - Los errores genericos del cliente, de configuracion, autenticacion o permisos son terminales y se exponen solo como un resumen publico generico.
 - `FakeOcrProvider` es el fallback explicito para desarrollo y pruebas locales. No es un fallback automatico para produccion.
 
-La primera activacion real requiere una prueba operativa controlada con un documento permitido, credenciales validas y el processor correcto. Esa prueba no forma parte de esta configuracion documental.
+La primera activacion real requiere una prueba operativa controlada con un documento permitido, credenciales validas y el processor correcto. La validez criptografica, IAM efectivo, existencia del processor y cuota no se pueden demostrar offline; el operador los verifica manualmente al activar el entorno. Esa prueba no forma parte de esta configuracion documental.
 
 ## Costos y control
 

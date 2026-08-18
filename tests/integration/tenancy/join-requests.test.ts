@@ -35,7 +35,7 @@ async function expectErrorResponse(
 
 describe("in-memory onboarding repository boundary", () => {
   beforeEach(() => {
-    process.env.AUTH_MODE = "development";
+    process.env.AUTH_MODE = "firebase";
     defaultOnboardingRepository.businesses.clear();
     defaultOnboardingRepository.memberships.splice(0);
     defaultOnboardingRepository.categories.splice(0);

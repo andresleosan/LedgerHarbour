@@ -27,7 +27,7 @@ describe("invoice review boundaries", () => {
   let invoice: Invoice;
 
   beforeEach(async () => {
-    process.env.AUTH_MODE = "development";
+    process.env.AUTH_MODE = "firebase";
     tenancy = createInMemoryOnboardingRepository();
     documents = createDocumentRepository();
     invoices = createInvoiceRepository();

@@ -8,10 +8,14 @@ const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 function decodeToken(value: string, prefix: string): FirebaseDecodedToken {
   if (!value.startsWith(prefix)) throw new Error("Invalid deterministic Firebase token");
   const encodedEmail = value.slice(prefix.length);
-  const email = decodeURIComponent(encodedEmail).trim().toLowerCase();
+  const decodedPayload = decodeURIComponent(encodedEmail);
+  const separator = decodedPayload.indexOf("|");
+  const email = (separator === -1 ? decodedPayload : decodedPayload.slice(0, separator)).trim().toLowerCase();
+  const providerUserId = separator === -1 ? `test-firebase-${email}` : decodedPayload.slice(separator + 1).trim();
   if (!emailPattern.test(email)) throw new Error("Invalid deterministic Firebase email");
+  if (!providerUserId) throw new Error("Invalid deterministic Firebase user");
   return {
-    uid: `test-firebase-${email}`,
+    uid: providerUserId,
     email,
     name: email.split("@", 1)[0].replace(/^./, (character) => character.toUpperCase()),
     email_verified: true,
@@ -22,8 +26,10 @@ function sessionFor(token: string): string {
   return `${SESSION_PREFIX}${token}`;
 }
 
-export function deterministicFirebaseToken(email: string): string {
-  return `${TOKEN_PREFIX}${encodeURIComponent(email.trim().toLowerCase())}`;
+export function deterministicFirebaseToken(email: string, providerUserId?: string): string {
+  const normalizedEmail = email.trim().toLowerCase();
+  const suffix = providerUserId ? `|${providerUserId.trim()}` : "";
+  return `${TOKEN_PREFIX}${encodeURIComponent(`${normalizedEmail}${suffix}`)}`;
 }
 
 export function createDeterministicFirebaseAdminAuth(): FirebaseAdminAuth {

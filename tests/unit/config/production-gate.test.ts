@@ -5,7 +5,7 @@ import {
   assertProductionConfiguration,
   ProductionConfigurationError,
 } from "../../../src/modules/config/production-gate";
-import { createPlaywrightWebServerEnv } from "../../../playwright.config";
+import { createPlaywrightServerEnv } from "../../../scripts/playwright-server";
 
 function validProductionEnvironment(): NodeJS.ProcessEnv {
   return {
@@ -15,24 +15,24 @@ function validProductionEnvironment(): NodeJS.ProcessEnv {
     PERSISTENCE_MODE: "postgres",
     STORAGE_MODE: "r2",
     RATE_LIMIT_MODE: "upstash",
-    DATABASE_URL: "postgresql://runtime.example/ledgerharbour",
+    DATABASE_URL: "postgresql://runtime.ledgerharbour.invalid/ledgerharbour",
     FIREBASE_PROJECT_ID: "ledgerharbour-prod",
     FIREBASE_CLIENT_EMAIL: "firebase-adminsdk@ledgerharbour-prod.iam.gserviceaccount.com",
-    FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----\n",
-    NEXT_PUBLIC_FIREBASE_API_KEY: "test-public-api-key",
+    FIREBASE_PRIVATE_KEY: "-----BEGIN PRIVATE KEY-----\nunit-key-material\n-----END PRIVATE KEY-----\n",
+    NEXT_PUBLIC_FIREBASE_API_KEY: "web-api-key-7f3a8c2d",
     NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "ledgerharbour-prod.firebaseapp.com",
     NEXT_PUBLIC_FIREBASE_PROJECT_ID: "ledgerharbour-prod",
     NEXT_PUBLIC_FIREBASE_APP_ID: "1:1234567890:web:abcdef123456",
     R2_ENDPOINT: "https://account-id.r2.cloudflarestorage.com",
     R2_BUCKET_NAME: "ledgerharbour-prod",
-    R2_ACCESS_KEY_ID: "r2-access-key",
-    R2_SECRET_ACCESS_KEY: "r2-secret-key",
-    UPSTASH_REDIS_REST_URL: "https://redis.example.upstash.io",
-    UPSTASH_REDIS_REST_TOKEN: "test-upstash-token",
+    R2_ACCESS_KEY_ID: "r2-access-7f3a8c2d",
+    R2_SECRET_ACCESS_KEY: "r2-secret-7f3a8c2d",
+    UPSTASH_REDIS_REST_URL: "https://redis-ledgerharbour.upstash.io",
+    UPSTASH_REDIS_REST_TOKEN: "upstash-token-7f3a8c2d",
     GOOGLE_CLOUD_PROJECT_ID: "ledgerharbour-prod",
     GOOGLE_CLOUD_LOCATION: "us",
     GOOGLE_DOCUMENT_AI_PROCESSOR_ID: "processor-id",
-    GOOGLE_SERVICE_ACCOUNT_JSON: '{"type":"service_account","project_id":"ledgerharbour-prod","client_email":"ocr@ledgerharbour-prod.iam.gserviceaccount.com","private_key":"-----BEGIN PRIVATE KEY-----\\ntest\\n-----END PRIVATE KEY-----\\n"}',
+    GOOGLE_SERVICE_ACCOUNT_JSON: '{"type":"service_account","project_id":"ledgerharbour-prod","client_email":"ocr@ledgerharbour-prod.iam.gserviceaccount.com","private_key":"-----BEGIN PRIVATE KEY-----\\nunit-key-material\\n-----END PRIVATE KEY-----\\n"}',
   };
 }
 
@@ -88,6 +88,25 @@ describe("production configuration gate", () => {
   });
 
   it.each([
+    ["FIREBASE_PROJECT_ID", "example-project"],
+    ["NEXT_PUBLIC_FIREBASE_API_KEY", "test-public-api-key"],
+    ["R2_ACCESS_KEY_ID", "synthetic-r2-key"],
+    ["UPSTASH_REDIS_REST_TOKEN", "fake-upstash-token"],
+  ])("rejects obvious synthetic values in %s", (name, value) => {
+    const environment = validProductionEnvironment();
+    environment[name] = value;
+
+    expect(() => assertProductionConfiguration(environment)).toThrow("Production configuration is invalid.");
+  });
+
+  it("requires the exact Cloudflare R2 endpoint host", () => {
+    const environment = validProductionEnvironment();
+    environment.R2_ENDPOINT = "https://account-id.r2.example.com";
+
+    expect(() => assertProductionConfiguration(environment)).toThrow("Production configuration is invalid.");
+  });
+
+  it.each([
     ["DATABASE_URL", "not-a-database-url"],
     ["R2_ENDPOINT", "http://account-id.r2.cloudflarestorage.com"],
     ["UPSTASH_REDIS_REST_URL", "not-a-redis-url"],
@@ -113,18 +132,22 @@ describe("production configuration gate", () => {
 
   it("keeps the browser harness on explicit non-paid test providers", () => {
     const source = readFileSync(new URL("../../../playwright.config.ts", import.meta.url), "utf8");
+    const serverSource = readFileSync(new URL("../../../scripts/playwright-server.ts", import.meta.url), "utf8");
 
-    expect(source).toContain('AUTH_MODE: "firebase"');
-    expect(source).toContain('OCR_PROVIDER: "fake"');
-    expect(source).toContain('PERSISTENCE_MODE: "memory"');
-    expect(source).toContain('STORAGE_MODE: "local"');
-    expect(source).toContain('RATE_LIMIT_MODE: "memory"');
-    expect(source).not.toContain("...process.env");
+    expect(serverSource).toContain('AUTH_MODE: "firebase"');
+    expect(serverSource).toContain('OCR_PROVIDER: "fake"');
+    expect(serverSource).toContain('PERSISTENCE_MODE: "memory"');
+    expect(serverSource).toContain('STORAGE_MODE: "local"');
+    expect(serverSource).toContain('RATE_LIMIT_MODE: "memory"');
+    expect(serverSource).toContain('LEDGERHARBOUR_PLAYWRIGHT_HARNESS: "true"');
+    expect(serverSource).not.toContain("...process.env");
     expect(source).not.toContain("GOOGLE_SERVICE_ACCOUNT_JSON");
+    expect(source).toContain("scripts/playwright-server.ts");
+    expect(source).not.toContain("env: createPlaywright");
   });
 
   it("passes only the test whitelist to the web server", () => {
-    const effective = createPlaywrightWebServerEnv({
+    const effective = createPlaywrightServerEnv({
       NODE_ENV: "test",
       PATH: "test-path",
       DATABASE_URL: "postgresql://secret.example/database",
@@ -157,5 +180,13 @@ describe("production configuration gate", () => {
     expect(source).not.toContain("FIREBASE_PRIVATE_KEY:");
     expect(source).not.toContain("R2_SECRET_ACCESS_KEY:");
     expect(source).not.toContain("UPSTASH_REDIS_REST_TOKEN:");
+  });
+
+  it("keeps Vitest on Firebase test auth instead of development sessions", () => {
+    const source = readFileSync(new URL("../../../tests/setup.ts", import.meta.url), "utf8");
+
+    expect(source).toContain('AUTH_MODE ??= "firebase"');
+    expect(source).not.toContain("DEV_SESSION_SECRET");
+    expect(source).not.toContain('AUTH_MODE ??= "development"');
   });
 });

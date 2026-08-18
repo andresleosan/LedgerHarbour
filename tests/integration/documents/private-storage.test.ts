@@ -40,7 +40,7 @@ describe("private document storage and service boundaries", () => {
     defaultOnboardingRepository.categories.splice(0);
     defaultOnboardingRepository.joinRequests.splice(0);
     defaultOnboardingRepository.auditEvents.splice(0);
-    process.env.AUTH_MODE = "development";
+    process.env.AUTH_MODE = "firebase";
     resetRateLimitersForTests();
   });
 
