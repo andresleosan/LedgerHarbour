@@ -14,7 +14,7 @@ import {
   getFirebaseGoogleRedirectResult,
   signInWithFirebaseCredential,
   signInWithFirebaseEmail,
-  signInWithFirebaseGoogle,
+  startFirebaseGoogleRedirect,
   signOutFirebaseUser,
   type FirebaseClientConfig,
 } from "@/modules/auth/firebase-client";
@@ -136,17 +136,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
     try {
       if (isFirebase && !firebaseConfig) throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE);
       if (isFirebase) {
-        const firebaseCredential = await signInWithFirebaseGoogle(firebaseConfig!);
-        if (firebaseGoogleCompletionStarted.current) return;
-        firebaseGoogleCompletionStarted.current = true;
-        const identity = await signInWithFirebaseCredential(firebaseCredential, provider.signInWithGoogle);
-        if (!identity) {
-          firebaseGoogleCompletionStarted.current = false;
-          setErrorKey("missingIdentity");
-          return;
-        }
-        setFeedback({ type: "signedIn", email: identity.email });
-        if (!isDeterministicFirebaseTest) router.replace("/onboarding");
+        await startFirebaseGoogleRedirect(firebaseConfig!);
         return;
       }
       const identity = await provider.signInWithGoogle();

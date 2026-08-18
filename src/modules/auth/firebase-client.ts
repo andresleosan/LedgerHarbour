@@ -7,7 +7,7 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
   type UserCredential,
 } from "firebase/auth";
@@ -55,10 +55,10 @@ export async function signInWithFirebaseEmail(config: FirebaseClientConfig, emai
   return register ? createUserWithEmailAndPassword(auth, email, password) : signInWithEmailAndPassword(auth, email, password);
 }
 
-export async function signInWithFirebaseGoogle(config: FirebaseClientConfig): Promise<UserCredential> {
-  if (isTestEnvironment()) return deterministicCredential("test-google@example.com") as UserCredential;
+export async function startFirebaseGoogleRedirect(config: FirebaseClientConfig): Promise<void> {
+  if (isTestEnvironment()) return;
   const auth = getAuth(firebaseApp(config));
-  return signInWithPopup(auth, new GoogleAuthProvider());
+  await signInWithRedirect(auth, new GoogleAuthProvider());
 }
 
 export async function getFirebaseGoogleRedirectResult(config: FirebaseClientConfig): Promise<UserCredential | null> {
