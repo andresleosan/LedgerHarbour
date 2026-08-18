@@ -20,10 +20,10 @@ Prototipo local/no comercial. El objetivo de la siguiente fase es una prueba des
 
 - Hosting: Vercel Hobby.
 - PostgreSQL objetivo: Neon Free; migracion inicial verificada remotamente con 11 tablas requeridas.
-- Auth: Firebase Authentication Spark; adapter email/password + Google implementado, activacion de staging pendiente.
+- Auth: Firebase Authentication; adapter email/password + Google implementado, activacion operator-controlled pendiente.
 - Storage privado: Cloudflare R2 Standard.
-- OCR: adapter Google Document AI Invoice Parser implementado; configuracion runtime y alerta de billing pendientes. Fake OCR se conserva para desarrollo y pruebas.
-- Rate limiting: memoria local por defecto; adapter Upstash preparado para staging.
+- OCR: adapter Google Document AI Invoice Parser implementado; configuracion runtime y alerta de billing pendientes. Fake OCR se conserva solo para desarrollo y pruebas deterministas.
+- Rate limiting: adapter Upstash preparado; memoria local queda limitada a desarrollo y pruebas.
 
 ## Costo
 
@@ -59,9 +59,10 @@ El storage de documentos dispone de `STORAGE_MODE=local|r2`. `local` es el valor
 - Firebase reemplaza el provider de desarrollo mediante `AUTH_MODE=firebase`; requiere probar el boundary de identidad y configurar Email/Password + Google en el proyecto.
 - Rate limiting sigue siendo obligatorio antes de exposicion publica; activar `RATE_LIMIT_MODE=upstash` en staging.
 - Las migraciones productivas requieren backup verificado, rollback probado y confirmacion explicita.
-- R2/Firebase/Upstash estan activados en produccion: el login Google conserva sesion, el rate limiter responde y R2 confirmo subida/descarga privada; OCR real requiere configuracion runtime y alerta de billing.
+- R2/Firebase/Upstash tienen adapters implementados y pruebas locales; no se consideran activados en produccion hasta completar `docs/production-activation.md`. El OCR real requiere configuracion runtime, IAM y alerta de billing verificada.
+- El production gate en `src/modules/config/production-gate.ts` exige `AUTH_MODE=firebase`, `OCR_PROVIDER=google-document-ai`, `PERSISTENCE_MODE=postgres`, `STORAGE_MODE=r2`, `RATE_LIMIT_MODE=upstash` y todas las variables privadas/publicas documentadas. Dev auth, fake OCR, memoria y storage local no son defaults de produccion.
 - `corepack pnpm audit --json` queda en cero vulnerabilidades conocidas tras fijar `sharp@0.35.0` y `postcss@8.5.23` bajo Next; debe repetirse en cada release.
-- Este documento no autoriza despliegue ni gasto.
+- Este documento no autoriza despliegue, migraciones, billing, OCR pago ni gasto.
 
 ## Decisiones de arquitectura
 

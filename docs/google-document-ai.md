@@ -8,7 +8,8 @@ Este documento describe la configuracion operativa del adapter de Google Documen
 2. Habilita la API **Document AI API** en ese proyecto.
 3. Crea un processor **Invoice Parser** en la misma region que usara el runtime: `us` o `eu`.
 4. Registra el processor ID. No confundas el ID con el nombre completo del processor.
-5. Crea una cuenta de servicio dedicada para este adapter y asignale el rol predefinido `roles/documentai.apiUser`.
+5. Crea una cuenta de servicio dedicada para este adapter y asignale el rol predefinido `roles/documentai.apiUser` en el proyecto del processor.
+6. Verifica que la cuenta no tenga roles de propietario, editor ni administrador de IAM. El permiso de uso del processor debe ser el minimo necesario.
 
 `roles/documentai.apiUser` permite procesamiento online y batch, sin permisos de administracion de processors. No asignes roles de propietario, editor ni administrador de Document AI a esta cuenta.
 
@@ -23,9 +24,9 @@ Configura estas cuatro variables de Google antes de activar el proveedor:
 | `GOOGLE_DOCUMENT_AI_PROCESSOR_ID` | ID del Invoice Parser |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | JSON de la cuenta de servicio, almacenado como secreto |
 
-En Vercel, guarda el JSON como el secreto de runtime `GOOGLE_SERVICE_ACCOUNT_JSON`. Nunca lo guardes en Git, en un archivo `.env` versionado, en un navegador, en logs ni en tickets. Usa el gestor de secretos del entorno para produccion; `.env.example` solo contiene placeholders.
+En el gestor de secretos del entorno, guarda el JSON como `GOOGLE_SERVICE_ACCOUNT_JSON`. Nunca lo guardes en Git, en un archivo `.env` versionado, en un navegador, en logs ni en tickets. `.env.example` solo contiene placeholders.
 
-Mantén `OCR_PROVIDER=fake` en desarrollo local y en pruebas deterministas. Cambia a `OCR_PROVIDER=google-document-ai` solamente cuando las cuatro variables anteriores existan y hayan sido validadas por el operador. La factory falla cerrado si falta una variable, el JSON no es valido o la configuracion no cumple el contrato; no cambia silenciosamente a `FakeOcrProvider`.
+Mantén `OCR_PROVIDER=fake` solo en desarrollo local y en pruebas deterministas. Cambia a `OCR_PROVIDER=google-document-ai` solamente cuando las cuatro variables anteriores existan y hayan sido validadas por el operador. La factory y el production gate fallan cerrado si falta una variable, el JSON no es valido o la configuracion no cumple el contrato; no cambia silenciosamente a `FakeOcrProvider`.
 
 ## Limites y comportamiento
 
@@ -44,6 +45,6 @@ La primera activacion real requiere una prueba operativa controlada con un docum
 
 El precio oficial de referencia para Invoice Parser es **US$0.10 por conteo de Invoice Parser de hasta 10 paginas**. El costo mensual depende del volumen procesado y de los precios vigentes de Google Cloud.
 
-Antes de activar `OCR_PROVIDER=google-document-ai` en produccion, configura y verifica una alerta de presupuesto de Google Cloud. La alerta no establece por si sola un tope duro de consumo; el operador debe revisar tambien los permisos, el volumen esperado y el comportamiento del worker.
+Antes de activar `OCR_PROVIDER=google-document-ai` en produccion, configura y verifica una alerta de presupuesto de Google Cloud para el proyecto del processor. La alerta no establece por si sola un tope duro de consumo; el operador debe revisar tambien los permisos, el volumen esperado y el comportamiento del worker.
 
-Estado actual: `billing alert: required/not verified`. La configuracion de la alerta y cualquier activacion de billing quedan fuera de este trabajo y requieren accion explicita del operador.
+Estado actual: `billing alert: required/not verified`. La configuracion de la alerta, la activacion de billing y cualquier prueba que genere costo quedan fuera de este trabajo y requieren accion explicita del operador.

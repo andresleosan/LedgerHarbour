@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  experimental: {
+    middlewareClientMaxBodySize: 12 * 1024 * 1024,
+  },
   async headers() {
     return [
       {
