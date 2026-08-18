@@ -5,6 +5,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 import type { AuthIdentity } from "@/modules/auth/auth-provider";
 import { signOutFirebaseUser, type FirebaseClientConfig } from "@/modules/auth/firebase-client";
+import { messages } from "@/i18n/config";
 import LanguageSwitcher from "@/ui/LanguageSwitcher";
 
 interface PlatformShellProps {
@@ -19,9 +20,7 @@ export default function PlatformShell({ children, identity, locale, firebaseConf
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const activeLocale = searchParams.get("locale") === "es" ? "es" : locale;
-  const navigation = activeLocale === "es"
-    ? { workspace: "Workspace", overview: "Resumen", businesses: "Negocios", projects: "Proyectos", administrators: "Administradores" }
-    : { workspace: "Workspace", overview: "Overview", businesses: "Businesses", projects: "Projects", administrators: "Administrators" };
+  const copy = messages[activeLocale].platform;
 
   return (
     <div className="platform-shell">
@@ -71,21 +70,21 @@ export default function PlatformShell({ children, identity, locale, firebaseConf
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
       `}</style>
       <header className="platform-header">
-        <a className="platform-brand" href="/admin" aria-label="LedgerHarbour">
+        <a className="platform-brand" href="/admin" aria-label={copy.brand}>
           <span className="platform-brand-mark" aria-hidden="true">LH</span>
-          <span className="platform-brand-label">{navigation.workspace}</span>
+          <span className="platform-brand-label">{copy.workspaceLabel}</span>
         </a>
-        <nav className="platform-nav" aria-label={navigation.workspace}>
-          <a href="/admin" aria-current={pathname === "/admin" ? "page" : undefined}>{navigation.overview}</a>
-          <a href="/admin/businesses" aria-current={pathname.startsWith("/admin/businesses") ? "page" : undefined}>{navigation.businesses}</a>
-          <a href="/admin/projects" aria-current={pathname.startsWith("/admin/projects") ? "page" : undefined}>{navigation.projects}</a>
-          <a href="/admin/administrators" aria-current={pathname.startsWith("/admin/administrators") ? "page" : undefined}>{navigation.administrators}</a>
+        <nav className="platform-nav" aria-label={copy.navigationLabel}>
+          <a href="/admin" aria-current={pathname === "/admin" ? "page" : undefined}>{copy.dashboard}</a>
+          <a href="/admin/businesses" aria-current={pathname.startsWith("/admin/businesses") ? "page" : undefined}>{copy.businesses}</a>
+          <a href="/admin/projects" aria-current={pathname.startsWith("/admin/projects") ? "page" : undefined}>{copy.projects}</a>
+          <a href="/admin/administrators" aria-current={pathname.startsWith("/admin/administrators") ? "page" : undefined}>{copy.administrators}</a>
         </nav>
         <div className="platform-user">
-          <LanguageSwitcher locale={activeLocale} />
+          <LanguageSwitcher locale={activeLocale} labels={{ ariaLabel: copy.languageLabel, english: copy.localeEnglish, spanish: copy.localeSpanish }} />
           <span><strong>{identity.displayName}</strong>{identity.email}</span>
           <form action={signOutAction} onSubmit={async (event) => { event.preventDefault(); try { await signOutFirebaseUser(firebaseConfig); } finally { await signOutAction(); } }}>
-            <button className="platform-sign-out" type="submit">{activeLocale === "es" ? "Cerrar sesión" : "Sign out"}</button>
+            <button className="platform-sign-out" type="submit">{copy.signOut}</button>
           </form>
         </div>
       </header>

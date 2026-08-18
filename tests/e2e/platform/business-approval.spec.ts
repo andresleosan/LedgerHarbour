@@ -39,7 +39,7 @@ test("submits a business request and requires platform approval before operation
     const response = await fetch(`/api/platform/businesses/${id}/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }),
+      body: JSON.stringify({ serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), reason: "E2E business approval" }),
     });
     return { status: response.status, body: await response.json() };
   }, businessId);

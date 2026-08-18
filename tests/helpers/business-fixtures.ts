@@ -27,7 +27,7 @@ export async function createApprovedBusiness(
     normalizedEmail: "test-platform-admin@example.com",
   });
   return createPlatformService({ tenancyRepository: repository, platformRepository: platform })
-    .approveBusiness(requested.id, TEST_PLATFORM_ADMIN, { serviceExpiresAt: testServiceExpiresAt() });
+    .approveBusiness(requested.id, TEST_PLATFORM_ADMIN, { serviceExpiresAt: testServiceExpiresAt(), reason: "Test approval" });
 }
 
 export async function createApprovedMemoryBusiness(

@@ -4,7 +4,7 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await page.goto("/login");
   await page.getByLabel("Work email").fill(email);
   await page.getByRole("button", { name: "Continue with email" }).click();
-  await expect(page.getByRole("status")).toContainText("Signed in as");
+  await expect.poll(async () => page.url().includes("/onboarding") || await page.getByRole("status").isVisible()).toBe(true);
 }
 
 test("platform approval and suspension gates business administrator access", async ({ browser }) => {
@@ -27,7 +27,7 @@ test("platform approval and suspension gates business administrator access", asy
     const response = await fetch(`/api/platform/businesses/${id}/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serviceExpiresAt: expiry }),
+      body: JSON.stringify({ serviceExpiresAt: expiry, reason: "E2E administrator setup" }),
     });
     return response.status;
   }, { id: businessId, expiry });
@@ -63,15 +63,15 @@ test("platform approval and suspension gates business administrator access", asy
   const target = administrators.body.administrators.find((item) => item.email?.toLowerCase() === "task4-member@example.com");
   expect(target).toBeTruthy();
 
-  const suspended = await platformAdmin.evaluate(async (membershipId) => {
-    const response = await fetch(`/api/platform/administrators/${membershipId}/suspend`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "suspend", reason: "E2E access review" }),
-    });
-    return response.status;
-  }, target?.membershipId);
-  expect(suspended).toBe(200);
+  await platformAdmin.goto("/admin/administrators");
+  const targetRow = platformAdmin.getByRole("row").filter({ hasText: "task4-member@example.com" });
+  await targetRow.getByRole("button", { name: /Revoke/ }).click();
+  const revokeDialog = platformAdmin.getByRole("dialog");
+  await revokeDialog.getByLabel("Reason").fill("E2E access review");
+  await revokeDialog.getByRole("button", { name: "Confirm" }).click();
+  await expect(targetRow).toContainText("Revoked");
+  const audit = await platformAdmin.evaluate(async () => (await fetch("/api/platform/audit-events")).json()) as { events: Array<{ action: string; targetId: string; reason: string | null }> };
+  expect(audit.events).toContainEqual(expect.objectContaining({ action: "administrator_revoked", targetId: target?.membershipId, reason: "E2E access review" }));
 
   const denied = await member.evaluate(async ({ id, membershipId }) => (await fetch(`/api/businesses/${id}/members/${membershipId}`)).status, {
     id: businessId,

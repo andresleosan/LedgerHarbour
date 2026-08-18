@@ -5,9 +5,14 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 interface LanguageSwitcherProps {
   locale: "en" | "es";
+  labels?: {
+    ariaLabel: string;
+    english: string;
+    spanish: string;
+  };
 }
 
-export default function LanguageSwitcher({ locale }: LanguageSwitcherProps) {
+export default function LanguageSwitcher({ locale, labels }: LanguageSwitcherProps) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -18,12 +23,12 @@ export default function LanguageSwitcher({ locale }: LanguageSwitcherProps) {
   };
 
   return (
-    <nav className="language-switcher" aria-label={locale === "es" ? "Idioma" : "Language"}>
+    <nav className="language-switcher" aria-label={labels?.ariaLabel ?? (locale === "es" ? "Idioma" : "Language")}>
       <Link href={hrefFor("en")} aria-current={locale === "en" ? "page" : undefined}>
-        English
+        {labels?.english ?? "English"}
       </Link>
       <Link href={hrefFor("es")} aria-current={locale === "es" ? "page" : undefined}>
-        Español
+        {labels?.spanish ?? "Español"}
       </Link>
     </nav>
   );

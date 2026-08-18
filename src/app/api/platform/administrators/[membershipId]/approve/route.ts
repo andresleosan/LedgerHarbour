@@ -10,7 +10,7 @@ import {
 import { getPersistenceContext } from "../../../../../../modules/persistence/repository-factory";
 import { platformRateLimitResponse } from "../../../../../../modules/platform/platform-route-security";
 
-const inputSchema = z.object({ reason: z.string().trim().max(1000).optional() }).strict();
+const inputSchema = z.object({ reason: z.string().trim().min(1).max(1000) }).strict();
 type RouteContext = { params: Promise<{ membershipId: string }> };
 
 function errorResponse(error: unknown): NextResponse {

@@ -51,7 +51,15 @@ test("confirms a business status action and refreshes the safe server DTO", asyn
   const dialog = platformAdmin.getByRole("dialog");
   await expect(dialog).toBeVisible();
   await expect(dialog.getByLabel(/service expiration/i)).toBeVisible();
+  await expect(dialog.getByLabel(/service expiration/i)).toBeFocused();
+  await platformAdmin.keyboard.press("Shift+Tab");
+  await expect(dialog.getByRole("button", { name: /Confirm/ })).toBeFocused();
+  await platformAdmin.keyboard.press("Escape");
+  await expect(businessCard.getByRole("button", { name: /Approve/ })).toBeFocused();
+  await businessCard.getByRole("button", { name: /Approve/ }).click();
+  await expect(dialog.getByLabel(/service expiration/i)).toBeFocused();
   await dialog.getByLabel(/service expiration/i).fill("2030-01-01");
+  await dialog.getByLabel("Reason").fill("Initial approval review");
   await dialog.getByRole("button", { name: /Confirm/ }).click();
   await expect(businessCard).toContainText("Active");
   await expect(businessCard).toContainText("Requester");

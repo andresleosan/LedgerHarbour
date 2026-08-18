@@ -53,7 +53,7 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
       id,
       name,
       action,
-      requiresReason: action === "reject" || action === "suspend" || action === "revoke",
+      requiresReason: true,
       requiresExpiration: kind === "business" && action === "approve",
     });
   };
@@ -68,12 +68,15 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
         : dialog.kind === "project"
           ? `/api/platform/projects/${dialog.id}`
           : `/api/platform/administrators/${dialog.id}`;
+      const endpointAction = dialog.kind === "administrator" && (dialog.action === "revoke" || dialog.action === "suspend")
+        ? "suspend"
+        : dialog.action;
       const body = dialog.kind === "administrator"
-        ? dialog.action === "approve" ? { reason: values.reason || undefined } : { action: dialog.action, reason: values.reason }
+        ? dialog.action === "approve" ? { reason: values.reason } : { action: dialog.action, reason: values.reason }
         : dialog.action === "approve" && dialog.kind === "business"
-          ? { serviceExpiresAt: values.serviceExpiresAt ? new Date(`${values.serviceExpiresAt}T23:59:59.000Z`).toISOString() : undefined }
-          : values.reason ? { reason: values.reason } : {};
-      const response = await fetch(`${basePath}/${dialog.action}`, {
+          ? { serviceExpiresAt: values.serviceExpiresAt ? new Date(`${values.serviceExpiresAt}T23:59:59.000Z`).toISOString() : undefined, reason: values.reason }
+          : { reason: values.reason };
+      const response = await fetch(`${basePath}/${endpointAction}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),

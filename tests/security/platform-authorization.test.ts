@@ -30,7 +30,7 @@ describe("platform administration authorization", () => {
     await expect(service.listBusinesses(user("requester"))).rejects.toMatchObject({
       code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED,
     });
-    await expect(service.approveBusiness(business.id, user("requester"), { serviceExpiresAt: testServiceExpiresAt() })).rejects.toMatchObject({
+    await expect(service.approveBusiness(business.id, user("requester"), { serviceExpiresAt: testServiceExpiresAt(), reason: "Unauthorized approval" })).rejects.toMatchObject({
       code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED,
     });
   });

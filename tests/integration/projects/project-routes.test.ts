@@ -66,7 +66,7 @@ describe("project HTTP contracts", () => {
     const requesterId = await defaultOnboardingRepository.upsertUser(requester);
     const platformUserId = await defaultOnboardingRepository.upsertUser(platformAdmin);
     defaultPlatformRepository.addMember({ id: "task5-route-platform-member", userId: platformUserId, normalizedEmail: platformAdmin.email });
-    await createPlatformService({ tenancyRepository: defaultOnboardingRepository, platformRepository: defaultPlatformRepository }).approveBusiness(business.id, platformAdmin, { serviceExpiresAt: testServiceExpiresAt() });
+    await createPlatformService({ tenancyRepository: defaultOnboardingRepository, platformRepository: defaultPlatformRepository }).approveBusiness(business.id, platformAdmin, { serviceExpiresAt: testServiceExpiresAt(), reason: "HTTP project setup" });
     expect(requesterId).toBeTruthy();
 
     mockedIdentity.mockResolvedValue(requester);
@@ -86,12 +86,12 @@ describe("project HTTP contracts", () => {
     const business = await createBusinessRequest({ name: "HTTP Approval Harbour" }, requester, defaultOnboardingRepository);
     const platformUserId = await defaultOnboardingRepository.upsertUser(platformAdmin);
     defaultPlatformRepository.addMember({ id: "task5-route-platform-member-2", userId: platformUserId, normalizedEmail: platformAdmin.email });
-    await createPlatformService({ tenancyRepository: defaultOnboardingRepository, platformRepository: defaultPlatformRepository }).approveBusiness(business.id, platformAdmin, { serviceExpiresAt: testServiceExpiresAt() });
+    await createPlatformService({ tenancyRepository: defaultOnboardingRepository, platformRepository: defaultPlatformRepository }).approveBusiness(business.id, platformAdmin, { serviceExpiresAt: testServiceExpiresAt(), reason: "HTTP project setup" });
     mockedIdentity.mockResolvedValue(requester);
     const created = await createProject(request({ name: "HTTP Approval Project" }), { params: Promise.resolve({ businessId: business.id }) });
     const project = await created.json() as { id: string };
     mockedIdentity.mockResolvedValue(platformAdmin);
-    const response = await approveProject(new Request("http://localhost/api/platform/projects/approve", { method: "POST", headers: { "x-forwarded-for": "198.51.100.92" } }), { params: Promise.resolve({ projectId: project.id }) });
+    const response = await approveProject(new Request("http://localhost/api/platform/projects/approve", { method: "POST", headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.92" }, body: JSON.stringify({ reason: "HTTP project approval" }) }), { params: Promise.resolve({ projectId: project.id }) });
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toMatchObject({ project: { id: project.id, status: "active" } });
     mockedIdentity.mockResolvedValue(ordinary);
@@ -123,7 +123,7 @@ describe("project HTTP contracts", () => {
       new Request("http://localhost/api/platform/projects/missing/reactivate", {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-forwarded-for": "198.51.100.96" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ reason: "Missing project reactivation" }),
       }),
       { params: Promise.resolve({ projectId: "missing" }) },
     );

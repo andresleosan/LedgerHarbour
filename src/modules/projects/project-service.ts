@@ -68,7 +68,7 @@ export interface CreateProjectInput {
 }
 
 export interface ProjectReasonInput {
-  reason?: string;
+  reason: string;
 }
 
 export interface AddProjectMemberInput {
@@ -88,7 +88,7 @@ export interface ProjectService {
   listProjects(actor: OnboardingActor, status?: (typeof ProjectStatus)[number]): Promise<ProjectDto[]>;
   addProjectMember(businessId: BusinessId, projectId: string, actor: OnboardingActor, input: AddProjectMemberInput): Promise<ProjectMembership>;
   listProjectMembers(businessId: BusinessId, projectId: string, actor: OnboardingActor): Promise<ProjectMembership[]>;
-  approveProject(projectId: string, actor: OnboardingActor): Promise<ProjectDto>;
+  approveProject(projectId: string, actor: OnboardingActor, input: ProjectReasonInput): Promise<ProjectDto>;
   rejectProject(projectId: string, actor: OnboardingActor, input: ProjectReasonInput): Promise<ProjectDto>;
   suspendProject(projectId: string, actor: OnboardingActor, input: ProjectReasonInput): Promise<ProjectDto>;
   reactivateProject(projectId: string, actor: OnboardingActor, input: ProjectReasonInput): Promise<ProjectDto>;
@@ -297,8 +297,9 @@ export function createProjectService(dependencies: ProjectServiceDependencies): 
       return projects.listProjectMemberships(projectId);
     },
 
-    approveProject(projectId, actor) {
-      return runPlatformTransition(projectId, actor, "pending", "project_approved", transitionUpdate("active", null), null);
+    approveProject(projectId, actor, input) {
+      const reason = requireReason(input.reason);
+      return runPlatformTransition(projectId, actor, "pending", "project_approved", transitionUpdate("active", null), reason);
     },
 
     rejectProject(projectId, actor, input) {
@@ -312,7 +313,7 @@ export function createProjectService(dependencies: ProjectServiceDependencies): 
     },
 
     reactivateProject(projectId, actor, input) {
-      const reason = input.reason?.trim() || null;
+      const reason = requireReason(input.reason);
       return runPlatformTransition(projectId, actor, "suspended", "project_reactivated", transitionUpdate("active", reason), reason);
     },
 

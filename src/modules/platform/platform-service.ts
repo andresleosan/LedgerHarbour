@@ -64,10 +64,11 @@ export interface PlatformBusinessDto {
 
 export interface ApproveBusinessInput {
   serviceExpiresAt: string;
+  reason: string;
 }
 
 export interface ReasonInput {
-  reason?: string;
+  reason: string;
 }
 
 export interface PlatformAdministratorDto {
@@ -262,19 +263,25 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
     async approveBusiness(businessId, actor, input) {
       const member = await requirePlatformMember(actor, tenancy, platform);
       const serviceExpiresAt = serviceExpirationDate(input.serviceExpiresAt);
+      const reason = requireReason(input.reason);
       const execute = async (transaction: OnboardingRepository, transactionPlatform: PlatformRepository): Promise<Business> => {
         const current = await transaction.findBusiness(businessId);
         if (!current) throw new PlatformError(PLATFORM_ERROR_CODES.BUSINESS_NOT_FOUND);
         if (current.status !== "pending") throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_TRANSITION);
         const now = new Date().toISOString();
-        await transaction.createMembership({
-          membershipId: randomUUID(),
-          userId: current.createdBy,
-          businessId,
-          role: "owner_admin",
-          isActive: true,
-          status: "active",
-        });
+        try {
+          await transaction.createMembership({
+            membershipId: randomUUID(),
+            userId: current.createdBy,
+            businessId,
+            role: "owner_admin",
+            isActive: true,
+            status: "active",
+          });
+        } catch (error) {
+          if (error instanceof OnboardingError) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
+          throw error;
+        }
          let approved: Business;
          try {
            approved = await transaction.updateBusinessLifecycle(businessId, {
@@ -296,7 +303,7 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
           targetId: businessId,
           beforeStatus: "pending",
           afterStatus: "active",
-          reason: null,
+           reason,
         });
         return approved;
       };
@@ -322,11 +329,12 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
     },
 
     async reactivateBusiness(businessId, actor, input) {
+      const reason = requireReason(input.reason);
       return runTransition(businessId, actor, "business_reactivated", "suspended", {
         status: "active",
         suspendedAt: null,
         suspensionReason: null,
-      }, input.reason?.trim() || null);
+      }, reason);
     },
 
     async listAdministrators(actor) {
@@ -341,7 +349,7 @@ export function createPlatformService(dependencies: PlatformServiceDependencies)
       const before = await findAdministratorEntry(tenancy, membershipId);
       if (!before || before.membership.isActive) throw new PlatformError(PLATFORM_ERROR_CODES.ADMINISTRATOR_NOT_FOUND);
       if (before.membership.status !== "pending") throw new PlatformError(PLATFORM_ERROR_CODES.INVALID_TRANSITION);
-      const reason = input.reason?.trim() || null;
+      const reason = requireReason(input.reason);
       const execute = async (transaction: OnboardingRepository, transactionPlatform: PlatformRepository): Promise<PlatformAdministratorDto> => {
         const current = await findAdministratorEntry(transaction, membershipId);
         if (!current || current.membership.isActive) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);

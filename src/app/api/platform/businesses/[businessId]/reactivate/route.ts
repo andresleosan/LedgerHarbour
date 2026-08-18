@@ -7,7 +7,7 @@ import { getPersistenceContext } from "../../../../../../modules/persistence/rep
 import { platformRateLimitResponse } from "../../../../../../modules/platform/platform-route-security";
 import type { BusinessId } from "../../../../../../modules/tenancy/types";
 
-const inputSchema = z.object({ reason: z.string().trim().max(1000).optional() }).strict();
+const inputSchema = z.object({ reason: z.string().trim().min(1).max(1000) }).strict();
 type RouteContext = { params: Promise<{ businessId: string }> };
 
 export async function POST(request: Request, context: RouteContext) {

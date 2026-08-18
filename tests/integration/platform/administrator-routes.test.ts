@@ -61,6 +61,7 @@ async function setupAdministrator(isActive = false, suffix = "") {
     platformRepository: defaultPlatformRepository,
   }).approveBusiness(business.id, platformIdentity, {
     serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    reason: "Administrator route setup",
   });
   const membership = await defaultOnboardingRepository.createMembership({
     membershipId: `route-administrator-membership${suffix}`,
@@ -99,7 +100,7 @@ describe("platform administrator HTTP contracts", () => {
     const context = { params: Promise.resolve({ membershipId: "missing" }) };
     const responses = await Promise.all([
       listAdministrators(request(undefined, "GET")),
-      approveAdministrator(request({}), context),
+      approveAdministrator(request({ reason: "Unauthorized approval" }), context),
       suspendAdministrator(request({ action: "suspend", reason: "test" }), context),
     ]);
 
@@ -120,7 +121,7 @@ describe("platform administrator HTTP contracts", () => {
 
     const suspended = await suspendAdministrator(request({ action: "suspend", reason: "HTTP review" }), context);
     expect(suspended.status).toBe(200);
-    const reapproval = await approveAdministrator(request({}), context);
+    const reapproval = await approveAdministrator(request({ reason: "Reapproval after suspension" }), context);
     expect(reapproval.status).toBe(409);
 
     const second = await setupAdministrator(true, "-2");
@@ -153,7 +154,7 @@ describe("platform administrator HTTP contracts", () => {
 
     const suspended = await suspendBusiness(request({ reason: "HTTP suspension" }), businessContext);
     expect(suspended.status).toBe(200);
-    const reactivated = await reactivateBusiness(request({}, "POST"), businessContext);
+    const reactivated = await reactivateBusiness(request({ reason: "HTTP reactivation" }, "POST"), businessContext);
     expect(reactivated.status).toBe(200);
 
     const pending = await createBusinessRequest({ name: "HTTP Reject Harbour" }, "route-pending-owner" as UserId, defaultOnboardingRepository);

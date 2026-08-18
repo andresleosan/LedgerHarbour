@@ -39,7 +39,7 @@ describe("business approval lifecycle", () => {
     const approved = await service.approveBusiness(
       created.id,
       user("platform-admin"),
-      { serviceExpiresAt },
+       { serviceExpiresAt, reason: "Initial approval" },
     );
 
     expect(approved).toMatchObject({
@@ -71,13 +71,13 @@ describe("business approval lifecycle", () => {
     const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
     const created = await createBusinessRequest({ name: "Protected Harbour" }, user("requester"), tenancy);
 
-    await expect(service.approveBusiness(created.id, user("requester"), { serviceExpiresAt: testServiceExpiresAt() })).rejects.toMatchObject({
+    await expect(service.approveBusiness(created.id, user("requester"), { serviceExpiresAt: testServiceExpiresAt(), reason: "Unauthorized approval" })).rejects.toMatchObject({
       code: PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED,
     });
 
     platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
     await service.rejectBusiness(created.id, user("platform-admin"), { reason: "Incomplete request" });
-    await expect(service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt() })).rejects.toMatchObject({
+    await expect(service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt(), reason: "Rejected approval" })).rejects.toMatchObject({
       code: PLATFORM_ERROR_CODES.INVALID_TRANSITION,
     });
   });
@@ -88,13 +88,13 @@ describe("business approval lifecycle", () => {
     const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
     const created = await createBusinessRequest({ name: "Service Harbour" }, user("requester"), tenancy);
     platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
-    await service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt() });
+    await service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt(), reason: "Lifecycle setup" });
 
     await service.suspendBusiness(created.id, user("platform-admin"), { reason: "Subscription unpaid" });
     await expect(tenancy.findBusinessStatus(created.id)).resolves.toBe("suspended");
     await expect(tenancy.listMemberships(created.id)).resolves.toHaveLength(1);
 
-    await service.reactivateBusiness(created.id, user("platform-admin"), {});
+    await service.reactivateBusiness(created.id, user("platform-admin"), { reason: "Lifecycle restoration" });
     await expect(tenancy.findBusinessStatus(created.id)).resolves.toBe("active");
     await expect(tenancy.findBusiness(business(created.id))).resolves.toMatchObject({ status: "active" });
   });
@@ -219,9 +219,9 @@ describe("business approval lifecycle", () => {
     const created = await createBusiness({ name: "Expiring Harbour" }, user("requester"), tenancy);
     platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "admin@example.com" });
 
-    await expect(service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: "2020-01-01T00:00:00.000Z" }))
+    await expect(service.approveBusiness(created.id, user("platform-admin"), { serviceExpiresAt: "2020-01-01T00:00:00.000Z", reason: "Expired approval" }))
       .rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.INVALID_DATE });
-    await expect(service.approveBusiness(created.id, user("platform-admin"), {} as never))
+    await expect(service.approveBusiness(created.id, user("platform-admin"), { reason: "Missing expiry" } as never))
       .rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.INVALID_DATE });
   });
 

@@ -27,7 +27,7 @@ async function approvedBusiness() {
   const requester = user("business-owner");
   const createdBusiness = await createBusinessRequest({ name: "Project Harbour" }, requester, tenancy);
   platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "platform@example.com" });
-  await platformService.approveBusiness(createdBusiness.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt() });
+  await platformService.approveBusiness(createdBusiness.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt(), reason: "Project test setup" });
   return { tenancy, platform, projectRepository, requester, business: createdBusiness };
 }
 
@@ -63,11 +63,11 @@ describe("project approval lifecycle", () => {
     const service = serviceFor(setup);
     const project = await service.createProjectRequest(setup.business.id, setup.requester, { name: "Approved Project" });
 
-    await expect(service.approveProject(project.id, setup.requester)).rejects.toMatchObject({
+    await expect(service.approveProject(project.id, setup.requester, { reason: "Requester approval" })).rejects.toMatchObject({
       code: PROJECT_ERROR_CODES.PLATFORM_ACCESS_DENIED,
     });
 
-    const approved = await service.approveProject(project.id, user("platform-admin"));
+    const approved = await service.approveProject(project.id, user("platform-admin"), { reason: "Project approved" });
     expect(approved).toMatchObject({ status: "active", isActive: true });
     await expect(service.getEffectiveProjectAccess(project.id, setup.requester)).resolves.toMatchObject({ allowed: true });
     expect(setup.platform.auditEvents).toContainEqual(expect.objectContaining({
@@ -84,12 +84,12 @@ describe("project approval lifecycle", () => {
     const service = serviceFor(setup);
     const rejected = await service.createProjectRequest(setup.business.id, setup.requester, { name: "Rejected Project" });
     await service.rejectProject(rejected.id, user("platform-admin"), { reason: "Insufficient information" });
-    await expect(service.approveProject(rejected.id, user("platform-admin"))).rejects.toMatchObject({
+    await expect(service.approveProject(rejected.id, user("platform-admin"), { reason: "Project reapproval" })).rejects.toMatchObject({
       code: PROJECT_ERROR_CODES.INVALID_TRANSITION,
     });
 
     const project = await service.createProjectRequest(setup.business.id, setup.requester, { name: "Suspended Project" });
-    await service.approveProject(project.id, user("platform-admin"));
+    await service.approveProject(project.id, user("platform-admin"), { reason: "Project approved" });
     const results = await Promise.allSettled([
       service.suspendProject(project.id, user("platform-admin"), { reason: "Service review" }),
       service.suspendProject(project.id, user("platform-admin"), { reason: "Concurrent review" }),
@@ -106,7 +106,7 @@ describe("project approval lifecycle", () => {
     const setup = await approvedBusiness();
     const service = serviceFor(setup);
     const project = await service.createProjectRequest(setup.business.id, setup.requester, { name: "Parent Gate Project" });
-    await service.approveProject(project.id, user("platform-admin"));
+    await service.approveProject(project.id, user("platform-admin"), { reason: "Project approved" });
 
     await createPlatformService({ tenancyRepository: setup.tenancy, platformRepository: setup.platform })
       .suspendBusiness(setup.business.id, user("platform-admin"), { reason: "Business suspended" });
@@ -125,12 +125,12 @@ describe("project approval lifecycle", () => {
     const firstBusiness = await createBusinessRequest({ name: "First Project Harbour" }, user("owner-a"), tenancy);
     const secondBusiness = await createBusinessRequest({ name: "Second Project Harbour" }, user("owner-b"), tenancy);
     platform.addMember({ id: "platform-1", userId: user("platform-admin"), normalizedEmail: "platform@example.com" });
-    await platformService.approveBusiness(firstBusiness.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt() });
-    await platformService.approveBusiness(secondBusiness.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt() });
+  await platformService.approveBusiness(firstBusiness.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt(), reason: "Project isolation setup" });
+  await platformService.approveBusiness(secondBusiness.id, user("platform-admin"), { serviceExpiresAt: testServiceExpiresAt(), reason: "Project isolation setup" });
     const firstService = createProjectService({ tenancyRepository: tenancy, projectRepository, platformRepository: platform });
     const secondService = firstService;
     const project = await firstService.createProjectRequest(firstBusiness.id, user("owner-a"), { name: "Private Project" });
-    await firstService.approveProject(project.id, user("platform-admin"));
+    await firstService.approveProject(project.id, user("platform-admin"), { reason: "Cross-tenant approval" });
 
     await expect(secondService.listProjectsForBusiness(firstBusiness.id, user("owner-b"))).rejects.toMatchObject({
       code: PROJECT_ERROR_CODES.BUSINESS_ACCESS_DENIED,
@@ -158,7 +158,7 @@ describe("project approval lifecycle", () => {
     const setup = await approvedBusiness();
     const service = serviceFor(setup);
     const project = await service.createProjectRequest(setup.business.id, setup.requester, { name: "Snapshot Project" });
-    await service.approveProject(project.id, user("platform-admin"));
+    await service.approveProject(project.id, user("platform-admin"), { reason: "Project approved" });
 
     let releaseMembership!: () => void;
     const membershipGate = new Promise<void>((resolve) => { releaseMembership = resolve; });

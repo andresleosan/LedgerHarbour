@@ -33,7 +33,7 @@ export default defineConfig({
       NEXT_PUBLIC_FIREBASE_PROJECT_ID: "playwright-project",
       NEXT_PUBLIC_FIREBASE_APP_ID: "playwright-app-id",
       NEXT_PUBLIC_FIREBASE_TEST_ADAPTER: "true",
-      PLATFORM_ADMIN_EMAILS: "platform-admin@example.com,platform-admin-mobile@example.com,platform-admin-panel@example.com,platform-admin-action@example.com",
+      PLATFORM_ADMIN_EMAILS: "platform-admin@example.com,platform-admin-mobile@example.com,platform-admin-panel@example.com,platform-admin-action@example.com,platform-admin-switcher@example.com,platform-admin-onboarding-workflow@example.com,platform-admin-onboarding-mobile@example.com,platform-admin-membership@example.com,platform-admin-membership-lifecycle@example.com",
     },
   },
 });

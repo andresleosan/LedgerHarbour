@@ -14,14 +14,15 @@ test("authenticates, switches authorized businesses, preserves locale, and keeps
   const firstName = `Portfolio Books ${Date.now()}`;
   const secondName = `Portfolio Studio ${Date.now()}`;
   const inactiveName = `Portfolio Closed ${"LongBusinessName".repeat(12)} ${Date.now()}`;
-  const firstId = await createApprovedBusiness(browser, page, firstName);
-  const secondId = await createApprovedBusiness(browser, page, secondName);
-  const inactiveId = await createApprovedBusiness(browser, page, inactiveName);
+  const platformAdminEmail = "platform-admin-switcher@example.com";
+  const firstId = await createApprovedBusiness(browser, page, firstName, platformAdminEmail);
+  const secondId = await createApprovedBusiness(browser, page, secondName, platformAdminEmail);
+  const inactiveId = await createApprovedBusiness(browser, page, inactiveName, platformAdminEmail);
 
   const lifecycleResponse = await withPlatformAdmin(browser, (admin) => browserApiRequest(admin, `/api/platform/businesses/${inactiveId}/suspend`, {
     method: "POST",
     data: { reason: "E2E inactive business coverage" },
-  }));
+  }), platformAdminEmail);
   expect(lifecycleResponse.status).toBe(200);
 
   await page.goto("/portfolio");

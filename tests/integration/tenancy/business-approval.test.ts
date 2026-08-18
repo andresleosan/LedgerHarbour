@@ -39,7 +39,7 @@ describe("PostgreSQL business approval lifecycle", () => {
       const service = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
       await service.claimPlatformMember(admin);
       const approved = await service
-        .approveBusiness(created.id, admin, { serviceExpiresAt: testServiceExpiresAt() });
+        .approveBusiness(created.id, admin, { serviceExpiresAt: testServiceExpiresAt(), reason: "Postgres approval" });
 
       expect(approved.status).toBe("active");
       await expect(tenancy.listMemberships(created.id)).resolves.toEqual([

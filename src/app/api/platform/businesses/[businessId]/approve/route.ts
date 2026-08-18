@@ -7,7 +7,7 @@ import { getPersistenceContext } from "../../../../../../modules/persistence/rep
 import { platformRateLimitResponse } from "../../../../../../modules/platform/platform-route-security";
 import type { BusinessId } from "../../../../../../modules/tenancy/types";
 
-const inputSchema = z.object({ serviceExpiresAt: z.string().trim().min(1) }).strict();
+const inputSchema = z.object({ serviceExpiresAt: z.string().trim().min(1), reason: z.string().trim().min(1).max(1000) }).strict();
 type RouteContext = { params: Promise<{ businessId: string }> };
 
 function responseFor(error: unknown): NextResponse {

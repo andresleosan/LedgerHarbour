@@ -58,7 +58,7 @@ describe("platform administrator approval", () => {
   it("approves and suspends a business administrator globally without tenant membership", async () => {
     const { tenancy, platform, service, created, administrator } = await fixture();
 
-    await expect(service.approveAdministrator(administrator.membershipId, user("platform-admin"), {}))
+    await expect(service.approveAdministrator(administrator.membershipId, user("platform-admin"), { reason: "Administrator approval" }))
       .resolves.toMatchObject({ membershipId: administrator.membershipId, isActive: true });
     await expect(service.suspendAdministrator(administrator.membershipId, user("platform-admin"), {
       action: "suspend",
@@ -84,7 +84,7 @@ describe("platform administrator approval", () => {
       reason: "Temporary review",
     });
 
-    await expect(service.approveAdministrator(administrator.membershipId, user("platform-admin"), {}))
+    await expect(service.approveAdministrator(administrator.membershipId, user("platform-admin"), { reason: "Reapproval attempt" }))
       .rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.INVALID_TRANSITION });
   });
 
@@ -173,7 +173,7 @@ describe("platform administrator approval", () => {
       reason: "Access no longer required",
     });
 
-    await expect(service.approveAdministrator(administrator.membershipId, user("platform-admin"), {}))
+    await expect(service.approveAdministrator(administrator.membershipId, user("platform-admin"), { reason: "Reapproval attempt" }))
       .rejects.toMatchObject({ code: PLATFORM_ERROR_CODES.INVALID_TRANSITION });
 
     await expect(tenancy.findMembership(user("administrator"), business(administrator.businessId))).resolves.toMatchObject({

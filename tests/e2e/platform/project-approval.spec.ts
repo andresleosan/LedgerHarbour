@@ -33,7 +33,7 @@ test("creates a pending project, approves it globally, and applies parent suspen
     const response = await fetch(`/api/platform/businesses/${id}/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() }),
+      body: JSON.stringify({ serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), reason: "E2E project setup" }),
     });
     return { status: response.status, body: await response.json() };
   }, businessId);
@@ -51,6 +51,7 @@ test("creates a pending project, approves it globally, and applies parent suspen
 
   const pendingRow = admin.getByRole("row").filter({ hasText: "E2E Pending Project" });
   await pendingRow.getByRole("button", { name: "Approve E2E Pending Project" }).click();
+  await admin.getByRole("dialog").getByLabel("Reason").fill("E2E pending approval reason");
   await admin.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
   await expect(pendingRow).toContainText("Active");
 
@@ -59,6 +60,7 @@ test("creates a pending project, approves it globally, and applies parent suspen
   await admin.goto("/admin/projects");
   const lifecycleRow = admin.getByRole("row").filter({ hasText: "E2E Lifecycle Project" });
   await lifecycleRow.getByRole("button", { name: "Approve E2E Lifecycle Project" }).click();
+  await admin.getByRole("dialog").getByLabel("Reason").fill("E2E lifecycle approval reason");
   await admin.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
   await expect(lifecycleRow).toContainText("Active");
   await lifecycleRow.getByRole("button", { name: "Suspend E2E Lifecycle Project" }).click();
@@ -66,6 +68,7 @@ test("creates a pending project, approves it globally, and applies parent suspen
   await admin.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
   await expect(lifecycleRow).toContainText("Suspended");
   await lifecycleRow.getByRole("button", { name: "Reactivate E2E Lifecycle Project" }).click();
+  await admin.getByRole("dialog").getByLabel("Reason").fill("E2E reactivation reason");
   await admin.getByRole("dialog").getByRole("button", { name: "Confirm" }).click();
   await expect(lifecycleRow).toContainText("Active");
 

@@ -80,10 +80,10 @@ test("searches, requests access, approves, rejects, and reapplies", async ({ bro
   await withPlatformAdmin(browser, async (admin) => {
     const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
       method: "POST",
-      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), reason: "E2E onboarding setup" },
     });
     expect(approval.status).toBe(200);
-  });
+  }, "platform-admin-onboarding-workflow@example.com");
 
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();
@@ -94,13 +94,11 @@ test("searches, requests access, approves, rejects, and reapplies", async ({ bro
   await member.getByRole("button", { name: "Request to join" }).click();
   await expect(member.getByRole("status")).toContainText("Request submitted");
 
-  await signIn(owner, "owner-workflow@example.com");
   await owner.goto(`/business/${businessId}/members`);
   await expect(owner.getByText(/Request from user-/)).toBeVisible();
   await owner.getByRole("button", { name: "Reject request" }).click();
   await expect(owner.getByRole("status")).toContainText("Request rejected");
 
-  await signIn(member, "member-workflow@example.com");
   await member.goto("/onboarding/join-business");
   await member.getByLabel("Search by business name").fill("request harbour");
   await member.getByRole("button", { name: "Search businesses" }).click();
@@ -108,12 +106,10 @@ test("searches, requests access, approves, rejects, and reapplies", async ({ bro
   await member.getByRole("button", { name: "Reapply for Administrator access" }).click();
   await expect(member.getByRole("status")).toContainText("Request submitted");
 
-  await signIn(owner, "owner-workflow@example.com");
   await owner.goto(`/business/${businessId}/members`);
   await owner.getByRole("button", { name: "Approve request" }).click();
   await expect(owner.getByRole("status")).toContainText("Request approved");
 
-  await signIn(member, "member-workflow@example.com");
   await member.goto(`/business/${businessId}/members`);
   await expect(member.getByText(/permission to review/)).toBeVisible();
 
@@ -167,13 +163,13 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
    await expect(createdStatus).toContainText("Mobile Harbour Books");
    const businessId = (await createdStatus.textContent())?.match(/business-[\w-]+/)?.[0];
     expect(businessId).toBeTruthy();
-    await withPlatformAdmin(browser, async (admin) => {
-      const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
-        method: "POST",
-        data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
-      });
-      expect(approval.status).toBe(200);
-   });
+     await withPlatformAdmin(browser, async (admin) => {
+       const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
+         method: "POST",
+         data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), reason: "E2E mobile onboarding setup" },
+       });
+       expect(approval.status).toBe(200);
+     }, "platform-admin-onboarding-mobile@example.com");
 
    await page.goto("/onboarding/join-business");
    await page.getByRole("button", { name: "Espanol" }).click();

@@ -317,6 +317,9 @@
   "platform": {
     "brand": "LedgerHarbour",
     "languageLabel": "Idioma",
+    "localeEnglish": "English",
+    "localeSpanish": "Español",
+    "navigationLabel": "Espacio de plataforma",
     "backToWorkspace": "Workspace",
     "signOut": "Cerrar sesión",
     "workspaceLabel": "Espacio de plataforma",

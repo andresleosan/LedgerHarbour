@@ -8,7 +8,7 @@ async function signIn(page: Page, email: string) {
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
-export async function createApprovedBusiness(browser: Browser, page: Page, name: string) {
+export async function createApprovedBusiness(browser: Browser, page: Page, name: string, platformAdminEmail = "platform-admin@example.com") {
   await page.goto("/onboarding/create-business");
   await page.getByLabel("Business name").fill(name);
   await page.getByRole("button", { name: "Submit request" }).click();
@@ -20,19 +20,19 @@ export async function createApprovedBusiness(browser: Browser, page: Page, name:
   await withPlatformAdmin(browser, async (admin) => {
     const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
       method: "POST",
-      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), reason: "E2E business setup" },
     });
     expect(approval.status, approval.body).toBe(200);
-  });
+  }, platformAdminEmail);
 
   return businessId as string;
 }
 
-export async function withPlatformAdmin<T>(browser: Browser, callback: (page: Page) => Promise<T>) {
+export async function withPlatformAdmin<T>(browser: Browser, callback: (page: Page) => Promise<T>, email = "platform-admin@example.com") {
   const adminContext = await browser.newContext();
   const admin = await adminContext.newPage();
   try {
-    await signIn(admin, "platform-admin@example.com");
+    await signIn(admin, email);
     return await callback(admin);
   } finally {
     await adminContext.close();

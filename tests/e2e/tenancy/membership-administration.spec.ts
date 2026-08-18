@@ -31,10 +31,10 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   await withPlatformAdmin(browser, async (admin) => {
     const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
       method: "POST",
-      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), reason: "E2E membership setup" },
     });
     expect(approval.status).toBe(200);
-  });
+  }, "platform-admin-membership@example.com");
 
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();
@@ -60,7 +60,6 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   await thirdMember.getByRole("button", { name: "Search businesses" }).click();
   await thirdMember.getByRole("button", { name: "Request to join" }).click();
   await expect(thirdMember.getByRole("status")).toContainText("Request submitted");
-  await signIn(owner, "task6-owner@example.com");
   await owner.goto(`/business/${businessId}/members`);
   await owner.getByRole("button", { name: "Approve request" }).first().click();
   await expect(owner.getByRole("button", { name: "Approve request" })).toHaveCount(2);
@@ -109,7 +108,6 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   expect(staleTransfer.status).toBe(400);
   expect(JSON.parse(staleTransfer.body)).toMatchObject({ error: { code: "CONFIRMATION_REQUIRED" } });
 
-  await signIn(secondMember, "task6-second-member@example.com");
   await secondMember.goto(`/business/${businessId}/settings/members`);
   await expect(secondMember.getByRole("button", { name: "Transfer ownership" })).toHaveCount(0);
   await expect(secondMember.getByRole("button", { name: "Remove General Admin" })).toHaveCount(0);
@@ -133,7 +131,6 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   await secondMember.getByRole("button", { name: "Remove Administrator" }).click();
   await expect(secondMember.getByText("Administrator", { exact: true })).toHaveCount(0);
 
-  await signIn(owner, "task6-owner@example.com");
   await owner.goto(`/business/${businessId}/settings/members`);
   await expect(owner.getByRole("button", { name: "Transfer ownership" })).toHaveCount(1);
   await owner.getByRole("button", { name: "Transfer ownership" }).click();
@@ -148,7 +145,6 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   await owner.getByRole("button", { name: "Confirm transfer" }).click();
   await expect(owner.getByRole("status")).toContainText("Ownership transferred.");
 
-  await signIn(secondMember, "task6-second-member@example.com");
   const transferredMembers = await readMembers(secondMember, businessId);
   expect(transferredMembers.find((candidate) => candidate.userId === ownerMember.userId)?.role).toBe("administrator");
   expect(transferredMembers.find((candidate) => candidate.userId === transferTargetId)?.role).toBe("owner_admin");
@@ -175,10 +171,10 @@ test("inactive business blocks join and review operations and preserves member s
   await withPlatformAdmin(browser, async (admin) => {
     const approval = await browserApiRequest(admin, `/api/platform/businesses/${businessId}/approve`, {
       method: "POST",
-      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() },
+      data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), reason: "E2E lifecycle setup" },
     });
     expect(approval.status).toBe(200);
-  });
+  }, "platform-admin-membership-lifecycle@example.com");
 
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();
@@ -188,7 +184,6 @@ test("inactive business blocks join and review operations and preserves member s
   await member.getByRole("button", { name: "Search businesses" }).click();
   await member.getByRole("button", { name: "Request to join" }).click();
   await expect(member.getByRole("status")).toContainText("Request submitted");
-  await signIn(page, "task6-lifecycle@example.com");
   await page.goto(`/business/${businessId}/members`);
   await page.getByRole("button", { name: "Approve request" }).click();
 
@@ -205,7 +200,7 @@ test("inactive business blocks join and review operations and preserves member s
   const suspended = await withPlatformAdmin(browser, (admin) => browserApiRequest(admin, `/api/platform/businesses/${businessId}/suspend`, {
     method: "POST",
     data: { reason: "E2E inactive business coverage" },
-  }));
+  }), "platform-admin-membership-lifecycle@example.com");
   expect(suspended.status).toBe(200);
 
   const blockedContext = await browser.newContext();
@@ -230,7 +225,7 @@ test("inactive business blocks join and review operations and preserves member s
   const reactivated = await withPlatformAdmin(browser, (admin) => browserApiRequest(admin, `/api/platform/businesses/${businessId}/reactivate`, {
     method: "POST",
     data: { reason: "E2E lifecycle restoration" },
-  }));
+  }), "platform-admin-membership-lifecycle@example.com");
   expect(reactivated.status).toBe(200);
   const preservedMembers = await readMembers(page, businessId);
   expect(preservedMembers).toEqual(expect.arrayContaining([

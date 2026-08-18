@@ -27,8 +27,8 @@ describe("project tenant isolation", () => {
     const businessA = await createBusinessRequest({ name: "Business A" }, "owner-a" as UserId, tenancy);
     const businessB = await createBusinessRequest({ name: "Business B" }, "owner-b" as UserId, tenancy);
     const platformService = createPlatformService({ tenancyRepository: tenancy, platformRepository: platform });
-    await platformService.approveBusiness(businessA.id, platformAdmin, { serviceExpiresAt: testServiceExpiresAt() });
-    await platformService.approveBusiness(businessB.id, platformAdmin, { serviceExpiresAt: testServiceExpiresAt() });
+    await platformService.approveBusiness(businessA.id, platformAdmin, { serviceExpiresAt: testServiceExpiresAt(), reason: "Isolation setup" });
+    await platformService.approveBusiness(businessB.id, platformAdmin, { serviceExpiresAt: testServiceExpiresAt(), reason: "Isolation setup" });
     const service = createProjectService({ tenancyRepository: tenancy, projectRepository: projects, platformRepository: platform });
     const projectA = await service.createProjectRequest(businessA.id, "owner-a" as UserId, { name: "Project A" });
 
@@ -42,11 +42,11 @@ describe("project tenant isolation", () => {
     const projects = createInMemoryProjectRepository();
     const business = await createBusinessRequest({ name: "Global Denial Harbour" }, "owner" as UserId, tenancy);
     platform.addMember({ id: "platform-1", userId: "platform-admin" as UserId, normalizedEmail: "platform@example.com" });
-    await createPlatformService({ tenancyRepository: tenancy, platformRepository: platform }).approveBusiness(business.id, "platform-admin" as UserId, { serviceExpiresAt: testServiceExpiresAt() });
+  await createPlatformService({ tenancyRepository: tenancy, platformRepository: platform }).approveBusiness(business.id, "platform-admin" as UserId, { serviceExpiresAt: testServiceExpiresAt(), reason: "Isolation setup" });
     const service = createProjectService({ tenancyRepository: tenancy, projectRepository: projects, platformRepository: platform });
     const project = await service.createProjectRequest(business.id, "owner" as UserId, { name: "Global Denial Project" });
 
     await expect(service.listProjects("owner" as UserId)).rejects.toMatchObject({ code: PROJECT_ERROR_CODES.PLATFORM_ACCESS_DENIED });
-    await expect(service.approveProject(project.id, "owner" as UserId)).rejects.toMatchObject({ code: PROJECT_ERROR_CODES.PLATFORM_ACCESS_DENIED });
+    await expect(service.approveProject(project.id, "owner" as UserId, { reason: "Unauthorized approval" })).rejects.toMatchObject({ code: PROJECT_ERROR_CODES.PLATFORM_ACCESS_DENIED });
   });
 });

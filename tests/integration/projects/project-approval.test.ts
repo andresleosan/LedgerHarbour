@@ -34,12 +34,13 @@ describe("PostgreSQL project approval lifecycle", () => {
       await createPlatformService({ tenancyRepository: tenancy, platformRepository: platform }).claimPlatformMember(admin);
       await createPlatformService({ tenancyRepository: tenancy, platformRepository: platform }).approveBusiness(business.id, admin, {
         serviceExpiresAt: testServiceExpiresAt(),
+        reason: "Project approval setup",
       });
       const service = createProjectService({ tenancyRepository: tenancy, projectRepository: projects, platformRepository: platform });
 
       const project = await service.createProjectRequest(business.id, requester, { name: "Postgres Project" });
       await expect(service.getEffectiveProjectAccess(project.id, requester)).resolves.toMatchObject({ allowed: false, reason: "project_pending" });
-      await service.approveProject(project.id, admin);
+      await service.approveProject(project.id, admin, { reason: "Project approval" });
       await expect(service.getEffectiveProjectAccess(project.id, requester)).resolves.toMatchObject({ allowed: true });
 
       await createPlatformService({ tenancyRepository: tenancy, platformRepository: platform }).suspendBusiness(business.id, admin, { reason: "Parent suspension" });
