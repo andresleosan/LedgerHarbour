@@ -121,3 +121,14 @@ Alcance: autenticación, upload, OCR process, review financiero y controles de a
 - Contrato: tests unitarios, integración PostgreSQL/PGlite y E2E ejercitan el mismo flujo Firebase -> usuario local -> claim -> autorización.
 - Concurrencia: claims simultáneos de memoria y PostgreSQL conservan un único ganador.
 - Casos límite de seguridad: provider development, provider ausente, email Firebase no verificado, flag legacy y usuario/email ya enlazado son rechazados sin fallback por email o ID.
+
+## Task 8 - Verificacion final
+
+La evidencia detallada queda en `.superpowers/sdd/2026-08-16-platform-administration-production/task-8-report.md`.
+
+- Suite local final: `corepack pnpm test` - `59` archivos pasan, `2` skipped; `511` tests pasan, `3` skipped.
+- E2E final: `corepack pnpm test:e2e` - `32/32` pasan; el flujo integral de administracion pasa `1/1` en `38.4s`.
+- Static/build/audit: lint, typecheck y build exit `0`; build genera `18/18` paginas estaticas; audit reporta `0` vulnerabilidades y `556` dependencias.
+- Seguridad/integracion focalizadas: `14` archivos y `61` tests pasan; PGlite migration apply/check/rollback/reapply `4/4` pasan.
+- PostgreSQL nativo: skip honesto porque `TEST_DATABASE_URL` no esta configurado.
+- Warning no bloqueante: `?mine=true` devuelve `400 INACTIVE_BUSINESS` bajo suspension, aunque el acceso queda denegado; se conserva fuera de alcance.
