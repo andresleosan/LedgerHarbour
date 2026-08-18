@@ -88,17 +88,29 @@ function isValidHttpsUrl(value: string | null, hostnameSuffix?: string): boolean
   }
 }
 
+function hasInvalidEndpointSyntax(value: string, url: URL): boolean {
+  const authorityMatch = /^https:\/\/([^/?#]*)(.*)$/i.exec(value);
+  if (!authorityMatch) return true;
+
+  const authorityHost = authorityMatch[1].slice(authorityMatch[1].lastIndexOf("@") + 1);
+  const suffix = authorityMatch[2];
+
+  return authorityHost.includes(":") ||
+    (suffix !== "" && suffix !== "/") ||
+    Boolean(url.search) ||
+    Boolean(url.hash) ||
+    Boolean(url.username) ||
+    Boolean(url.password);
+}
+
 function isValidHttpsEndpoint(value: string | null, hostnamePattern: RegExp): boolean {
   if (!isValidHttpsUrl(value)) return false;
   try {
     const url = new URL(value!);
     return hostnamePattern.test(url.hostname) &&
       url.pathname === "/" &&
-      !url.search &&
-      !url.hash &&
-      !url.username &&
-      !url.password &&
-      !url.port;
+      !url.port &&
+      !hasInvalidEndpointSyntax(value!, url);
   } catch {
     return false;
   }
