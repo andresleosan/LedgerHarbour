@@ -18,7 +18,10 @@ import { AUTH_ERROR_CODES, AuthError } from "./auth-errors";
 export type { FirebaseClientConfig } from "./firebase-config";
 
 function firebaseApp(config: FirebaseClientConfig): FirebaseApp {
-  return getApps()[0] ?? initializeApp(config);
+  const authConfig = typeof window !== "undefined" && window.location.hostname === "ledgerharbour.vercel.app"
+    ? { ...config, authDomain: window.location.hostname }
+    : config;
+  return getApps()[0] ?? initializeApp(authConfig);
 }
 
 const googleRedirectResults = new Map<string, Promise<UserCredential | null>>();

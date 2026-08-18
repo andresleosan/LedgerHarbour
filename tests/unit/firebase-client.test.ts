@@ -3,12 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const signInWithRedirect = vi.hoisted(() => vi.fn());
 const getRedirectResult = vi.hoisted(() => vi.fn());
 const getApps = vi.hoisted(() => vi.fn(() => [{ name: "app" }]));
+const initializeApp = vi.hoisted(() => vi.fn(() => ({ name: "initialized-app" })));
 const getAuth = vi.hoisted(() => vi.fn(() => "auth"));
 const signOut = vi.hoisted(() => vi.fn());
 
 vi.mock("firebase/app", () => ({
   getApps,
-  initializeApp: vi.fn(),
+  initializeApp,
 }));
 
 vi.mock("firebase/auth", () => ({
@@ -49,6 +50,19 @@ describe("Firebase Google authentication", () => {
     await expect(startFirebaseGoogleRedirect(config)).resolves.toBeUndefined();
     expect(signInWithRedirect).toHaveBeenCalledOnce();
     expect(signInWithRedirect.mock.calls[0]?.[0]).toBe("auth");
+  });
+
+  it("uses the production origin for Firebase redirect helpers", async () => {
+    vi.stubGlobal("window", { location: { hostname: "ledgerharbour.vercel.app" } });
+    getApps.mockReturnValueOnce([]);
+
+    await startFirebaseGoogleRedirect(config);
+
+    expect(initializeApp).toHaveBeenCalledWith({
+      ...config,
+      authDomain: "ledgerharbour.vercel.app",
+    });
+    vi.unstubAllGlobals();
   });
 
   it("reads the Google result after returning from the redirect", async () => {
