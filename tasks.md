@@ -21,7 +21,7 @@ This file is the canonical source for development status. Specs and plans provid
 | LH-001 | P0 | desplegada | Fix date hydration in `/admin` | Platform operator | 4.50 |
 | LH-002 | P0 | aprobada | Fail E2E on browser console errors | All users | 4.00 |
 | LH-003 | P1 | revision | Add safe production verification for an ordinary user | Platform operator | 4.25 |
-| LH-005 | P2 | pendiente | Verify provider alerts and limits | Platform operator | 4.25 |
+| LH-005 | P2 | revision | Verify provider alerts and limits | Platform operator | 4.25 |
 | LH-004 | P2 | pendiente | Update repository production-status documentation | Engineering team | 3.75 |
 | LH-006 | P2 | pendiente | Remove the Playwright `allowedDevOrigins` warning | Engineering team | 3.50 |
 | LH-007 | P3 | pendiente | Consolidate language handling in auth and onboarding | End users | 3.25 |
@@ -136,7 +136,7 @@ This file is the canonical source for development status. Specs and plans provid
 ### LH-005: Verify provider alerts and limits
 
 - Priority: `P2`
-- State: `pendiente`
+- State: `revision`
 - Primary user: Platform operator
 - RICE: `4.25` (`reach 3 / impact 5 / confidence 5 / effort 4`)
 - Why now: Document AI can incur usage charges, while R2 and Upstash require explicit quota and credential-scope checks even when operating in free tiers.
@@ -152,6 +152,14 @@ This file is the canonical source for development status. Specs and plans provid
   - Redacted checklist with provider, date, quota, alert state, and owner.
   - No secret values, tokens, account rows, or billing details in Git.
   - Separate operator approval for any remediation that changes billing or credentials.
+- Verification evidence:
+  - Exact secret scan with `rg` was attempted but unavailable (`CommandNotFoundException`). The equivalent PowerShell .NET scan returned `secret_scan_matches=0`.
+  - Exact placeholder scan with `rg` was attempted but unavailable (`CommandNotFoundException`). The equivalent PowerShell .NET scan returned `placeholder_scan_matches=0`.
+  - The checklist was reviewed as documentation only and was not changed in this task.
+  - No provider dashboard or external source was opened. Document AI, R2, and Upstash quotas, alerts, and credential scopes remain unverified.
+  - No billing, plan, credential, resource, OCR, external request, or productive operation was performed.
+  - `git diff --check`: passed with no whitespace errors.
+- Review gate: remains `revision`; it cannot become `aprobada` until the operator performs and records the required read-only external verification.
 
 ### LH-004: Update repository production-status documentation
 
