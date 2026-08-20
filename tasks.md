@@ -1,6 +1,6 @@
 # LedgerHarbour Development Tasks
 
-Updated: 2026-08-19
+Updated: 2026-08-20
 
 This file is the canonical source for development status. Specs and plans provide detail but do not override the state recorded here.
 
@@ -20,7 +20,7 @@ This file is the canonical source for development status. Specs and plans provid
 |---|---|---|---|---|---:|
 | LH-001 | P0 | desplegada | Fix date hydration in `/admin` | Platform operator | 4.50 |
 | LH-002 | P0 | aprobada | Fail E2E on browser console errors | All users | 4.00 |
-| LH-003 | P1 | pendiente | Add safe production verification for an ordinary user | Platform operator | 4.25 |
+| LH-003 | P1 | revision | Add safe production verification for an ordinary user | Platform operator | 4.25 |
 | LH-005 | P2 | pendiente | Verify provider alerts and limits | Platform operator | 4.25 |
 | LH-004 | P2 | pendiente | Update repository production-status documentation | Engineering team | 3.75 |
 | LH-006 | P2 | pendiente | Remove the Playwright `allowedDevOrigins` warning | Engineering team | 3.50 |
@@ -90,7 +90,7 @@ This file is the canonical source for development status. Specs and plans provid
 ### LH-003: Add safe production verification for an ordinary user
 
 - Priority: `P1`
-- State: `pendiente`
+- State: `revision`
 - Primary user: Platform operator
 - RICE: `4.25` (`reach 3 / impact 5 / confidence 5 / effort 4`)
 - Why now: Production verifies the global administrator and anonymous boundaries, but lacks a dedicated authenticated ordinary identity proving the negative role path.
@@ -107,6 +107,15 @@ This file is the canonical source for development status. Specs and plans provid
   - Redacted production browser report showing `/onboarding` and denied `/admin`.
   - Read-only membership verification for the test identity.
   - Operator confirmation before creating or changing the production identity.
+- Verification evidence:
+  - The exact secret scan from the brief was attempted: `rg` is not installed or available in `PATH` in this environment, so PowerShell returned a command-not-found result; an equivalent explicit .NET regex scan with the same pattern returned `0` matches.
+  - The exact placeholder scan from the brief was attempted: `rg` is not installed or available in `PATH` in this environment, so PowerShell returned a command-not-found result; an equivalent explicit .NET regex scan with the same pattern returned `0` matches.
+  - The runbook contains only redacted template fields in brackets and uses SQL bind parameter `$1`; no real identity, email, URL, token, cookie, password, session state, or response body was recorded.
+  - `git diff --check`: passed with no output.
+  - `git status --short`: only the pre-existing untracked `tests/integration/postgres/native-schema.test.ts` was present before this task; it remains outside the intended scope.
+  - No commit created: `ninguno`, per operator instruction.
+  - Production execution did not occur: no SQL, login, browser session, migration, paid request, or productive operation was performed. The operator checkpoint remains pending.
+- Review gate: remains `revision`; it cannot become `aprobada` until an operator authorizes and performs the real read-only membership check and isolated browser verification with redacted evidence.
 
 ## P2: Operations And Documentation
 
