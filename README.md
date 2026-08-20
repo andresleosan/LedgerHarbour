@@ -1,8 +1,12 @@
 # LedgerHarbour
 
-MVP local de revisión de documentos e invoices. El estado de este repositorio es:
+MVP local de revisión de documentos e invoices.
 
-**MVP LOCAL VERIFICADO - NO LISTO PARA PRODUCCION**
+## Estado del repositorio
+
+- Desarrollo local y pruebas deterministas: verificados en el alcance documentado.
+- Integraciones de proveedores: adapters y contratos implementados donde se indica en `docs/STACK.md`.
+- Operacion productiva: activacion y estado externo no revalidados por este repositorio; requieren evidencia del operador.
 
 ## Requisitos
 
@@ -32,6 +36,8 @@ presentable. El recorrido funcional empieza en `http://localhost:3000/login`:
 3. Desde el negocio, prueba upload, OCR, revision y configuracion.
 
 La landing publica tambien enlaza directamente a `/login` y `/register`.
+
+La cuenta sintetica, los adapters locales y las URLs `localhost` del demo son exclusivamente para desarrollo y no representan activacion productiva.
 
 ## Verificación
 
