@@ -19,15 +19,35 @@ Prototipo local/no comercial. El objetivo de la siguiente fase es una prueba des
 ## Arquitectura de prototipo desplegable
 
 - Hosting: Vercel Hobby.
-- PostgreSQL objetivo: Neon Free; migracion inicial verificada remotamente con 11 tablas requeridas.
+- PostgreSQL objetivo: Neon Free; adapter PostgreSQL, migraciones versionadas y evidencia local con PGlite. No se uso Neon remoto ni se aplicaron migraciones productivas; la conexion nativa, el backup productivo y el estado de migracion quedan `unverified`.
 - Auth: Firebase Authentication; adapter email/password + Google implementado, activacion operator-controlled pendiente.
 - Storage privado: Cloudflare R2 Standard.
 - OCR: adapter Google Document AI Invoice Parser implementado; configuracion runtime y alerta de billing pendientes. Fake OCR se conserva solo para desarrollo y pruebas deterministas.
 - Rate limiting: adapter Upstash preparado; memoria local queda limitada a desarrollo y pruebas.
 
+### Estado documentado
+
+La siguiente matriz separa evidencia del repositorio, controles bajo responsabilidad del operador y
+hechos externos que no fueron verificados. El gate de activacion es un runbook y no prueba que un
+proveedor este activo; ver [docs/production-activation.md](production-activation.md) y el checklist
+read-only de [docs/provider-alerts-limits-checklist.md](provider-alerts-limits-checklist.md).
+
+| Proveedor | Implementacion | Evidencia local/documental | Gate del operador | Hechos externos no verificados |
+|---|---|---|---|---|
+| Firebase | Adapter de autenticacion email/password + Google. | Contrato y documentacion local. | Activacion `operator-controlled`. | Boundary de identidad y estado externo `unverified`. |
+| Neon | Adapter PostgreSQL y migraciones versionadas. | Evidencia local con PGlite. | Conexion, backup y migracion requieren control operativo. | Conexion remota, backup productivo y estado de migracion `unverified`. |
+| Vercel | Hosting objetivo. | Documentacion del production gate. | Despliegue `operator-controlled`. | Cuenta y plan actuales `unverified`. |
+| Cloudflare R2 | Adapter de storage privado. | Pruebas de contrato locales. | Activacion `operator-controlled`. | Bucket, scope de claves, cuotas y alertas `unverified`. |
+| Upstash | Adapter de rate limiting. | Contrato y documentacion local. | Activacion `operator-controlled`. | Redis, entorno, limites y alertas `unverified`. |
+| Google Document AI | Adapter Invoice Parser. | Cobertura determinista con fake OCR. | Activacion runtime y billing requieren control del operador. | Processor, IAM, alerta de billing y cuotas `unverified`. |
+
 ## Costo
 
 Objetivo inicial: `US$0/mes` mientras el proyecto sea un prototipo no comercial y permanezca dentro de las cuotas gratuitas.
+
+Los precios y cuotas de la tabla son referencias de planificacion tomadas de la documentacion del
+repositorio, no una verificacion externa actual de planes, limites, alertas o costos. Deben revisarse
+antes de crear cuentas, activar billing o desplegar, con aprobacion explicita del operador.
 
 | Servicio | Cuota/no-cost observada | Costo inicial estimado | Limite o alerta |
 |---|---|---:|---|
