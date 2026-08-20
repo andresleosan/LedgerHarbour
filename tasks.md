@@ -235,7 +235,7 @@ This file is the canonical source for development status. Specs and plans provid
 ### LH-006: Remove the Playwright `allowedDevOrigins` warning
 
 - Priority: `P2`
-- State: `pendiente`
+- State: `revision`
 - Primary user: Engineering team
 - RICE: `3.50` (`reach 2 / impact 2 / confidence 5 / effort 5`)
 - Why now: Next.js warns that future versions will reject the `127.0.0.1` origin used by the Playwright harness unless it is configured explicitly.
@@ -244,12 +244,34 @@ This file is the canonical source for development status. Specs and plans provid
 - Acceptance:
   - The complete E2E run no longer emits the `allowedDevOrigins` warning.
   - Production configuration does not add development origins.
-  - The allowed value is limited to the host and port used by the test server.
+  - The allowed development hostname is `127.0.0.1`; the unchanged Playwright harness fixes port `3100`.
   - Existing Firebase same-origin rewrites remain unchanged.
 - Evidence required:
   - A focused configuration test proving production excludes the development origin.
   - Full Playwright output without the warning.
   - Production build and configuration review.
+- Previous verification evidence (before Fix round 1/5, 2026-08-20):
+  - `corepack pnpm vitest run tests/unit/config/next-config.test.ts` -> exit code `0`; `Test Files 1 passed (1)`, `Tests 4 passed (4)`. The test covered exactly `127.0.0.1:3100` in `development` and `test`, production omission, and both Firebase rewrites.
+  - `corepack pnpm test` -> exit code `0`; `Test Files 66 passed | 2 skipped (68)`, `Tests 570 passed | 3 skipped (573)`.
+  - `corepack pnpm lint` -> exit code `0`; no lint diagnostics.
+  - `corepack pnpm exec tsc --noEmit` -> exit code `0`; no output or type errors.
+  - `corepack pnpm build` -> exit code `0`; Next.js `15.5.23` compiled successfully, generated `18/18` static pages, and completed route optimization.
+  - Complete E2E block from the brief -> the first run reached the shell timeout at `120000 ms` without captured output. The same literal block was rerun with a `300000 ms` shell timeout and exited `1`: `26 failed`, `6 did not run`, `9 passed` in `3.4m`. The captured WebServer output included `Blocked cross-origin request from 127.0.0.1 to /_next/* resource` and the `allowedDevOrigins` guidance, so the warning check failed as required. The failed tests also reported HMR WebSocket diagnostics (`ERR_INVALID_HTTP_RESPONSE`).
+  - Boundary review -> focused test passed for the production exclusion; `next.config.ts` contains only `127.0.0.1:3100` for `development` and `test`, no production property, and both Firebase rewrites unchanged. `playwright.config.ts` remains unchanged and targets port `3100`.
+  - `git diff --check` -> no output and no whitespace errors. `git status --short` -> only `?? tests/integration/postgres/native-schema.test.ts`; it remained untracked and untouched.
+  - No `git add`, `git commit`, `git reset`, `git checkout` or push was executed. No credentials, Firebase real project, dashboards, providers, billing, deployment, migration or other external service was accessed.
+- Fix round 1/5 verification evidence (2026-08-20):
+  - Root cause confirmed from Next.js `15.5.23`: `allowedDevOrigins` is compared by hostname, not host plus port. Task 1 commits `e1cc536` and `721f639` changed the development/test value to exactly `127.0.0.1`; the Playwright harness remains on `127.0.0.1:3100`.
+  - `corepack pnpm vitest run tests/unit/config/next-config.test.ts` -> exit code `0`; `Test Files 1 passed (1)`, `Tests 4 passed (4)`.
+  - `corepack pnpm test` -> exit code `0`; `Test Files 66 passed | 2 skipped (68)`, `Tests 570 passed | 3 skipped (573)`.
+  - `corepack pnpm lint` -> exit code `0`; no lint diagnostics.
+  - `corepack pnpm exec tsc --noEmit` -> exit code `0`; no output or type errors.
+  - `corepack pnpm build` -> exit code `0`; Next.js `15.5.23` compiled successfully and generated `18/18` static pages.
+  - Complete E2E block from the brief with the initial `120000 ms` shell timeout -> shell timeout with no captured output. The same literal block was rerun with a `300000 ms` shell timeout -> exit code `0`; `41 passed (3.9m)`. The captured output contained no `allowedDevOrigins` warning, so the warning check did not throw. The PowerShell wrapper displayed the native `corepack.cmd` diagnostic while capturing stderr, but the Playwright command completed successfully.
+  - Current boundary review -> `development` and `test` contain exactly `allowedDevOrigins: ["127.0.0.1"]`; `production` omits the property; Firebase rewrites are unchanged; `playwright.config.ts` remains unchanged and targets port `3100`.
+  - `tests/integration/postgres/native-schema.test.ts` remained untracked, excluded and untouched. No code, tests, harness, specs or plans were modified in this fix round.
+  - No credentials, real Firebase project, dashboards, providers, billing, deployment, migration or external service was accessed. No Git write operation was executed; no subagent commit exists.
+- Review gate: remains `revision`; Fix round 1/5 passed the required gates, but this task is not `aprobada` pending independent review.
 
 ## P3: Future Improvements
 
