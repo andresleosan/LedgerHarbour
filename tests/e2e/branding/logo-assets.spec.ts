@@ -1,7 +1,8 @@
 import { createRequire } from "node:module";
 import path from "node:path";
 
-import { expect, test, type APIResponse } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import type { APIResponse } from "@playwright/test";
 
 const require = createRequire(import.meta.url);
 const sharp = require(require.resolve("sharp", { paths: [path.dirname(require.resolve("next"))] }));

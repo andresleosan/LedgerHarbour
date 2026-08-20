@@ -1,5 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { createApprovedBusiness } from "./helpers/business";
+import { browserApiRequest } from "./helpers/browser-api";
 
 test.describe.configure({ mode: "serial" });
 
@@ -10,7 +11,7 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
-test("verifies the local MVP critical path and cross-tenant access block", async ({ browser }) => {
+test("verifies the local MVP critical path and cross-tenant access block", async ({ browserWithDiagnostics: browser }) => {
   const ownerContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const owner = await ownerContext.newPage();
   await signIn(owner, "task11-owner@example.com");
@@ -51,10 +52,8 @@ test("verifies the local MVP critical path and cross-tenant access block", async
   const invoiceId = reviewHref?.match(/invoices\/([^?]+)\?/)?.[1];
   expect(invoiceId).toBeTruthy();
 
-  const directReviewResponse = await owner.evaluate(async (id) => {
-    const response = await fetch(`/api/invoices/${id}/review`);
-    return { status: response.status, body: await response.json() };
-  }, invoiceId);
+  const directReview = await browserApiRequest(owner, `/api/invoices/${invoiceId}/review`);
+  const directReviewResponse = { status: directReview.status, body: JSON.parse(directReview.body) };
   expect(directReviewResponse.status).toBe(200);
   expect(directReviewResponse.body.invoice).toMatchObject({ id: invoiceId, reviewState: "needs_review" });
 
@@ -93,10 +92,11 @@ test("verifies the local MVP critical path and cross-tenant access block", async
 
   const approvedReview = await owner.evaluate(async (url) => (await fetch(url)).json(), `/api/invoices/${invoiceId}/review`) as { invoice: { reviewState: string; notes: string; supplier: string } };
   expect(approvedReview.invoice.reviewState).toBe("approved");
-  const editAfterApproval = await owner.evaluate(async (url) => {
-    const response = await fetch(url, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notes: "Should not change" }) });
-    return { status: response.status, body: await response.json() };
-  }, `/api/invoices/${invoiceId}/review`);
+  const editAfterApprovalResult = await browserApiRequest(owner, `/api/invoices/${invoiceId}/review`, {
+    method: "PATCH",
+    data: { notes: "Should not change" },
+  });
+  const editAfterApproval = { status: editAfterApprovalResult.status, body: JSON.parse(editAfterApprovalResult.body) };
   expect(editAfterApproval.status).toBe(409);
   expect((await owner.evaluate(async (url) => (await fetch(url)).json(), `/api/invoices/${invoiceId}/review`)).invoice).toMatchObject({ reviewState: "approved", notes: "Reviewed in Task 11", supplier: "Corrected Supplier" });
 
@@ -121,14 +121,10 @@ test("verifies the local MVP critical path and cross-tenant access block", async
   const otherBusinessId = await createApprovedBusiness(browser, other, "Task Eleven Other Harbour");
   await other.goto(`/business/${businessId}`);
   await expect(other).toHaveURL(/\/portfolio$/);
-  const crossTenantReview = other.waitForResponse((response) => response.url().endsWith(`/api/invoices/${invoiceId}/review`) && response.request().method() === "GET");
-  await other.goto(`/business/${businessId}/invoices/${invoiceId}`);
-  expect((await crossTenantReview).status()).toBe(403);
-  const crossTenant = await other.evaluate(async (url) => {
-    const response = await fetch(url);
-    return response.status;
-  }, downloadHref as string);
-  expect(crossTenant).toBe(403);
+  const crossTenantReview = await browserApiRequest(other, `/api/invoices/${invoiceId}/review`);
+  expect(crossTenantReview.status).toBe(403);
+  const crossTenant = await browserApiRequest(other, downloadHref as string);
+  expect(crossTenant.status).toBe(403);
   expect(otherBusinessId).not.toBe(businessId);
 
   await ownerContext.close();

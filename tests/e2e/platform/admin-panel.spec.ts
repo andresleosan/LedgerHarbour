@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 
 async function signIn(page: import("@playwright/test").Page, email: string) {
   await page.goto("/login");
@@ -7,7 +7,7 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
-test("allows only active platform administrators into the global panel", async ({ browser }) => {
+test("allows only active platform administrators into the global panel", async ({ browserWithDiagnostics: browser }) => {
   const ordinary = await browser.newPage();
   await signIn(ordinary, "task6-ordinary@example.com");
   await ordinary.goto("/admin");
@@ -31,7 +31,7 @@ test("allows only active platform administrators into the global panel", async (
   await platformAdmin.close();
 });
 
-test("redirects an anonymous continuation request to login", async ({ browser }) => {
+test("redirects an anonymous continuation request to login", async ({ browserWithDiagnostics: browser }) => {
   const anonymous = await browser.newPage();
 
   await anonymous.goto("/auth/continue");
@@ -40,7 +40,7 @@ test("redirects an anonymous continuation request to login", async ({ browser })
   await anonymous.close();
 });
 
-test("rejects an invalid Firebase session cookie and redirects continuation to login", async ({ browser }) => {
+test("rejects an invalid Firebase session cookie and redirects continuation to login", async ({ browserWithDiagnostics: browser }) => {
   const invalidSession = await browser.newPage();
   await invalidSession.context().addCookies([{
     name: "ledgerharbour_firebase_session",
@@ -59,7 +59,7 @@ test("rejects an invalid Firebase session cookie and redirects continuation to l
   await invalidSession.close();
 });
 
-test("continues platform administrators to admin and ordinary users to onboarding", async ({ browser }) => {
+test("continues platform administrators to admin and ordinary users to onboarding", async ({ browserWithDiagnostics: browser }) => {
   const admin = await browser.newPage();
   await signIn(admin, "platform-admin-panel@example.com");
   await admin.goto("/auth/continue");
@@ -74,7 +74,7 @@ test("continues platform administrators to admin and ordinary users to onboardin
   await ordinary.close();
 });
 
-test("confirms a business status action and refreshes the safe server DTO", async ({ browser }) => {
+test("confirms a business status action and refreshes the safe server DTO", async ({ browserWithDiagnostics: browser }) => {
   const requester = await browser.newPage();
   await signIn(requester, "task6-requester@example.com");
   await requester.goto("/onboarding/create-business");

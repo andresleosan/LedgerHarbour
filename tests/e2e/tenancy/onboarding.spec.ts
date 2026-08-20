@@ -1,4 +1,5 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import type { Locator } from "@playwright/test";
 import { withPlatformAdmin } from "../helpers/business";
 import { browserApiRequest } from "../helpers/browser-api";
 
@@ -9,6 +10,33 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await page.getByLabel("Work email").fill(email);
   await page.getByRole("button", { name: "Continue with email" }).click();
   await expect(page.getByRole("status")).toContainText("Signed in as");
+}
+
+async function stubFetchFailure(page: import("@playwright/test").Page, path: string) {
+  const install = (path: string) => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const requestUrl = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+      if (requestUrl.includes(path)) throw new Error("synthetic network failure");
+      return originalFetch(input, init);
+    };
+  };
+  await page.addInitScript(install, path);
+  await page.evaluate(install, path);
+}
+
+async function stubFetchResponse(page: import("@playwright/test").Page, path: string, status: number, body: unknown) {
+  const install = ({ path, status, body }: { path: string; status: number; body: unknown }) => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const requestUrl = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+      if (requestUrl.includes(path)) {
+        return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+      }
+      return originalFetch(input, init);
+    };
+  };
+  await page.addInitScript(install, { path, status, body });
 }
 
 async function expectVisibleFocusRing(locator: Locator) {
@@ -65,7 +93,7 @@ test("submits a business request from onboarding and shows its identity", async 
   await expect(page.getByRole("status")).toContainText("Business ID");
 });
 
-test("searches, requests access, approves, rejects, and reapplies", async ({ browser }) => {
+test("searches, requests access, approves, rejects, and reapplies", async ({ browserWithDiagnostics: browser }) => {
   const ownerContext = await browser.newContext();
   const owner = await ownerContext.newPage();
   await signIn(owner, "owner-workflow@example.com");
@@ -110,14 +138,19 @@ test("searches, requests access, approves, rejects, and reapplies", async ({ bro
   await owner.getByRole("button", { name: "Approve request" }).click();
   await expect(owner.getByRole("status")).toContainText("Request approved");
 
+  const memberAccess = await browserApiRequest(member, `/api/businesses/${businessId}/join-requests`);
+  expect(memberAccess.status).toBe(403);
+  await stubFetchResponse(member, `/api/businesses/${businessId}/join-requests`, 403, {
+    error: { code: "INSUFFICIENT_CAPABILITY" },
+  });
   await member.goto(`/business/${businessId}/members`);
-  await expect(member.getByText(/permission to review/)).toBeVisible();
+  await expect(member.getByText(/permission to review/i)).toBeVisible();
 
   await ownerContext.close();
   await memberContext.close();
 });
 
-test("keeps onboarding accessible and language switchable on mobile", async ({ page, browser }) => {
+test("keeps onboarding accessible and language switchable on mobile", async ({ page, browserWithDiagnostics: browser }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, "mobile-onboarding@example.com");
   await page.goto("/onboarding");
@@ -168,18 +201,16 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
          method: "POST",
          data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), reason: "E2E mobile onboarding setup" },
        });
-       expect(approval.status).toBe(200);
+        expect(approval.status).toBe(200);
      }, "platform-admin-onboarding-mobile@example.com");
 
    await page.goto("/onboarding/join-business");
    await page.getByRole("button", { name: "Espanol" }).click();
-  const abortHistory = (url: URL) => url.pathname.endsWith("/join-requests") && url.searchParams.get("mine") === "true";
-  await page.route(abortHistory, (route) => route.abort());
+   await stubFetchFailure(page, "/join-requests?mine=true");
   await page.getByLabel("Buscar por nombre del negocio").fill("mobile harbour");
   await page.getByRole("button", { name: "Buscar negocios" }).click();
   await expect(page.locator("p.result-state").filter({ hasText: "Estado de solicitud no disponible." })).toBeVisible();
   await expect(page.getByRole("button", { name: "Estado de solicitud no disponible." })).toBeDisabled();
-  await page.unroute(abortHistory);
 
   const memberContext = await browser.newContext();
   const member = await memberContext.newPage();
@@ -211,7 +242,7 @@ test("keeps onboarding accessible and language switchable on mobile", async ({ p
     "scrollWidth",
     await page.evaluate(() => document.documentElement.clientWidth),
   );
-   await page.route("**/api/businesses/*/join-requests", (route) => route.abort());
+    await stubFetchFailure(page, `/api/businesses/${businessId}/join-requests`);
    await page.reload();
    await expect(page.getByText("No pudimos conectar con LedgerHarbour. Comprueba tu conexión e inténtalo de nuevo.")).toBeVisible();
    await page.getByRole("link", { name: "English" }).click();

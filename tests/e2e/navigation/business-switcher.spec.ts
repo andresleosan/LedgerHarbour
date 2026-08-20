@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { createApprovedBusiness, withPlatformAdmin } from "../helpers/business";
 import { browserApiRequest } from "../helpers/browser-api";
 
@@ -9,7 +9,7 @@ async function signIn(page: import("@playwright/test").Page, email = "portfolio-
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
-test("authenticates, switches authorized businesses, preserves locale, and keeps inactive businesses non-selectable", async ({ page, browser }) => {
+test("authenticates, switches authorized businesses, preserves locale, and keeps inactive businesses non-selectable", async ({ page, browserWithDiagnostics: browser }) => {
   await signIn(page);
   const firstName = `Portfolio Books ${Date.now()}`;
   const secondName = `Portfolio Studio ${Date.now()}`;

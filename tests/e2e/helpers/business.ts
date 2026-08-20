@@ -1,4 +1,5 @@
-import { expect, type Browser, type Page } from "@playwright/test";
+import { expect, type Page } from "@playwright/test";
+import type { DiagnosticBrowser } from "../fixtures";
 import { browserApiRequest } from "./browser-api";
 
 async function signIn(page: Page, email: string) {
@@ -8,7 +9,7 @@ async function signIn(page: Page, email: string) {
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
-export async function createApprovedBusiness(browser: Browser, page: Page, name: string, platformAdminEmail = "platform-admin@example.com") {
+export async function createApprovedBusiness(browser: DiagnosticBrowser, page: Page, name: string, platformAdminEmail = "platform-admin@example.com") {
   await page.goto("/onboarding/create-business");
   await page.getByLabel("Business name").fill(name);
   await page.getByRole("button", { name: "Submit request" }).click();
@@ -22,13 +23,13 @@ export async function createApprovedBusiness(browser: Browser, page: Page, name:
       method: "POST",
       data: { serviceExpiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), reason: "E2E business setup" },
     });
-    expect(approval.status, approval.body).toBe(200);
+    expect(approval.status).toBe(200);
   }, platformAdminEmail);
 
   return businessId as string;
 }
 
-export async function withPlatformAdmin<T>(browser: Browser, callback: (page: Page) => Promise<T>, email = "platform-admin@example.com") {
+export async function withPlatformAdmin<T>(browser: DiagnosticBrowser, callback: (page: Page) => Promise<T>, email = "platform-admin@example.com") {
   const adminContext = await browser.newContext();
   const admin = await adminContext.newPage();
   try {

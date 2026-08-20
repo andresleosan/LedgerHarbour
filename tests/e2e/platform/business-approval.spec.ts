@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import { browserApiRequest } from "../helpers/browser-api";
 
 async function signIn(page: import("@playwright/test").Page, email: string) {
   await page.goto("/login");
@@ -7,7 +8,7 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
-test("submits a business request and requires platform approval before operation", async ({ browser }) => {
+test("submits a business request and requires platform approval before operation", async ({ browserWithDiagnostics: browser }) => {
   const requester = await browser.newPage();
   await signIn(requester, "task3-requester@example.com");
   await requester.goto("/onboarding/create-business");
@@ -18,13 +19,17 @@ test("submits a business request and requires platform approval before operation
   const businessId = (await requestStatus.textContent())?.match(/business-[\w-]+/)?.[0];
   expect(businessId).toBeTruthy();
 
-  const beforeApproval = await requester.evaluate(async (id) => {
-    const form = new FormData();
-    form.append("file", new File(["%PDF-1.7\n1 0 obj\n<<>>\nendobj\nstartxref\n0\n%%EOF\n"], "pending.pdf", { type: "application/pdf" }));
-    const response = await fetch(`/api/businesses/${id}/documents`, { method: "POST", body: form });
-    return response.status;
-  }, businessId);
-  expect(beforeApproval).toBe(403);
+  const beforeApproval = await browserApiRequest(requester, `/api/businesses/${businessId}/documents`, {
+    method: "POST",
+    multipart: {
+      file: {
+        name: "pending.pdf",
+        mimeType: "application/pdf",
+        buffer: Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\nstartxref\n0\n%%EOF\n"),
+      },
+    },
+  });
+  expect(beforeApproval.status).toBe(403);
 
   const admin = await browser.newPage();
   await signIn(admin, "platform-admin@example.com");

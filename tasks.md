@@ -19,7 +19,7 @@ This file is the canonical source for development status. Specs and plans provid
 | ID | Priority | State | Task | Primary user | RICE |
 |---|---|---|---|---|---:|
 | LH-001 | P0 | desplegada | Fix date hydration in `/admin` | Platform operator | 4.50 |
-| LH-002 | P0 | pendiente | Fail E2E on browser console errors | All users | 4.00 |
+| LH-002 | P0 | aprobada | Fail E2E on browser console errors | All users | 4.00 |
 | LH-003 | P1 | pendiente | Add safe production verification for an ordinary user | Platform operator | 4.25 |
 | LH-005 | P2 | pendiente | Verify provider alerts and limits | Platform operator | 4.25 |
 | LH-004 | P2 | pendiente | Update repository production-status documentation | Engineering team | 3.75 |
@@ -61,7 +61,7 @@ This file is the canonical source for development status. Specs and plans provid
 ### LH-002: Fail E2E on browser console errors
 
 - Priority: `P0`
-- State: `pendiente`
+- State: `aprobada`
 - Primary user: All users
 - RICE: `4.00` (`reach 4 / impact 4 / confidence 4 / effort 4`)
 - Why now: Current browser tests can pass while React or runtime errors are present in the browser console.
@@ -76,6 +76,14 @@ This file is the canonical source for development status. Specs and plans provid
   - Red/green test demonstrating the synthetic failure.
   - Focused browser tests and the complete Playwright suite.
   - Security review of captured output and persisted test artifacts.
+- Verification evidence:
+  - RED: the expanded diagnostics and cookie-scope tests reported `12 failed, 4 passed` before the round-three fixes.
+  - `corepack pnpm vitest run tests/unit/e2e/browser-diagnostics.test.ts tests/unit/e2e/browser-api.test.ts`: 16 passed.
+  - `corepack pnpm test`: 65 files passed, 2 skipped; 566 tests passed, 3 skipped.
+  - `corepack pnpm lint`, `corepack pnpm exec tsc --noEmit`, and `corepack pnpm build`: passed.
+  - `corepack pnpm exec playwright test --config=playwright.verification.config.ts`: 41 passed on isolated port 3110 because port 3100 was occupied by another workspace; the temporary config was removed afterward.
+  - Independent quality review: approved with no open findings. Security re-review: `PASS`, with no critical or important findings.
+  - The remaining `allowedDevOrigins` warning is tracked separately by `LH-006` and is not allowlisted by the gate.
 
 ## P1: Incomplete Functional Flows
 

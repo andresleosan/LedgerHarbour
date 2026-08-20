@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { createApprovedBusiness } from "../helpers/business";
 import { browserApiRequest } from "../helpers/browser-api";
 
@@ -9,6 +9,19 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await page.getByLabel("Work email").fill(email);
   await page.getByRole("button", { name: "Continue with email" }).click();
   await expect(page.getByRole("status")).toContainText("Signed in as");
+}
+
+async function stubUploadResponse(page: import("@playwright/test").Page, status: number, code: string) {
+  await page.evaluate(({ status, code }) => {
+    const originalFetch = window.fetch.bind(window);
+    window.fetch = async (input, init) => {
+      const requestUrl = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+      if (requestUrl.includes("/api/businesses/") && requestUrl.endsWith("/documents")) {
+        return new Response(JSON.stringify({ error: { code } }), { status, headers: { "Content-Type": "application/json" } });
+      }
+      return originalFetch(input, init);
+    };
+  }, { status, code });
 }
 
 const validPdf = {
@@ -25,7 +38,7 @@ const validProgressiveJpeg = {
   ),
 };
 
-test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks another business", async ({ browser }) => {
+test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks another business", async ({ browserWithDiagnostics: browser }) => {
   const ownerContext = await browser.newContext();
   const owner = await ownerContext.newPage();
   await signIn(owner, "documents-owner@example.com");
@@ -57,20 +70,34 @@ test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks a
   await otherContext.close();
 });
 
-test("shows invalid and oversized validation errors, including Spanish copy", async ({ page, browser }) => {
+test("shows invalid and oversized validation errors, including Spanish copy", async ({ page, browserWithDiagnostics: browser }) => {
   await signIn(page, "documents-validation@example.com");
   const businessId = await createApprovedBusiness(browser, page, "E2E Validation Harbour");
   await page.goto(`/business/${businessId}/upload`);
   await page.getByRole("link", { name: "Español" }).click();
+  const invalidResponse = await browserApiRequest(page, `/api/businesses/${businessId}/documents`, {
+    method: "POST",
+    multipart: { file: { name: "bad.txt", mimeType: "text/plain", buffer: Buffer.from("not a document") } },
+  });
+  expect(invalidResponse.status).toBe(400);
+  expect(JSON.parse(invalidResponse.body)).toMatchObject({ error: { code: "UNSUPPORTED_DOCUMENT_FORMAT" } });
+  await stubUploadResponse(page, 400, "UNSUPPORTED_DOCUMENT_FORMAT");
   await page.locator('input[type="file"]').setInputFiles({ name: "bad.txt", mimeType: "text/plain", buffer: Buffer.from("not a document") });
   await page.getByRole("button", { name: "Subir documento" }).click();
   await expect(page.locator("p[role='alert']")).toContainText("formato");
+  const oversizedResponse = await browserApiRequest(page, `/api/businesses/${businessId}/documents`, {
+    method: "POST",
+    multipart: { file: { name: "large.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(10 * 1024 * 1024 + 1, 0x20) } },
+  });
+  expect(oversizedResponse.status).toBe(413);
+  expect(JSON.parse(oversizedResponse.body)).toMatchObject({ error: { code: "DOCUMENT_TOO_LARGE" } });
+  await stubUploadResponse(page, 413, "DOCUMENT_TOO_LARGE");
   await page.locator('input[type="file"]').setInputFiles({ name: "large.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(10 * 1024 * 1024 + 1, 0x20) });
   await page.getByRole("button", { name: "Subir documento" }).click();
   await expect(page.locator("p[role='alert']")).toContainText("10 MiB");
 });
 
-test("uploads and downloads a real progressive JPEG fixture", async ({ page, browser }) => {
+test("uploads and downloads a real progressive JPEG fixture", async ({ page, browserWithDiagnostics: browser }) => {
   await signIn(page, "documents-jpeg@example.com");
   const businessId = await createApprovedBusiness(browser, page, "E2E JPEG Harbour");
   await page.goto(`/business/${businessId}/upload`);
@@ -94,7 +121,7 @@ test("uploads and downloads a real progressive JPEG fixture", async ({ page, bro
   expect(response.length).toBe(validProgressiveJpeg.buffer.length);
 });
 
-test("keeps upload usable on mobile with keyboard focus and reduced motion", async ({ page, browser }) => {
+test("keeps upload usable on mobile with keyboard focus and reduced motion", async ({ page, browserWithDiagnostics: browser }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, "documents-accessibility@example.com");
   const businessId = await createApprovedBusiness(browser, page, "E2E Accessibility Harbour");

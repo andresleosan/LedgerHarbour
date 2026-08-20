@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import { browserApiRequest } from "../helpers/browser-api";
 
 async function signIn(page: import("@playwright/test").Page, email: string) {
   await page.goto("/login");
@@ -16,7 +17,7 @@ async function createProjectFromTenantView(page: import("@playwright/test").Page
   await expect(projectCard.locator(".project-status")).toHaveText("Pending approval");
 }
 
-test("creates a pending project, approves it globally, and applies parent suspension", async ({ browser }) => {
+test("creates a pending project, approves it globally, and applies parent suspension", async ({ browserWithDiagnostics: browser }) => {
   const requester = await browser.newPage();
   await signIn(requester, "task5-requester@example.com");
   await requester.goto("/onboarding/create-business");
@@ -82,11 +83,8 @@ test("creates a pending project, approves it globally, and applies parent suspen
   }, businessId);
   expect(suspension).toBe(200);
 
-  const access = await requester.evaluate(async (id) => {
-    const response = await fetch(`/api/businesses/${id}/projects`);
-    return response.status;
-  }, businessId);
-  expect(access).toBe(403);
+  const access = await browserApiRequest(requester, `/api/businesses/${businessId}/projects`);
+  expect(access.status).toBe(403);
   await requester.close();
   await admin.close();
 });

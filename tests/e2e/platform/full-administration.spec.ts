@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import type { Page } from "@playwright/test";
+import { browserApiRequest } from "../helpers/browser-api";
 
 type ApiResult = { status: number; body: unknown };
 
@@ -10,20 +12,14 @@ async function signIn(page: Page, email: string): Promise<void> {
 }
 
 async function api(page: Page, path: string, options: { method?: string; body?: unknown } = {}): Promise<ApiResult> {
-  return page.evaluate(async ({ path, method, body }) => {
-    const response = await fetch(path, {
-      method,
-      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    let responseBody: unknown = null;
-    try {
-      responseBody = await response.json();
-    } catch {
-      responseBody = null;
-    }
-    return { status: response.status, body: responseBody };
-  }, { path, method: options.method, body: options.body });
+  const response = await browserApiRequest(page, path, { method: options.method, data: options.body });
+  let responseBody: unknown = null;
+  try {
+    responseBody = JSON.parse(response.body);
+  } catch {
+    responseBody = null;
+  }
+  return { status: response.status, body: responseBody };
 }
 
 function expectSafeDto(value: unknown): void {
@@ -31,7 +27,7 @@ function expectSafeDto(value: unknown): void {
   expect(serialized).not.toMatch(/password|token|secret|privateObjectKey|documentBytes|credential/i);
 }
 
-test("runs the complete platform administration lifecycle with test-only providers", async ({ browser }) => {
+test("runs the complete platform administration lifecycle with test-only providers", async ({ browserWithDiagnostics: browser }) => {
   const owner = await browser.newPage();
   const platformAdmin = await browser.newPage();
   const administrator = await browser.newPage();

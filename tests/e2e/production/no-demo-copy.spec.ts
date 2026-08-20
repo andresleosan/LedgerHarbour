@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 
 const forbiddenCopy = /open demo|demo account|development simulation|simulated google|fake ocr/i;
 

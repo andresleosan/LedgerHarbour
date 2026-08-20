@@ -1,6 +1,6 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 
-test("renders the English login and completes the test email flow without demo copy", async ({ browser }) => {
+test("renders the English login and completes the test email flow without demo copy", async ({ browserWithDiagnostics: browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
 
@@ -42,7 +42,7 @@ test("renders the English login and completes the test email flow without demo c
   await context.close();
 });
 
-test("keeps the login usable without horizontal overflow on mobile", async ({ browser }) => {
+test("keeps the login usable without horizontal overflow on mobile", async ({ browserWithDiagnostics: browser }) => {
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const page = await context.newPage();
 
@@ -53,7 +53,7 @@ test("keeps the login usable without horizontal overflow on mobile", async ({ br
   await context.close();
 });
 
-test("renders register without demo status", async ({ browser }) => {
+test("renders register without demo status", async ({ browserWithDiagnostics: browser }) => {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 } });
   const page = await context.newPage();
 

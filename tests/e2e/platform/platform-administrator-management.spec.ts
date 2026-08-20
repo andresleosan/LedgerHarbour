@@ -1,4 +1,6 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import type { Page } from "@playwright/test";
+import { browserApiRequest } from "../helpers/browser-api";
 
 async function signIn(page: Page, email: string): Promise<void> {
   await page.goto("/login");
@@ -7,7 +9,7 @@ async function signIn(page: Page, email: string): Promise<void> {
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
-test("adds, claims, and removes a platform administrator", async ({ browser }) => {
+test("adds, claims, and removes a platform administrator", async ({ browserWithDiagnostics: browser }) => {
   const admin = await browser.newPage();
   const addedAdmin = await browser.newPage();
   const email = `task-final-added-${Date.now()}@example.com`;
@@ -35,8 +37,8 @@ test("adds, claims, and removes a platform administrator", async ({ browser }) =
     await dialog.getByRole("button", { name: "Confirm" }).click();
     await expect(record).toContainText("Inactive");
 
-    const deniedAfterRemoval = await addedAdmin.evaluate(async () => (await fetch("/api/platform/businesses")).status);
-    expect(deniedAfterRemoval).toBe(403);
+    const deniedAfterRemoval = await browserApiRequest(addedAdmin, "/api/platform/businesses");
+    expect(deniedAfterRemoval.status).toBe(403);
 
     await expect(record.getByRole("button", { name: new RegExp(`Remove ${email}`) })).toHaveCount(0);
   } finally {

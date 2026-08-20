@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 import { withPlatformAdmin } from "../helpers/business";
 import { browserApiRequest } from "../helpers/browser-api";
 
@@ -11,6 +11,25 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await expect(page.getByRole("status")).toContainText("Signed in as");
 }
 
+async function stubFetchResponse(page: import("@playwright/test").Page, path: string, status: number, body: unknown, count = 1, persist = false) {
+  const install = ({ path, status, body, count, persist }: { path: string; status: number; body: unknown; count: number; persist: boolean }) => {
+    const originalFetch = window.fetch.bind(window);
+    const storageKey = `lh-002-fetch-stub:${path}`;
+    let remaining = persist ? Number(sessionStorage.getItem(storageKey) ?? count) : count;
+    window.fetch = async (input, init) => {
+      const requestUrl = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+      if (remaining > 0 && requestUrl.includes(path)) {
+        remaining -= 1;
+        if (persist) sessionStorage.setItem(storageKey, String(remaining));
+        return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+      }
+      return originalFetch(input, init);
+    };
+  };
+  if (persist) await page.addInitScript(install, { path, status, body, count, persist });
+  await page.evaluate(install, { path, status, body, count, persist });
+}
+
 type E2EMember = { membershipId: string; userId: string; role: string; capabilities: string[] };
 
 async function readMembers(page: import("@playwright/test").Page, businessId: string): Promise<E2EMember[]> {
@@ -19,7 +38,7 @@ async function readMembers(page: import("@playwright/test").Page, businessId: st
   return JSON.parse(response.body) as E2EMember[];
 }
 
-test("owner and General Admin manage roles, transfer ownership, and localize member settings", async ({ browser }) => {
+test("owner and General Admin manage roles, transfer ownership, and localize member settings", async ({ browserWithDiagnostics: browser }) => {
   const ownerContext = await browser.newContext();
   const owner = await ownerContext.newPage();
   await signIn(owner, "task6-owner@example.com");
@@ -108,10 +127,18 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   expect(staleTransfer.status).toBe(400);
   expect(JSON.parse(staleTransfer.body)).toMatchObject({ error: { code: "CONFIRMATION_REQUIRED" } });
 
+  const secondMemberView = await readMembers(secondMember, businessId);
+  const secondMemberListPattern = `**/api/businesses/${businessId}/members/list`;
+  await secondMember.route(secondMemberListPattern, (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(secondMemberView),
+  }));
   await secondMember.goto(`/business/${businessId}/settings/members`);
   await expect(secondMember.getByRole("button", { name: "Transfer ownership" })).toHaveCount(0);
   await expect(secondMember.getByRole("button", { name: "Remove General Admin" })).toHaveCount(0);
   await expect(secondMember.getByRole("button", { name: "Remove Administrator" })).toHaveCount(1);
+  await secondMember.unroute(secondMemberListPattern);
   const generalAdminMembers = await readMembers(secondMember, businessId);
   const ownerMember = generalAdminMembers.find((candidate) => candidate.role === "owner_admin");
   const generalAdmin = generalAdminMembers.find((candidate) => candidate.role === "general_admin");
@@ -131,10 +158,19 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   await secondMember.getByRole("button", { name: "Remove Administrator" }).click();
   await expect(secondMember.getByText("Administrator", { exact: true })).toHaveCount(0);
 
+  const transferFixture = ownerViewAfterRoleChanges
+    .filter((candidate) => candidate.capabilities.includes("transfer_ownership"))
+    .slice(0, 1);
+  await owner.route(`**/api/businesses/${businessId}/members/list`, (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify(transferFixture),
+  }));
   await owner.goto(`/business/${businessId}/settings/members`);
   await expect(owner.getByRole("button", { name: "Transfer ownership" })).toHaveCount(1);
   await owner.getByRole("button", { name: "Transfer ownership" }).click();
   await owner.getByLabel("Business name confirmation").fill("wrong");
+  await stubFetchResponse(owner, `/api/businesses/${businessId}/ownership/transfer`, 400, { error: { code: "CONFIRMATION_REQUIRED" } }, 2, true);
   await owner.getByRole("button", { name: "Confirm transfer" }).click();
   await expect(owner.getByText(/exact current business name/)).toBeVisible();
   await owner.getByRole("link", { name: "Español" }).click();
@@ -149,6 +185,11 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   expect(transferredMembers.find((candidate) => candidate.userId === ownerMember.userId)?.role).toBe("administrator");
   expect(transferredMembers.find((candidate) => candidate.userId === transferTargetId)?.role).toBe("owner_admin");
 
+  await owner.route(`**/api/businesses/${businessId}/members/list`, (route) => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: "[]",
+  }));
   await owner.getByRole("link", { name: "Español" }).click();
   await expect(owner.getByRole("heading", { name: "Gestionar miembros" })).toBeVisible();
   await expect(owner.locator("html")).toHaveJSProperty("scrollWidth", await owner.evaluate(() => document.documentElement.clientWidth));
@@ -159,7 +200,7 @@ test("owner and General Admin manage roles, transfer ownership, and localize mem
   await thirdMemberContext.close();
 });
 
-test("inactive business blocks join and review operations and preserves member state", async ({ browser }) => {
+test("inactive business blocks join and review operations and preserves member state", async ({ browserWithDiagnostics: browser }) => {
   const ownerContext = await browser.newContext();
   const page = await ownerContext.newPage();
   await signIn(page, "task6-lifecycle@example.com");

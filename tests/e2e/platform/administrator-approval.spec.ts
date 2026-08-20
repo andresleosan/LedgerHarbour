@@ -1,4 +1,5 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
+import { browserApiRequest } from "../helpers/browser-api";
 
 async function signIn(page: import("@playwright/test").Page, email: string) {
   await page.goto("/login");
@@ -7,7 +8,7 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
   await expect.poll(async () => page.url().includes("/onboarding") || await page.getByRole("status").isVisible()).toBe(true);
 }
 
-test("platform approval and suspension gates business administrator access", async ({ browser }) => {
+test("platform approval and suspension gates business administrator access", async ({ browserWithDiagnostics: browser }) => {
   const owner = await browser.newPage();
   await signIn(owner, "task4-owner@example.com");
   await owner.goto("/onboarding/create-business");
@@ -73,11 +74,8 @@ test("platform approval and suspension gates business administrator access", asy
   const audit = await platformAdmin.evaluate(async () => (await fetch("/api/platform/audit-events")).json()) as { events: Array<{ action: string; targetId: string; reason: string | null }> };
   expect(audit.events).toContainEqual(expect.objectContaining({ action: "administrator_revoked", targetId: target?.membershipId, reason: "E2E access review" }));
 
-  const denied = await member.evaluate(async ({ id, membershipId }) => (await fetch(`/api/businesses/${id}/members/${membershipId}`)).status, {
-    id: businessId,
-    membershipId: target?.membershipId,
-  });
-  expect(denied).toBe(403);
+  const denied = await browserApiRequest(member, `/api/businesses/${businessId}/members/${target?.membershipId}`);
+  expect(denied.status).toBe(403);
 
   await owner.close();
   await member.close();

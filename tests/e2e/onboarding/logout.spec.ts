@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "../fixtures";
 
 test("logs out from onboarding, clears the session, and redirects to login", async ({ page, context }) => {
   await page.goto("/login");
