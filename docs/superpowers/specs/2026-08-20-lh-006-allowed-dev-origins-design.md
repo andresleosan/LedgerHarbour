@@ -3,8 +3,10 @@
 ## Goal
 
 Remove the Next.js development warning for the Playwright server while allowing
-only the harness origin `127.0.0.1:3100` outside production. Production
-configuration must omit `allowedDevOrigins` entirely.
+only the harness hostname `127.0.0.1` outside production. The harness remains
+bound to port `3100`; Next.js 15.5.23 matches `allowedDevOrigins` by hostname
+and cannot enforce the port through this option. Production configuration must
+omit `allowedDevOrigins` entirely.
 
 ## Scope
 
@@ -23,7 +25,7 @@ behavior unchanged.
 Export a testable `createNextConfig(nodeEnv)` factory from `next.config.ts`.
 The factory must:
 
-- include `allowedDevOrigins: ["127.0.0.1:3100"]` when `nodeEnv` is
+- include `allowedDevOrigins: ["127.0.0.1"]` when `nodeEnv` is
   `development` or `test`;
 - omit `allowedDevOrigins` when `nodeEnv` is `production`;
 - preserve the existing headers, middleware body-size setting, and Firebase
@@ -31,16 +33,18 @@ The factory must:
 
 The default export must be created from `process.env.NODE_ENV` through this
 factory so Next.js receives the correct environment-specific configuration.
-No other development origin, wildcard, scheme, host, or port may be added.
+No other development hostname, wildcard, scheme, or origin may be added. The
+Playwright harness command remains the control that binds the development
+server to port `3100`.
 
 ## Test design
 
 Create `tests/unit/config/next-config.test.ts` with focused assertions:
 
 1. `createNextConfig("test").allowedDevOrigins` equals exactly
-   `["127.0.0.1:3100"]`.
+   `["127.0.0.1"]`.
 2. `createNextConfig("development").allowedDevOrigins` equals exactly
-   `["127.0.0.1:3100"]`.
+   `["127.0.0.1"]`.
 3. `createNextConfig("production")` does not contain the
    `allowedDevOrigins` property.
 4. The production config retains both Firebase rewrite source/destination
@@ -52,7 +56,8 @@ external services.
 ## Security and compatibility
 
 - Production must not receive a development origin policy.
-- The origin is limited to the exact Playwright host and port.
+- The hostname is limited to `127.0.0.1`; the existing Playwright server command
+  limits the harness port to `3100`.
 - Existing Firebase same-origin rewrites remain byte-for-byte equivalent in
   behavior.
 - No secrets, credentials, network calls, or provider configuration changes are
@@ -69,7 +74,7 @@ TypeScript, build, E2E output, and production configuration review all pass.
 
 ## Non-goals
 
-- Allowing `localhost`, wildcard subdomains, arbitrary ports, or production
+- Allowing `localhost`, wildcard subdomains, additional hostnames, or production
   origins.
 - Changing Playwright base URLs or server commands.
 - Changing Firebase rewrites, authentication, middleware, or application code.

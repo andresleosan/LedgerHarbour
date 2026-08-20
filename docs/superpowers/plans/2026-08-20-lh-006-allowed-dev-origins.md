@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Remove the Next.js `allowedDevOrigins` warning for the Playwright server while allowing only `127.0.0.1:3100` outside production.
+**Goal:** Remove the Next.js `allowedDevOrigins` warning for the Playwright server while allowing only the Playwright hostname `127.0.0.1` outside production. The harness remains bound to port `3100`.
 
 **Architecture:** `next.config.ts` will expose a small `createNextConfig(nodeEnv)` factory. The factory adds the single Playwright origin only for `development` and `test`, omits the property for `production`, and returns the existing headers, body-size setting, and Firebase rewrites unchanged. A focused Vitest test locks the environment boundary and rewrite behavior; the final task records the complete validation gate.
 
@@ -11,11 +11,12 @@
 ## Global Constraints
 
 - Modify only `next.config.ts`, `tests/unit/config/next-config.test.ts`, and `tasks.md` during implementation.
-- The only allowed development origin is `127.0.0.1:3100`.
-- `allowedDevOrigins` is present for `development` and `test`, and absent for `production`.
+- The only allowed development hostname is `127.0.0.1`; Next.js 15.5.23 matches `allowedDevOrigins` by hostname and cannot enforce a port through this option.
+- The Playwright harness remains bound to port `3100` by `playwright.config.ts` and `scripts/playwright-server.ts`.
+- `allowedDevOrigins` is present for `development` and `test` with `["127.0.0.1"]`, and absent for `production`.
 - Do not modify `playwright.config.ts`; its `baseURL` and web server already use `http://127.0.0.1:3100`.
 - Preserve the existing headers, `middlewareClientMaxBodySize`, and Firebase rewrites.
-- Do not add localhost aliases, wildcard origins, arbitrary ports, production origins, or schemes.
+- Do not add localhost aliases, wildcard hostnames, additional hosts, production origins, or schemes.
 - Do not add dependencies or change application behavior outside Next configuration.
 - Do not access credentials, Firebase, dashboards, providers, billing, or external services.
 - Do not modify historical specs/plans or `tests/integration/postgres/native-schema.test.ts`.
@@ -46,7 +47,7 @@
     it.each(["development", "test"])("allows only the Playwright origin in %s", (nodeEnv) => {
       const config = createNextConfig(nodeEnv);
 
-      expect(config.allowedDevOrigins).toEqual(["127.0.0.1:3100"]);
+      expect(config.allowedDevOrigins).toEqual(["127.0.0.1"]);
     });
 
     it("omits development origins from production", () => {
@@ -87,7 +88,7 @@
   Refactor `next.config.ts` to keep the existing config values and add this policy:
 
   ```ts
-  const PLAYWRIGHT_DEV_ORIGIN = "127.0.0.1:3100";
+  const PLAYWRIGHT_DEV_ORIGIN = "127.0.0.1";
 
   export function createNextConfig(nodeEnv = process.env.NODE_ENV): NextConfig {
     return {
@@ -123,7 +124,7 @@
   export default createNextConfig();
   ```
 
-  Keep the existing `experimental.middlewareClientMaxBodySize`, `headers`, and two Firebase rewrites exactly as they behave today. Production must not receive an `allowedDevOrigins` property.
+  Set `PLAYWRIGHT_DEV_ORIGIN` to `"127.0.0.1"`. Keep the existing `experimental.middlewareClientMaxBodySize`, `headers`, and two Firebase rewrites exactly as they behave today. Production must not receive an `allowedDevOrigins` property. The port remains constrained by the unchanged Playwright harness command.
 
 - [ ] **Step 4: Run the focused test after implementation**
 
@@ -195,10 +196,10 @@
 
   Confirm from `next.config.ts` and the focused test that:
 
-  - `development` and `test` contain exactly `127.0.0.1:3100`;
+  - `development` and `test` contain exactly `127.0.0.1` as the allowed hostname;
   - `production` has no `allowedDevOrigins` property;
   - Firebase rewrites are unchanged;
-  - `playwright.config.ts` remains unchanged and still targets port `3100`.
+  - `playwright.config.ts` and `scripts/playwright-server.ts` remain unchanged and still target port `3100`.
 
 - [ ] **Step 5: Update LH-006 without prematurely approving it**
 
@@ -229,7 +230,7 @@
 - [ ] Lint, TypeScript, and build pass.
 - [ ] Full E2E passes without `allowedDevOrigins` in output.
 - [ ] Production config omits `allowedDevOrigins`.
-- [ ] Development/test config allows only `127.0.0.1:3100`.
+- [ ] Development/test config allows only hostname `127.0.0.1`; the unchanged harness remains on port `3100`.
 - [ ] Firebase rewrites remain unchanged.
 - [ ] No application, provider, credential, billing, deployment, or migration operation occurred.
 - [ ] LH-006 remains `revision` until all evidence is independently reviewed.
