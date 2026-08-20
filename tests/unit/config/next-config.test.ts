@@ -6,7 +6,7 @@ describe("Next environment configuration", () => {
   it.each(["development", "test"])("allows only the Playwright origin in %s", (nodeEnv) => {
     const config = createNextConfig(nodeEnv);
 
-    expect(config.allowedDevOrigins).toEqual(["127.0.0.1:3100"]);
+    expect(config.allowedDevOrigins).toEqual(["127.0.0.1"]);
   });
 
   it("omits development origins from production", () => {

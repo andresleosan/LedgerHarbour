@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const PLAYWRIGHT_DEV_ORIGIN = "127.0.0.1:3100";
+const PLAYWRIGHT_DEV_ORIGIN = "127.0.0.1";
 
 export function createNextConfig(nodeEnv: string | undefined = process.env.NODE_ENV): NextConfig {
   return {
