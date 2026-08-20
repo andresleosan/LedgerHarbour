@@ -270,7 +270,7 @@ This file is the canonical source for development status. Specs and plans provid
   - Complete E2E block from the brief with the initial `120000 ms` shell timeout -> shell timeout with no captured output. The same literal block was rerun with a `300000 ms` shell timeout -> exit code `0`; `41 passed (3.9m)`. The captured output contained no `allowedDevOrigins` warning, so the warning check did not throw. The PowerShell wrapper displayed the native `corepack.cmd` diagnostic while capturing stderr, but the Playwright command completed successfully.
   - Current boundary review -> `development` and `test` contain exactly `allowedDevOrigins: ["127.0.0.1"]`; `production` omits the property; Firebase rewrites are unchanged; `playwright.config.ts` remains unchanged and targets port `3100`.
   - `tests/integration/postgres/native-schema.test.ts` remained untracked, excluded and untouched. No code, tests, harness, specs or plans were modified in this fix round.
-  - No credentials, real Firebase project, dashboards, providers, billing, deployment, migration or external service was accessed. No Git write operation was executed; no subagent commit exists.
+  - No credentials, real Firebase project, dashboards, providers, billing, deployment, migration or external service was accessed. The subagent executed no Git write operation and created no commit. Task 1 is represented by `e1cc536` and `721f639`; after Task 2 execution and review, the controller subsequently created `b8ffae5` (`test: record allowed dev origins verification`) containing the `tasks.md` QA evidence.
 - Review gate: remains `revision`; Fix round 1/5 passed the required gates, but this task is not `aprobada` pending independent review.
 
 ## P3: Future Improvements
