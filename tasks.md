@@ -186,26 +186,49 @@ This file is the canonical source for development status. Specs and plans provid
 - State: `revision`
 - Primary user: Engineering team
 - RICE: `3.75` (`reach 2 / impact 3 / confidence 5 / effort 5`)
-- Why now: `README.md` and parts of `docs/STACK.md` still describe an exclusively local MVP or providers as pending after production activation and deployment.
+- Why now: `README.md` y partes de `docs/STACK.md` todavia necesitan alinear su lenguaje con la evidencia del repositorio y distinguir el objetivo operativo de cualquier activacion o despliegue externo no verificado.
 - Dependencies: `LH-005` for provider alert statements that must not be guessed.
-- Scope: Synchronize repository documentation with verified production reality while retaining explicit operational caveats.
+- Scope: Sincronizar la documentacion con la evidencia del repositorio y los contratos operativos objetivo, conservando las salvedades explicitas de control del operador; el estado externo de los proveedores permanece `unverified`.
 - Acceptance:
-  - `README.md` distinguishes local development, deterministic testing, and current production operation.
-  - `docs/STACK.md` reflects verified Firebase, Neon, Vercel, R2, Upstash, and Document AI status without overstating readiness.
-  - `docs/production-activation.md` distinguishes completed activation steps from recurring controls.
+  - `README.md` distingue desarrollo local, pruebas deterministas y evidencia del repositorio para el objetivo operativo, sin afirmar una operacion productiva actual.
+  - `docs/STACK.md` refleja la evidencia del repositorio para Firebase, Neon, Vercel, R2, Upstash y Document AI, y etiqueta la activacion o el estado externo como `operator-controlled` o `unverified` cuando corresponde.
+  - `docs/production-activation.md` distingue los pasos de activacion unica objetivo de los controles recurrentes y no implica que esten completados.
   - Historical specs and plans remain unchanged.
-  - Every production statement cites current evidence or is labeled unverified.
+  - Every production statement cita evidencia del repositorio o queda etiquetada como `unverified`, `pending` u `operator-controlled`.
 - Evidence required:
   - Documentation diff reviewed against production configuration and deployment evidence.
   - Placeholder, contradiction, stale-status, and secret scans.
   - `git diff --check` with no whitespace errors.
 - Verification evidence:
-  - Implementation range `544a90f..17cc2ef` reviewed: `96eda20` clarifies repository production status, `de3ead9` qualifies provider production status, and `17cc2ef` separates one-time activation from recurring controls. QA commit `953666a` records the QA task and is not part of the implementation range.
+  - Rango de implementacion `544a90f..17cc2ef` revisado: `96eda20` clarifica el estado documentado del repositorio, `de3ead9` califica el estado documentado de proveedores y `17cc2ef` separa la activacion unica de los controles recurrentes.
+  - Rango de QA/fix `953666a..82bc41f` revisado; el gate final de esta revision fue comprobado contra `82bc41f` y no se usa ningun hash posterior.
   - The three exact `rg` invocations and their real `CommandNotFoundException` outputs are reproduced in `task-4-report.md`, section `Fix round 1/5`, against only `README.md`, `docs/STACK.md`, `docs/production-activation.md`, and `tasks.md`; no `rg` match count is claimed.
   - The exact PowerShell/.NET fallback returned `secret_scan_matches=0` and `placeholder_scan_matches=9`. Breakdown: `docs/production-activation.md:3` has one case-insensitive marker substring inside an ordinary Spanish word; `tasks.md:119` has four documented pattern literals; and `tasks.md:123` repeats those four literals. These are documentary scan text, not operational placeholders. The exact causes are listed in `task-4-report.md`, section `Desglose Del Conteo De Placeholders`. No secret pattern matched under the fallback.
   - Manual review of the in-scope documents found intentional local/prototype, `operator-controlled`, `pending`, and `unverified` labels consistently qualified. No stale production-ready claim or contradiction was identified; external provider facts remain unverified.
-  - The exact brief gate `git diff --check 10ddbe2 HEAD` and the implementation checks `git diff --check 544a90f 17cc2ef` plus `git diff --name-only 544a90f 17cc2ef` are recorded in `task-4-report.md`, section `Fix round 1/5`. The first is the required full documentation gate; the second identifies only the three implementation documents and must not be conflated with the `10ddbe2..HEAD` range.
-  - `git status --short` before this task showed only `?? tests/integration/postgres/native-schema.test.ts`; that untracked test is unrelated and excluded. The requested review report is an external task artifact and is not part of the implementation diff.
+  - Gate final del paquete previo contra `82bc41f`: `git diff --check 544a90f 82bc41f` termino sin salida y con exit code `0`; `git diff --name-only 544a90f 82bc41f` listo `README.md`, `docs/STACK.md`, `docs/production-activation.md` y `tasks.md`.
+  - `82bc41f` es el head previo. Gate final del working tree, con los cambios no commiteados de `README.md` y `tasks.md`, ejecutado contra `544a90f`; las salidas reales fueron:
+
+    ```text
+    git diff --check 544a90f
+    warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+    warning: in the working copy of 'tasks.md', LF will be replaced by CRLF the next time Git touches it
+    (exit code 0; sin errores de whitespace)
+
+    git diff --name-only 544a90f
+    warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+    README.md
+    docs/STACK.md
+    docs/production-activation.md
+    tasks.md
+    warning: in the working copy of 'tasks.md', LF will be replaced by CRLF the next time Git touches it
+
+    git status --short
+     M README.md
+     M tasks.md
+    ?? tests/integration/postgres/native-schema.test.ts
+    ```
+
+    Los warnings son la conversion normal de line endings de Git. El untracked es ajeno y los cambios de `README.md` y `tasks.md` son los cambios finales de esta ronda; no se registra el hash del commit que hara el controlador. Las salidas tambien estan en `task-4-report.md`, seccion `Final fix`.
   - No provider dashboard, account, quota, alert, scope, billing system, deployment target, migration, credential, OCR request, or external request was accessed or changed. No production fact was verified externally.
 - Review gate: remains `revision`; it cannot become `aprobada` until current external evidence is supplied by the operator.
 

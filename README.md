@@ -4,7 +4,7 @@ MVP local de revisión de documentos e invoices.
 
 ## Estado del repositorio
 
-- Desarrollo local y pruebas deterministas: verificados en el alcance documentado.
+- Desarrollo local y pruebas deterministas: respaldados por evidencia local documentada; esta linea no implica una nueva ejecucion ni evidencia productiva.
 - Integraciones de proveedores: adapters y contratos implementados donde se indica en `docs/STACK.md`.
 - Operacion productiva: activacion y estado externo no revalidados por este repositorio; requieren evidencia del operador.
 
