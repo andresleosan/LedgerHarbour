@@ -18,7 +18,7 @@ This file is the canonical source for development status. Specs and plans provid
 
 | ID | Priority | State | Task | Primary user | RICE |
 |---|---|---|---|---|---:|
-| LH-001 | P0 | aprobada | Fix date hydration in `/admin` | Platform operator | 4.50 |
+| LH-001 | P0 | desplegada | Fix date hydration in `/admin` | Platform operator | 4.50 |
 | LH-002 | P0 | pendiente | Fail E2E on browser console errors | All users | 4.00 |
 | LH-003 | P1 | pendiente | Add safe production verification for an ordinary user | Platform operator | 4.25 |
 | LH-005 | P2 | pendiente | Verify provider alerts and limits | Platform operator | 4.25 |
@@ -32,7 +32,7 @@ This file is the canonical source for development status. Specs and plans provid
 ### LH-001: Fix date hydration in `/admin`
 
 - Priority: `P0`
-- State: `aprobada`
+- State: `desplegada`
 - Primary user: Platform operator
 - RICE: `4.50` (`reach 4 / impact 4 / confidence 5 / effort 5`)
 - Why now: Production emits React error `#418` because Vercel renders dates in UTC while verified browsers can render them in `America/Bogota`, producing different calendar days during hydration.
@@ -55,6 +55,8 @@ This file is the canonical source for development status. Specs and plans provid
   - `corepack pnpm exec playwright test tests/e2e/platform/admin-panel.spec.ts`: 5 passed; no React `#418`, `console.error`, or `pageerror` in MCP verification.
   - `git diff --check`: no whitespace errors on the LH-001 and tracking files.
   - Security review and final re-review: clean; no new endpoints, secrets, DTO/API, persistence, or authorization changes.
+  - Production deployment for commit `2ecafc7`: Vercel completed successfully; `/admin` rendered with stable UTC dates and 0 browser console errors.
+- Rollback: revert `2ecafc7` and redeploy; no data rollback is required.
 
 ### LH-002: Fail E2E on browser console errors
 
