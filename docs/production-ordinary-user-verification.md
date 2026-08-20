@@ -31,10 +31,8 @@ WHERE normalized_email = lower(btrim($1));
 
 Interpretar el resultado exactamente de esta forma:
 
-- Cero filas: continuar solo si la identidad ya fue aprobada para la prueba.
-- Una fila con `is_active = false`: detenerse; no cambiarla durante esta tarea.
-- Una fila con `is_active = true`: detenerse; la identidad no es ordinaria para esta prueba.
-- `role` distinto de `platform_admin`: tratar como inconsistencia y detenerse.
+- Cero filas: es el unico resultado que permite continuar, siempre que la identidad ya este aprobada para la prueba.
+- Una o mas filas, sin importar los valores de `is_linked`, `role` o `is_active`: detenerse; no cambiar datos durante esta tarea.
 - Error de conexion, permisos o resultado ambiguo: detenerse.
 
 La consulta solo comprueba `platform_members` y no debe imprimir otros datos de usuario. Estan prohibidos `INSERT`, `UPDATE`, `DELETE`, bootstrap, migraciones y cualquier consulta de escritura o que imprima otros datos de usuario. No se deben copiar valores sensibles a tickets, logs, chat o reportes.
@@ -58,8 +56,7 @@ La comprobacion de `/admin` debe registrar solo la ruta, el resultado observable
 Detener la prueba inmediatamente si ocurre cualquiera de estos casos:
 
 - La identidad no coincide con la aprobada.
-- La consulta read-only no confirma la ausencia de membresia requerida.
-- Existe una membresia activa.
+- La consulta read-only devuelve una o mas filas; solo cero filas permite continuar.
 - La identidad obtiene acceso a `/admin` o aparece el panel global.
 - La respuesta o interfaz expone detalles internos de autorizacion.
 - Aparecen secretos, cookies, tokens, headers, HTML, datos personales u otros datos sensibles en la evidencia.
@@ -78,6 +75,8 @@ Usar solamente estos campos:
 - UTC timestamp: YYYY-MM-DDTHH:MM:SSZ
 - Environment/deployment: [redacted identifier]
 - Test identity: [redacted identifier]
+- Execution: not executed / blocked / executed
+- Operator checkpoint: confirmed / not confirmed
 - Read-only platform membership: absent / stopped / ambiguous
 - Login destination: `/onboarding` / failed
 - Direct `/admin` check: denied / unexpected access / ambiguous
@@ -86,7 +85,11 @@ Usar solamente estos campos:
 - Notes: [no secrets, cookies, tokens, headers, bodies, HTML or personal data]
 ```
 
-Los valores entre corchetes son datos que el operador completa fuera del repositorio o en una evidencia segura. No son valores para commitear. El reporte debe describir un procedimiento realmente ejecutado solo cuando exista la confirmacion operativa correspondiente; revisar este documento no demuestra que la prueba haya sido ejecutada.
+Los campos `Execution` y `Operator checkpoint` son obligatorios. `Execution: executed` solo puede marcarse despues de ejecutar la consulta read-only y los siete pasos del navegador, incluido el cierre de sesion y de la ventana aislada. `Execution: blocked` indica que la prueba comenzo pero se detuvo; `Execution: not executed` indica que no comenzo o que solo se reviso el documento. `Operator checkpoint: confirmed` solo puede marcarse cuando el operador confirmo explicitamente la ejecucion real antes de abrir produccion.
+
+`Result: pass` solo es valido cuando `Execution: executed`, `Operator checkpoint: confirmed`, `Read-only platform membership: absent`, `Login destination: /onboarding`, `Direct /admin check: denied` y `Session cleanup: confirmed` aparecen juntos en la misma evidencia redactada. Cualquier otra combinacion debe usar `Result: stopped` o `Result: blocked`, nunca `pass`.
+
+Una revision documental debe registrar `Execution: not executed`, `Operator checkpoint: not confirmed` y `Result: blocked`; revisar este documento nunca demuestra que la prueba haya sido ejecutada. Los valores entre corchetes son datos que el operador completa fuera del repositorio o en una evidencia segura. No son valores para commitear.
 
 ## Reutilizacion Y Limpieza
 
