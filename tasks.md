@@ -158,7 +158,16 @@ This file is the canonical source for development status. Specs and plans provid
   - The checklist was reviewed as documentation only and was not changed in this task.
   - No provider dashboard or external source was opened. Document AI, R2, and Upstash quotas, alerts, and credential scopes remain unverified.
   - No billing, plan, credential, resource, OCR, external request, or productive operation was performed.
-  - `git diff --check`: passed with no whitespace errors.
+  - Before the controller's documentation commit, the exact `git status --short` output was:
+
+    ```text
+     M tasks.md
+    ?? tests/integration/postgres/native-schema.test.ts
+    ```
+
+    The checklist was already committed from Task 1; `tests/integration/postgres/native-schema.test.ts` remained outside scope.
+  - `git diff --check`: exit code `0`. The only observed output was the normal line-ending warning: `warning: in the working copy of 'tasks.md', LF will be replaced by CRLF the next time Git touches it`.
+  - The subagent implementation created no commit; the subagent did not execute Git. The controller later created documentation commit `870c473` (`docs: record provider verification qa`).
 - Review gate: remains `revision`; it cannot become `aprobada` until the operator performs and records the required read-only external verification.
 
 ### LH-004: Update repository production-status documentation
