@@ -108,12 +108,26 @@ This file is the canonical source for development status. Specs and plans provid
   - Read-only membership verification for the test identity.
   - Operator confirmation before creating or changing the production identity.
 - Verification evidence:
-  - The exact secret scan from the brief was attempted: `rg` is not installed or available in `PATH` in this environment, so PowerShell returned a command-not-found result; an equivalent explicit .NET regex scan with the same pattern returned `0` matches.
-  - The exact placeholder scan from the brief was attempted: `rg` is not installed or available in `PATH` in this environment, so PowerShell returned a command-not-found result; an equivalent explicit .NET regex scan with the same pattern returned `0` matches.
+  - Exact secret scan attempt (failed because `rg` is unavailable; not a passing result): `rg -n -- "-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|AIza[0-9A-Za-z_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk_live_[A-Za-z0-9]{10,}|(DATABASE_URL|FIREBASE_PRIVATE_KEY)=.{8,}" docs/production-ordinary-user-verification.md`; PowerShell returned command-not-found.
+  - Equivalent secret scan executed after the `rg` failure:
+
+    ```powershell
+    $path = (Resolve-Path -LiteralPath 'docs/production-ordinary-user-verification.md').Path; $text = [System.IO.File]::ReadAllText($path); $pattern = '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----|AIza[0-9A-Za-z_-]{20,}|ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk_live_[A-Za-z0-9]{10,}|(DATABASE_URL|FIREBASE_PRIVATE_KEY)=.{8,}'; $matches = [regex]::Matches($text, $pattern); "secret_scan_matches=$($matches.Count)"
+    ```
+
+    Result: `secret_scan_matches=0`.
+  - Exact placeholder scan attempt (failed because `rg` is unavailable; not a passing result): `rg -n "TODO|TBD|FIXME|<email real>|password real|token real" docs/production-ordinary-user-verification.md`; PowerShell returned command-not-found.
+  - Equivalent placeholder scan executed after the `rg` failure:
+
+    ```powershell
+    $path = (Resolve-Path -LiteralPath 'docs/production-ordinary-user-verification.md').Path; $text = [System.IO.File]::ReadAllText($path); $pattern = 'TODO|TBD|FIXME|<email real>|password real|token real'; $matches = [regex]::Matches($text, $pattern); "placeholder_scan_matches=$($matches.Count)"
+    ```
+
+    Result: `placeholder_scan_matches=0`.
   - The runbook contains only redacted template fields in brackets and uses SQL bind parameter `$1`; no real identity, email, URL, token, cookie, password, session state, or response body was recorded.
-  - `git diff --check`: passed with no output.
+  - `git diff --check`: exit code 0 with no whitespace errors; PowerShell showed the normal LF/CRLF conversion warning for `tasks.md`.
   - `git status --short`: only the pre-existing untracked `tests/integration/postgres/native-schema.test.ts` was present before this task; it remains outside the intended scope.
-  - No commit created: `ninguno`, per operator instruction.
+  - Implementation by the subagent created no commit; the final documentation commit was created by the controller as `011bac8`.
   - Production execution did not occur: no SQL, login, browser session, migration, paid request, or productive operation was performed. The operator checkpoint remains pending.
 - Review gate: remains `revision`; it cannot become `aprobada` until an operator authorizes and performs the real read-only membership check and isolated browser verification with redacted evidence.
 
