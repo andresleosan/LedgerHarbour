@@ -22,7 +22,7 @@ This file is the canonical source for development status. Specs and plans provid
 | LH-002 | P0 | aprobada | Fail E2E on browser console errors | All users | 4.00 |
 | LH-003 | P1 | revision | Add safe production verification for an ordinary user | Platform operator | 4.25 |
 | LH-005 | P2 | revision | Verify provider alerts and limits | Platform operator | 4.25 |
-| LH-004 | P2 | pendiente | Update repository production-status documentation | Engineering team | 3.75 |
+| LH-004 | P2 | revision | Update repository production-status documentation | Engineering team | 3.75 |
 | LH-006 | P2 | pendiente | Remove the Playwright `allowedDevOrigins` warning | Engineering team | 3.50 |
 | LH-007 | P3 | pendiente | Consolidate language handling in auth and onboarding | End users | 3.25 |
 | LH-008 | P3 | pendiente | Define optional service-expiration automation | Platform operator | 2.75 |
@@ -183,7 +183,7 @@ This file is the canonical source for development status. Specs and plans provid
 ### LH-004: Update repository production-status documentation
 
 - Priority: `P2`
-- State: `pendiente`
+- State: `revision`
 - Primary user: Engineering team
 - RICE: `3.75` (`reach 2 / impact 3 / confidence 5 / effort 5`)
 - Why now: `README.md` and parts of `docs/STACK.md` still describe an exclusively local MVP or providers as pending after production activation and deployment.
@@ -199,6 +199,15 @@ This file is the canonical source for development status. Specs and plans provid
   - Documentation diff reviewed against production configuration and deployment evidence.
   - Placeholder, contradiction, stale-status, and secret scans.
   - `git diff --check` with no whitespace errors.
+- Verification evidence:
+  - Implementation commits reviewed from `544a90f` through `17cc2ef`: `96eda20` clarifies repository production status, `de3ead9` qualifies provider production status, and `17cc2ef` separates one-time activation from recurring controls.
+  - The three exact `rg` scans from the Task 4 brief were attempted against only `README.md`, `docs/STACK.md`, `docs/production-activation.md`, and `tasks.md`; all returned PowerShell `CommandNotFoundException` because `rg` is unavailable. No `rg` match count is claimed.
+  - The exact PowerShell/.NET fallback returned `secret_scan_matches=0` and `placeholder_scan_matches=9`. The placeholder count is not treated as a clean zero: the matches are scan-pattern literals recorded in `tasks.md` evidence, not real placeholder values. No secret pattern matched under the fallback.
+  - Manual review of the in-scope documents found intentional local/prototype, `operator-controlled`, `pending`, and `unverified` labels consistently qualified. No stale production-ready claim or contradiction was identified; external provider facts remain unverified.
+  - `git diff --check 544a90f HEAD`: exit code `0`, no output. `git diff --name-only 544a90f HEAD`: `README.md`, `docs/STACK.md`, and `docs/production-activation.md` only. Historical specs and plans are absent from the range.
+  - `git status --short` before this task showed only `?? tests/integration/postgres/native-schema.test.ts`; that untracked test is unrelated and excluded. The requested review report is an external task artifact and is not part of the implementation diff.
+  - No provider dashboard, account, quota, alert, scope, billing system, deployment target, migration, credential, OCR request, or external request was accessed or changed. No production fact was verified externally.
+- Review gate: remains `revision`; it cannot become `aprobada` until current external evidence is supplied by the operator.
 
 ### LH-006: Remove the Playwright `allowedDevOrigins` warning
 
