@@ -9,6 +9,7 @@ import type { PlatformSummaryDto } from "@/modules/platform/platform-summary";
 import type { ProjectDto } from "@/modules/projects/types";
 import ActionDialog, { type ActionDialogValues } from "@/ui/platform/ActionDialog";
 import StatusBadge from "@/ui/platform/StatusBadge";
+import { formatPlatformDate } from "@/ui/platform/platform-date";
 
 type Section = "all" | "businesses" | "projects" | "administrators";
 type Action = "approve" | "reject" | "suspend" | "reactivate" | "revoke" | "remove";
@@ -27,10 +28,6 @@ interface PlatformAdminPanelProps {
   locale: SupportedLocale;
   section?: Section;
 }
-
-const dateFor = (value: string | null, locale: SupportedLocale) => value
-  ? new Intl.DateTimeFormat(locale === "es" ? "es-ES" : "en-GB", { dateStyle: "medium" }).format(new Date(value))
-  : "—";
 
 export default function PlatformAdminPanel({ summary, locale, section = "all" }: PlatformAdminPanelProps) {
   const router = useRouter();
@@ -253,7 +250,7 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
               <td data-label={copy.business}><strong>{business.name}</strong><small>{business.id}</small></td>
               <td data-label={copy.requesterOwner}><span>{business.requesterId}</span><small>{copy.requesterOwner}</small></td>
               <td data-label={copy.statusFilter}><StatusBadge status={business.status} label={statusLabel(business.status)} /></td>
-              <td data-label={copy.dates}><small>{copy.activated}: {dateFor(business.activatedAt, locale)}</small><small>{copy.serviceExpires}: {dateFor(business.serviceExpiresAt, locale)}</small></td>
+              <td data-label={copy.dates}><small>{copy.activated}: {formatPlatformDate(business.activatedAt, locale)}</small><small>{copy.serviceExpires}: {formatPlatformDate(business.serviceExpiresAt, locale)}</small></td>
               <td data-label={copy.actions}>{actionButtons("business", business.id, business.name, actionsForBusiness(business))}</td>
             </tr>)}</tbody>
           </table></div>
@@ -270,7 +267,7 @@ export default function PlatformAdminPanel({ summary, locale, section = "all" }:
               <td data-label={copy.business}>{project.businessId}</td>
               <td data-label={copy.requesterOwner}>{project.requesterId}</td>
               <td data-label={copy.statusFilter}><StatusBadge status={project.status} label={statusLabel(project.status)} /></td>
-              <td data-label={copy.dates}><small>{copy.created}: {dateFor(project.createdAt, locale)}</small><small>{copy.activated}: {dateFor(project.activatedAt, locale)}</small><small>{copy.reviewed}: {dateFor(project.reviewedAt, locale)}</small></td>
+              <td data-label={copy.dates}><small>{copy.created}: {formatPlatformDate(project.createdAt, locale)}</small><small>{copy.activated}: {formatPlatformDate(project.activatedAt, locale)}</small><small>{copy.reviewed}: {formatPlatformDate(project.reviewedAt, locale)}</small></td>
               <td data-label={copy.actions}>{actionButtons("project", project.id, project.name, actionsForProject(project))}</td>
             </tr>)}</tbody>
           </table></div>
