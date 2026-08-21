@@ -125,6 +125,6 @@ describe("production authentication boundary", () => {
     const continuation = readFileSync(continuationUrl, "utf8");
     expect(continuation).toContain("getCurrentIdentity");
     expect(continuation).toContain("resolvePostLoginDestination");
-    expect(continuation).toContain('redirect(withLocale("/login"');
+    expect(continuation).toContain('buildPostLoginRedirect("/login"');
   });
 });

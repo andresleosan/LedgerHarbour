@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { resolveLocale, withLocale } from "../../../src/i18n/locale";
 
 describe("locale URL contract", () => {
-  it.each([["en", "en"], ["es", "es"], [undefined, "en"], ["fr", "en"]] as const)(
+  it.each([["en", "en"], ["es", "es"], [null, "en"], [undefined, "en"], ["fr", "en"]] as const)(
     "resolves %s to %s",
     (value, expected) => expect(resolveLocale(value)).toBe(expected),
   );

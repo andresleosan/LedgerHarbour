@@ -86,7 +86,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
       });
 
     return () => { cancelled = true; };
-  }, [authMode, firebaseConfig, isDeterministicFirebaseTest, isFirebase, isLogin, mode, provider, router]);
+  }, [authMode, firebaseConfig, isDeterministicFirebaseTest, isFirebase, isLogin, locale, mode, provider, router]);
 
   const clearFeedback = () => {
     setFeedback(null);

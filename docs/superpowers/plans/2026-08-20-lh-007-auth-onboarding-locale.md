@@ -33,13 +33,15 @@
 - Modify: `src/app/(auth)/auth/continue/page.tsx`
 - Create: `tests/unit/i18n/locale.test.ts`
 - Create: `tests/unit/auth/post-login-navigation.test.ts`
+- Create: `tests/unit/auth/post-login-continuation.test.ts`
 - Modify: `tests/unit/auth/production-auth-config.test.ts` to update existing auth-boundary expectations
 
 **Interfaces:**
 - Produces: `resolveLocale(value: string | null | undefined): SupportedLocale`.
 - Produces: `withLocale(path: string, current: URLSearchParams | string, locale: SupportedLocale): string`.
-- Produces: `useUrlLocale(fallback?: SupportedLocale)` returning `{ locale, setLocale, hrefFor }`.
+- Produces: `useUrlLocale()` returning `{ locale, setLocale, hrefFor }`; missing or invalid URL locale always resolves to `en`.
 - Produces: `navigateAfterSuccessfulLogin(input, replace)` where `input.locale` is a `SupportedLocale` and `replace` accepts a string destination.
+- Produces: `buildPostLoginRedirect(destination, rawSearchParams)` from the continuation page, preserving functional params and normalizing locale for `/admin`, `/onboarding`, and `/login`.
 
 - [ ] **Step 1: Write failing pure locale tests**
 
@@ -51,7 +53,7 @@
   import { resolveLocale, withLocale } from "@/i18n/locale";
 
   describe("locale URL contract", () => {
-    it.each([["en", "en"], ["es", "es"], [undefined, "en"], ["fr", "en"]] as const)(
+    it.each([["en", "en"], ["es", "es"], [null, "en"], [undefined, "en"], ["fr", "en"]] as const)(
       "resolves %s to %s",
       (value, expected) => expect(resolveLocale(value)).toBe(expected),
     );
@@ -102,7 +104,7 @@
 
 - [ ] **Step 4: Refactor `useUrlLocale` to use the shared utility**
 
-  Keep the existing hook API. Read the current search params, resolve `locale` through `resolveLocale`, implement `hrefFor` with `withLocale`, and make `setLocale` call `router.replace(hrefFor(pathname, candidate))`. Do not discard unrelated query parameters.
+  Keep the existing hook API. Read the current search params, resolve `locale` through `resolveLocale`, implement `hrefFor` with `withLocale`, and make `setLocale` call `router.replace(hrefFor(pathname, candidate))`. Do not accept a fallback that can override the URL contract or discard unrelated query parameters.
 
 - [ ] **Step 5: Make AuthForm URL-driven**
 
@@ -112,7 +114,7 @@
 
   Update `navigateAfterSuccessfulLogin` so its input includes `locale: SupportedLocale` and its replace callback accepts `string`. For a successful non-deterministic Firebase login, call `replace(withLocale("/auth/continue", "", input.locale))`; preserve the existing early-return rules for registration, development auth, and deterministic tests.
 
-  Update `src/app/(auth)/auth/continue/page.tsx` to read `searchParams`, resolve its locale, and append that locale to the destination returned by `resolvePostLoginDestination`. Preserve the existing identity check and authorization decision.
+  Extract and expose the pure `buildPostLoginRedirect(destination, rawSearchParams)` from `src/app/(auth)/auth/continue/page.tsx`. It must normalize locale through `resolveLocale`, preserve functional params, and produce only locale-preserving `/admin`, `/onboarding`, or `/login` redirects. Make the page use it after the existing identity check and authorization decision.
 
 - [ ] **Step 7: Add focused auth navigation tests**
 
@@ -138,12 +140,14 @@
 
   Update `tests/unit/auth/production-auth-config.test.ts` so its existing Firebase continuation assertions include the locale query and its continuation source assertion recognizes the locale-preserving redirect.
 
+  Add `tests/unit/auth/post-login-continuation.test.ts` for admin, onboarding, unauthenticated login, invalid-locale fallback, and preservation of an unrelated functional parameter.
+
 - [ ] **Step 8: Run Task 1 focused tests and static checks**
 
   Run:
 
   ```powershell
-  corepack pnpm vitest run tests/unit/i18n/locale.test.ts tests/unit/auth/post-login-navigation.test.ts
+  corepack pnpm vitest run tests/unit/i18n/locale.test.ts tests/unit/auth/post-login-navigation.test.ts tests/unit/auth/post-login-continuation.test.ts
   corepack pnpm exec tsc --noEmit
   ```
 
@@ -152,7 +156,7 @@
 - [ ] **Step 9: Commit the shared/auth locale change**
 
   ```powershell
-  git add -- src/i18n/locale.ts src/ui/useUrlLocale.ts src/ui/auth/AuthForm.tsx src/ui/auth/post-login-navigation.ts "src/app/(auth)/auth/continue/page.tsx" tests/unit/i18n/locale.test.ts tests/unit/auth/post-login-navigation.test.ts
+  git add -- src/i18n/locale.ts src/ui/useUrlLocale.ts src/ui/auth/AuthForm.tsx src/ui/auth/post-login-navigation.ts "src/app/(auth)/auth/continue/page.tsx" tests/unit/i18n/locale.test.ts tests/unit/auth/post-login-navigation.test.ts tests/unit/auth/post-login-continuation.test.ts tests/unit/auth/production-auth-config.test.ts
   git commit -m "feat: preserve locale through auth navigation"
   ```
 
