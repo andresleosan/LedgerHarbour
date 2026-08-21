@@ -2,9 +2,11 @@
 
 ## Estado
 
-Task 2 del discovery documental completada. La propuesta queda en revision para
-la siguiente fase, pero este documento no aprueba LH-008, no autoriza
-implementacion y no cambia el comportamiento de produccion.
+Tasks 1-3 del discovery documental completadas. Esta Task 3 agrega los gates
+operativos y de seguridad para la fase recomendada de notificaciones. La
+propuesta queda en revision para la siguiente fase, pero este documento no
+aprueba LH-008, no autoriza implementacion y no cambia el comportamiento de
+produccion.
 
 ## Current State
 
@@ -139,6 +141,121 @@ reducir mas trabajo, puede suspender clientes validos por errores de zona
 horaria, renovaciones concurrentes, fechas obsoletas, jobs duplicados o fallas
 de entrega. Requiere recuperacion, guardas transaccionales, auditoria y una
 aprobacion explicita en una tarea separada.
+
+## Task 3: gates operativos y de seguridad
+
+### Gate temporal y de elegibilidad
+
+Antes de implementar cualquier evaluador o notificacion, el operador debe
+decidir y registrar estos campos, sin inferirlos del comportamiento tecnico
+actual:
+
+- `canonicalTimezone`: zona horaria canonica del producto o zona horaria por
+  negocio. La conversion observada a UTC no constituye una politica comercial.
+- `finalDayInterpretation`: si `serviceExpiresAt` es el inicio de un instante de
+  expiracion o el final inclusivo del ultimo dia de servicio.
+- `preExpirationWindows`: lista ordenada de ventanas con identificador,
+  desplazamiento, limites inclusivos/exclusivos y regla de activacion. Las
+  ventanas deben ser deterministas y no solaparse sin una decision explicita.
+- `postExpirationGracePeriod`: duracion de gracia y su interpretacion temporal.
+  No se define un valor por defecto en este discovery.
+- `eligibleStatuses`: estados elegibles, incluyendo si se exige `active` con
+  `isActive = true`. Como baseline seguro se propone excluir `pending`,
+  `rejected`, `suspended` y registros sin fecha valida, sujeto a decision de
+  producto.
+
+La evaluacion debe capturar el valor actual de `serviceExpiresAt`, el estado,
+`isActive`, la ventana y el instante de evaluacion. Una fecha renovada o
+editada invalida cualquier alerta pendiente basada en el valor anterior: el
+job debe volver a leer el registro, suprimir el resultado stale y generar una
+nueva clave solo para el valor vigente. Una ejecucion duplicada, clock skew o
+fecha invalida debe producir un resultado visible de no elegible o error, nunca
+una mutacion del ciclo de vida.
+
+### Gate de notificaciones
+
+- **Destinatarios:** definir y aprobar las clases exactas antes de implementar;
+  los candidatos son administradores de plataforma y administradores activos
+  del negocio. Los destinatarios deben resolverse desde identidades autorizadas,
+  no desde datos libres del cliente.
+- **Contenido y locale:** definir plantilla versionada, locale/fallback,
+  asunto, datos minimos y enlace de accion. No incluir secretos, tokens ni
+  informacion innecesaria. El contenido debe escaparse segun el canal futuro.
+- **Frontera de entrega:** usar una interfaz provider-neutral que reciba un
+  mensaje ya validado y devuelva estados normalizados. El dry-run solo
+  clasifica y observa; no entrega mensajes ni selecciona proveedor.
+- **Rate limits:** definir limites independientes por negocio, destinatario,
+  ventana, job y total del proceso. `auth-rate-limit.ts` solo cubre scopes de
+  autenticacion `email` y `google`; no es un limite suficiente para este flujo.
+- **Retries:** definir un maximo finito de intentos, backoff con jitter y
+  errores reintentables/no reintentables. No se permiten reintentos infinitos ni
+  reintentos que ignoren la invalidacion por renovacion o edicion de fecha.
+- **Visibilidad de fallos:** registrar estado normalizado, contador de intento,
+  ultima causa tecnica sanitizada y correlation ID; exponer conteos agregados y
+  una cola de trabajo manual autorizada sin guardar contenido completo del
+  mensaje en logs.
+- **Deduplicacion:** la clave estable debe componerse exactamente de negocio,
+  evento de expiracion, ventana y valor actual de expiracion normalizado:
+  `businessId|expirationEvent|windowId|serviceExpiresAt`. La fanout por clase de
+  destinatario se registra aparte sin cambiar esa clave. La reserva y el
+  resultado deben ser idempotentes ante jobs concurrentes.
+
+### Gate de auditoria y recuperacion
+
+Toda implementacion futura debe producir eventos auditables para evaluacion,
+intento de notificacion, resultado de entrega y accion del operador. La tabla
+`audit_events` ya modela `actorType = system`, `actorId`, `action`, `entityType`,
+`entityId`, `metadata` y `createdAt`, pero el `appendAuditEvent` observado en el
+repositorio PostgreSQL siempre escribe actor de tipo usuario y no acepta
+metadata. Antes de usarla para jobs se debe ampliar el contrato de auditoria o
+crear una frontera operacional equivalente, con soporte explicito para
+identidad de job y metadata minima. No se debe simular un job como usuario.
+
+Cada evento debe incluir, cuando aplique, el valor de expiracion, `correlationId`,
+clave de deduplicacion, ventana, resultado y referencia interna minima. Los
+logs no deben copiar el mensaje ni datos de contacto completos.
+
+La fase dry-run puede generar observabilidad append-only si se aprueba ese
+registro, pero no puede cambiar estado de negocio, membresias, `isActive`,
+`serviceExpiresAt`, ni campos de suspension. Un outage del proveedor, una
+entrega duplicada o un job repetido tampoco puede mutar el ciclo de vida.
+
+Si una tarea futura propone mutar el ciclo de vida, debe exigir antes/despues,
+razon, actor o identidad de job, valor de expiracion, `correlationId` y una
+guarda compare-and-set que cubra al menos el estado esperado y el valor de
+expiracion esperado. El `expectedStatus` existente es necesario pero no
+suficiente para proteger una renovacion concurrente. La operacion debe ser
+transaccional, auditable y contar con una recuperacion manual autorizada que
+registre su propio evento; el fallo de entrega nunca debe disparar rollback de
+estado por si solo. La suspension automatica sigue fuera de alcance y requiere
+una tarea, aprobacion y plan de recuperacion separados.
+
+### Gate de seguridad y no-goals
+
+- Los datos de expiracion, destinatarios, estado de entrega y correlation IDs
+  son datos operativos sensibles. Aplicar minimizacion, acceso por rol y
+  retencion definida; en logs usar IDs internos y conteos agregados.
+- Las acciones manuales de reconocer, reenviar, suprimir u overridear alertas
+  deben pasar por identidad, membresia activa de plataforma, capacidad autorizada,
+  razon obligatoria y auditoria. La autorizacion existente de plataforma sigue
+  siendo obligatoria; un job no obtiene permisos por ser interno.
+- Validar y normalizar entradas de ventana, locale, destinatario, razon y
+  referencias antes de procesarlas. No aceptar contenido ni destinatarios
+  arbitrarios desde el frontend o un cliente externo.
+- No agregar proveedor, cliente externo, credencial, servicio de pago ni
+  produccion en esta fase. No seleccionar canal irreversible hasta el checkpoint
+  del operador.
+- No implementar suspension automatica, revocacion de acceso, renovacion
+  automatica, migracion de esquema ni rollback automatico por fallo de entrega.
+
+### Criterio de salida de la fase
+
+La fase solo puede pasar de discovery a implementacion cuando el operador haya
+decidido los campos temporales, estados elegibles, destinatarios, canal,
+limites, retries, deduplicacion, eventos de auditoria y permisos de recovery;
+existan pruebas de concurrencia, stale-date, duplicate-job, provider-outage y
+clock-skew; y el dry-run demuestre cero mutaciones del ciclo de vida. La
+suspension automatica no forma parte de este criterio ni queda autorizada.
 
 ## Plan de medicion
 
