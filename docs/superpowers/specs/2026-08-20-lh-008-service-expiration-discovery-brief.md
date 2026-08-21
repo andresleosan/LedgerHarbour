@@ -2,11 +2,11 @@
 
 ## Estado
 
-Tasks 1-3 del discovery documental completadas. Esta Task 3 agrega los gates
-operativos y de seguridad para la fase recomendada de notificaciones. La
-propuesta queda en revision para la siguiente fase, pero este documento no
-aprueba LH-008, no autoriza implementacion y no cambia el comportamiento de
-produccion.
+Tasks 1-4 del discovery documental completadas. Task 3 agrega los gates
+operativos y de seguridad para la fase recomendada de notificaciones, y Task 4
+cierra el checklist documental. La propuesta queda en revision para la
+siguiente fase, pero este documento no aprueba LH-008, no autoriza
+implementacion y no cambia el comportamiento de produccion.
 
 ## Current State
 
@@ -327,6 +327,35 @@ canonico del ledger.
   el ciclo de vida; durante discovery no se selecciona proveedor ni se conecta
   ningun servicio externo.
 
-El brief queda listo para revision documental. El ledger canonico aun muestra
-LH-008 como `pendiente` porque la actualizacion de `tasks.md` pertenece a Task
-4; no se interpreta este documento como aprobacion de implementacion.
+## Task 4: acceptance checklist
+
+- [x] Usuarios afectados: platform operators y business administrators.
+- [x] Resultado medible: reducir las horas de seguimiento manual de expiraciones.
+- [x] Alternativas comparadas: fecha informativa, notificaciones y suspension
+  automatica.
+- [x] Recomendacion: notificaciones precedidas por dry-run/observation.
+- [x] Suspension automatica: diferida y fuera de alcance de LH-008.
+- [x] Reglas temporales: timezone canonica, semantica del ultimo dia, ventanas
+  de aviso y periodo de gracia.
+- [x] Elegibilidad y destinatarios: estados, fecha valida, renovaciones e
+  identidades autorizadas.
+- [x] Entrega: canal provider-neutral, limites, retries finitos, backoff,
+  deduplicacion e invalidacion de alertas stale.
+- [x] Idempotencia: clave estable por negocio, evento, ventana y expiracion
+  vigente, con reserva segura ante jobs concurrentes.
+- [x] Auditoria: evaluacion, intento, resultado y accion operativa con identidad
+  de job, metadata minima y correlation ID.
+- [x] Rollback y recovery: solo operacion manual autorizada y auditada; no
+  rollback automatico por fallo de entrega.
+- [x] Provider failure: outage, entrega duplicada, job repetido y clock skew no
+  mutan el ciclo de vida y dejan visibilidad operativa.
+- [x] Medicion: baseline de horas manuales y medidas secundarias de elegibilidad,
+  entrega, duplicados, stale alerts, resolucion e incidentes.
+- [x] RICE propuesto: `3.50` para notificaciones precedidas por dry-run.
+- [x] Gates de aprobacion: decisiones temporales, destinatarios, canal, limites,
+  retries, deduplicacion, auditoria, recovery y pruebas de borde deben ser
+  aprobadas antes de implementar.
+
+El brief queda cerrado como evidencia documental y el ledger canonico queda en
+`revision`. No se interpreta este documento como aprobacion de implementacion,
+despliegue, migracion, billing o accion productiva.

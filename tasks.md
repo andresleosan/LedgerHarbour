@@ -25,7 +25,7 @@ This file is the canonical source for development status. Specs and plans provid
 | LH-004 | P2 | revision | Update repository production-status documentation | Engineering team | 3.75 |
 | LH-006 | P2 | pendiente | Remove the Playwright `allowedDevOrigins` warning | Engineering team | 3.50 |
 | LH-007 | P3 | revision | Consolidate language handling in auth and onboarding | End users | 3.25 |
-| LH-008 | P3 | pendiente | Define optional service-expiration automation | Platform operator | 2.75 |
+| LH-008 | P3 | revision | Define optional service-expiration automation | Platform operator | 3.50 |
 
 ## P0: Production Risks
 
@@ -323,22 +323,29 @@ This file is the canonical source for development status. Specs and plans provid
 ### LH-008: Define optional service-expiration automation
 
 - Priority: `P3`
-- State: `pendiente`
+- State: `revision`
 - Primary user: Platform operator
-- RICE: `2.75` (`reach 3 / impact 3 / confidence 3 / effort 2`)
+- RICE propuesto: `3.50` (`reach 3 / impact 4 / confidence 4 / effort 3`)
 - Why now: `serviceExpiresAt` is currently informational; automatic action could reduce manual work but could also suspend valid customers if temporal and recovery rules are incomplete.
 - Dependencies: Product discovery and explicit operator approval of one behavior.
 - Scope: Compare keeping the date informational, sending alerts, and automatic suspension before implementing any automation.
 - Acceptance:
   - Discovery identifies affected users and a measurable operational outcome.
-  - The proposal defines timezone, grace period, notification timing, retries, idempotency, and manual override.
-  - Audit events and rollback behavior are specified.
-  - Failure modes for unavailable providers or delayed jobs are documented.
-  - The operator approves one alternative before an implementation plan is created.
+  - Informational date, notifications, and automatic suspension are compared with trade-offs.
+  - Notifications with dry-run/observation are recommended; automatic suspension remains deferred.
+  - Timezone, final-day semantics, grace period, eligibility, recipients, notification timing, retries, idempotency, and manual override are addressed.
+  - Audit events, rollback/recovery behavior, and provider/job failure modes are specified.
+  - Implementation approval gates are explicit; no implementation approval is granted by this task.
 - Evidence required:
-  - Product brief with alternatives and simplified RICE reassessment.
-  - Architecture and security review for any scheduled or automated action.
-  - No production scheduler, suspension, or billing change during discovery.
+  - Brief: `docs/superpowers/specs/2026-08-20-lh-008-service-expiration-discovery-brief.md`.
+  - Recommendation: notifications preceded by dry-run/observation; automatic suspension remains out of scope.
+  - Alternatives: informational date, notifications, and automatic suspension, with manual-work effect, customer risk, and reversibility.
+  - RICE reassessment: proposed `3.50` (`3 + 4 + 4 + 3`) for the notification phase.
+  - Static verification: `git diff --check`.
+  - Static verification: `git status --short`.
+  - Static verification: `git grep -n "LH-008\|serviceExpiresAt\|automatic suspension\|notification" -- docs/superpowers/specs/2026-08-20-lh-008-service-expiration-automation-design.md docs/superpowers/specs/2026-08-20-lh-008-service-expiration-discovery-brief.md tasks.md`.
+  - Report: `.superpowers/sdd/2026-08-20-lh-008-service-expiration-discovery/task-4-report.md`.
+  - No commit: prohibited by the task instructions; no production scheduler, suspension, migration, provider, billing, or external-service action occurred.
 
 ## Recently Completed
 
