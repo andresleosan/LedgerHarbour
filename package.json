@@ -10,6 +10,7 @@
     "start": "next start",
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:check": "tsx scripts/db/check.ts",
+    "db:service-expiration-dry-run": "tsx scripts/service-expiration-dry-run.ts",
     "db:native-check": "vitest run tests/integration/postgres/native-schema.test.ts",
     "lint": "eslint src tests --no-config-lookup --parser @typescript-eslint/parser --plugin @typescript-eslint --ext .ts,.tsx --rule @typescript-eslint/no-unused-vars:error",
     "test": "vitest run",
