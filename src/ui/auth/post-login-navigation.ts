@@ -1,3 +1,6 @@
+import { withLocale } from "../../i18n/locale";
+import type { SupportedLocale } from "../../i18n/config";
+
 export type SuccessfulLoginFlow = "googleRedirectCompletion" | "email";
 
 interface SuccessfulLoginNavigationInput {
@@ -5,11 +8,12 @@ interface SuccessfulLoginNavigationInput {
   mode: "login" | "register";
   authMode: "development" | "firebase";
   isDeterministicFirebaseTest: boolean;
+  locale: SupportedLocale;
 }
 
 export function navigateAfterSuccessfulLogin(
   input: SuccessfulLoginNavigationInput,
-  replace: (destination: "/auth/continue") => void,
+  replace: (destination: string) => void,
 ): void {
   if (
     (input.flow !== "googleRedirectCompletion" && input.flow !== "email")
@@ -20,5 +24,5 @@ export function navigateAfterSuccessfulLogin(
     return;
   }
 
-  replace("/auth/continue");
+  replace(withLocale("/auth/continue", "", input.locale));
 }

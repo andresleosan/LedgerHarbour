@@ -18,7 +18,8 @@ import {
   signOutFirebaseUser,
   type FirebaseClientConfig,
 } from "@/modules/auth/firebase-client";
-import { messages, type SupportedLocale } from "@/i18n/config";
+import { messages } from "@/i18n/config";
+import { useUrlLocale } from "@/ui/useUrlLocale";
 import { navigateAfterSuccessfulLogin } from "./post-login-navigation";
 
 type AuthFormMode = "login" | "register";
@@ -35,7 +36,7 @@ interface AuthFormProps {
 const interpolate = (message: string, email: string) => message.replace("{email}", email);
 
 export default function AuthForm({ mode, providerActions, authMode = "firebase", firebaseConfig }: AuthFormProps) {
-  const [locale, setLocale] = useState<SupportedLocale>("en");
+  const { locale, setLocale, hrefFor } = useUrlLocale();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -73,6 +74,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
           mode,
           authMode,
           isDeterministicFirebaseTest,
+          locale,
         }, (destination) => router.replace(destination));
       })
       .catch((error) => {
@@ -118,6 +120,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
         mode,
         authMode,
         isDeterministicFirebaseTest,
+        locale,
       }, (destination) => router.replace(destination));
     } catch (error) {
       const authError = toAuthError(error);
@@ -299,7 +302,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
             )}
             <p className="auth-footer">
               {isLogin ? copy.login.registerPrompt : copy.register.loginPrompt}{" "}
-              <Link href={isLogin ? "/register" : "/login"}>
+              <Link href={hrefFor(isLogin ? "/register" : "/login")}>
                 {isLogin ? copy.login.registerAction : copy.register.loginAction}
               </Link>
             </p>

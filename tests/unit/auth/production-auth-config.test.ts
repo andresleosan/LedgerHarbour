@@ -63,10 +63,11 @@ describe("production authentication boundary", () => {
       mode: "login",
       authMode: "firebase",
       isDeterministicFirebaseTest: false,
+      locale: "en",
     }, replace);
 
     expect(replace).toHaveBeenCalledOnce();
-    expect(replace).toHaveBeenCalledWith("/auth/continue");
+    expect(replace).toHaveBeenCalledWith("/auth/continue?locale=en");
   });
 
   it("navigates email login through the server continuation boundary", () => {
@@ -77,10 +78,11 @@ describe("production authentication boundary", () => {
       mode: "login",
       authMode: "firebase",
       isDeterministicFirebaseTest: false,
+      locale: "en",
     }, replace);
 
     expect(replace).toHaveBeenCalledOnce();
-    expect(replace).toHaveBeenCalledWith("/auth/continue");
+    expect(replace).toHaveBeenCalledWith("/auth/continue?locale=en");
   });
 
   it.each(["googleRedirectCompletion", "email"] as const)(
@@ -93,6 +95,7 @@ describe("production authentication boundary", () => {
         mode: "login",
         authMode: "firebase",
         isDeterministicFirebaseTest: true,
+        locale: "en",
       }, replace);
 
       expect(replace).not.toHaveBeenCalled();
@@ -107,6 +110,7 @@ describe("production authentication boundary", () => {
       mode: "register",
       authMode: "firebase",
       isDeterministicFirebaseTest: false,
+      locale: "en",
     }, replace);
 
     expect(replace).not.toHaveBeenCalled();
@@ -121,6 +125,6 @@ describe("production authentication boundary", () => {
     const continuation = readFileSync(continuationUrl, "utf8");
     expect(continuation).toContain("getCurrentIdentity");
     expect(continuation).toContain("resolvePostLoginDestination");
-    expect(continuation).toContain('redirect("/login")');
+    expect(continuation).toContain('redirect(withLocale("/login"');
   });
 });

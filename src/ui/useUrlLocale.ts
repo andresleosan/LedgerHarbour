@@ -2,19 +2,17 @@
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
+import { resolveLocale, withLocale } from "@/i18n/locale";
 import type { SupportedLocale } from "@/i18n/config";
 
 export function useUrlLocale(fallback: SupportedLocale = "en") {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const locale: SupportedLocale = searchParams.get("locale") === "es" ? "es" : fallback;
+  const locale = resolveLocale(searchParams.get("locale") ?? fallback);
 
   const hrefFor = (targetPath: string, candidate = locale) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set("locale", candidate);
-    const query = params.toString();
-    return query ? `${targetPath}?${query}` : targetPath;
+    return withLocale(targetPath, searchParams, candidate);
   };
 
   const setLocale = (candidate: SupportedLocale) => {
