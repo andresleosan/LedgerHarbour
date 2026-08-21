@@ -6,7 +6,7 @@ test("renders the English login and completes the test email flow without demo c
 
   await page.goto("/login");
   await expect(page.getByRole("heading", { name: "Bring clarity to every ledger." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Go to home" })).toHaveAttribute("href", "/");
+  await expect(page.getByRole("link", { name: "Go to home" })).toHaveAttribute("href", "/?locale=en");
   await expect(page.getByRole("button", { name: /Continue with Google/ })).toBeVisible();
   await expect(page.getByRole("button", { name: "Continue with email" })).toBeVisible();
   await expect(page.getByText("Development simulation")).toHaveCount(0);

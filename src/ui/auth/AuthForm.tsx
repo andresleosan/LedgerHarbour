@@ -227,7 +227,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
          <aside className="auth-aside">
            <div className="aside-top">
               <div className="brand"><img className="brand-logo" src="/brand/ledgerharbour-logo.png" alt="LedgerHarbour" width={180} height={120} /></div>
-             <Link className="home-link" href="/" aria-label={copy.login.homeLabel}>
+              <Link className="home-link" href={hrefFor("/")} aria-label={copy.login.homeLabel}>
                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                  <path d="m3 10 9-7 9 7" />
                  <path d="M5 9.5V21h14V9.5M9 21v-6h6v6" />

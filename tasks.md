@@ -24,7 +24,7 @@ This file is the canonical source for development status. Specs and plans provid
 | LH-005 | P2 | revision | Verify provider alerts and limits | Platform operator | 4.25 |
 | LH-004 | P2 | revision | Update repository production-status documentation | Engineering team | 3.75 |
 | LH-006 | P2 | pendiente | Remove the Playwright `allowedDevOrigins` warning | Engineering team | 3.50 |
-| LH-007 | P3 | pendiente | Consolidate language handling in auth and onboarding | End users | 3.25 |
+| LH-007 | P3 | revision | Consolidate language handling in auth and onboarding | End users | 3.25 |
 | LH-008 | P3 | pendiente | Define optional service-expiration automation | Platform operator | 2.75 |
 
 ## P0: Production Risks
@@ -313,6 +313,9 @@ This file is the canonical source for development status. Specs and plans provid
   - The previous `git diff --check` evidence did not cover the untracked `tests/e2e/auth-onboarding/locale.spec.ts`. The current `git diff --check` exits `0` with only the normal `tasks.md` LF/CRLF warning, and the direct untracked-spec check returned `untracked_spec_trailing_whitespace_errors=0`.
   - The deterministic local adapter intentionally remains on `/login` after email submit; authenticated `/auth/continue` is validated E2E only after the session is established. The unit evidence covers the Firebase branch of `navigateAfterSuccessfulLogin`; this local deterministic E2E does not claim to exercise the real Firebase auto-navigation.
   - Independent final rerun: `corepack pnpm test:e2e` exit code `0`; `42` tests passed in `4.5m` on temporary local port `3110`. Port `3100` was intermittently occupied by an unrelated workspace and produced external 404/HMR diagnostics; `playwright.config.ts` and `scripts/playwright-server.ts` were restored to the committed `3100` harness afterward.
+  - Final review fix round 2/5: auth Home now uses `hrefFor("/")`, preserving locale and functional queries; the E2E spec asserts that contract. The active summary and detailed entry both record LH-007 as `revision`.
+  - Fix round 2/5 focused E2E: exit code `0`; `1` test passed in `35.8s` on temporary local port `3110`, with the temporary port configuration restored afterward.
+  - Fix round 2/5 full E2E after updating the existing Home-link expectation: exit code `0`; `42` tests passed in `3.9m` on temporary local port `3110`, with no console/page errors; the temporary port configuration was restored afterward.
   - Security re-review: clean; only the allowed spec/report/tracking files were changed, with no new endpoint, secret, dependency, authentication, authorization, persistence, migration, deployment, or billing change.
   - Full details and exact outputs are recorded in `.superpowers/sdd/2026-08-20-lh-007-auth-onboarding-locale/task-3-report.md`.
 - Review gate: remains `revision`; it must not move to `aprobada` until independent review passes.

@@ -15,6 +15,7 @@ const copy = {
     spanish: "Espanol",
     emailLabel: "Work email",
     emailAction: "Continue with email",
+    homeLabel: "Go to home",
     registerAction: "Create an account",
     loginAction: "Sign in",
     loginTitle: "Bring clarity to every ledger.",
@@ -32,6 +33,7 @@ const copy = {
     spanish: "Espanol",
     emailLabel: "Correo de trabajo",
     emailAction: "Continuar con correo",
+    homeLabel: "Ir al inicio",
     registerAction: "Crear una cuenta",
     loginAction: "Iniciar sesión",
     loginTitle: "Claridad para cada libro contable.",
@@ -121,6 +123,7 @@ async function expectAuthLocaleFlow(
   await page.goto(localeUrl("/login", locale));
   await expect(page.getByRole("heading", { name: text.loginTitle })).toBeVisible();
   await expectSingleSelector(page, "auth-toolbar", locale);
+  await expect(page.getByRole("link", { name: text.homeLabel })).toHaveAttribute("href", localeUrl("/", locale));
   await expectNoOverflowAndClientStateIsLocaleFree(page, context);
   await expectAccessibleLocaleControl(page, locale);
 
