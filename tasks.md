@@ -278,7 +278,7 @@ This file is the canonical source for development status. Specs and plans provid
 ### LH-007: Consolidate language handling in auth and onboarding
 
 - Priority: `P3`
-- State: `pendiente`
+- State: `revision`
 - Primary user: End users
 - RICE: `3.25` (`reach 4 / impact 2 / confidence 4 / effort 3`)
 - Why now: Auth and onboarding were intentionally excluded from the first authenticated-shell language consolidation and still maintain separate controls.
@@ -295,6 +295,26 @@ This file is the canonical source for development status. Specs and plans provid
   - Approved design spec before implementation.
   - Unit or integration coverage for locale preservation.
   - Desktop and mobile Playwright evidence in both languages.
+- Verification evidence:
+  - `corepack pnpm vitest run tests/unit/i18n/locale.test.ts tests/unit/auth/post-login-navigation.test.ts`: exit code `0`; `2` files passed, `11` tests passed.
+  - `corepack pnpm test`: exit code `0`; `69` files passed, `2` skipped; `585` tests passed, `3` skipped.
+  - `corepack pnpm lint`: exit code `0`, without diagnostics.
+  - `corepack pnpm exec tsc --noEmit`: exit code `0`, without output.
+  - `corepack pnpm build`: exit code `0`; Next.js `15.5.23` compiled and generated `18/18` static pages.
+  - `corepack pnpm exec playwright test tests/e2e/auth-onboarding/locale.spec.ts`: exit code `0`; `1` test passed in `43.3s`, with desktop `1280x900` and mobile `390x844` contexts, both `locale=en|es`.
+  - `corepack pnpm test:e2e`: exit code `0`; `42` tests passed in `4.7m` with `1` worker and `[chromium]`. The diagnostics fixture kept console and `pageerror` gates empty; no timeout or retry output occurred.
+  - `git diff --check`: exit code `0`, without whitespace errors. The unrelated untracked `tests/integration/postgres/native-schema.test.ts` was not modified.
+  - Boundary review confirmed one auth/onboarding selector per target screen, locale and functional queries preserved, no locale state in browser storage, and `/auth/continue` authorization behavior unchanged.
+- Fix round 1/5 verification evidence (2026-08-20):
+  - `corepack pnpm vitest run tests/unit/i18n/locale.test.ts tests/unit/auth/post-login-navigation.test.ts`: exit code `0`; `2` files passed, `11` tests passed. The existing unit evidence for `navigateAfterSuccessfulLogin` remains separate from E2E.
+  - `corepack pnpm exec tsc --noEmit`: exit code `0`; no output or type errors.
+  - `corepack pnpm lint`: exit code `0`; no diagnostics.
+  - `corepack pnpm audit --json`: exit code `0`; `0` info, `0` low, `0` moderate, `0` high, `0` critical; `556` dependencies.
+  - The previous `git diff --check` evidence did not cover the untracked `tests/e2e/auth-onboarding/locale.spec.ts`. The current `git diff --check` exits `0` with only the normal `tasks.md` LF/CRLF warning, and the direct untracked-spec check returned `untracked_spec_trailing_whitespace_errors=0`.
+  - The deterministic local adapter intentionally remains on `/login` after email submit; authenticated `/auth/continue` is validated E2E only after the session is established. The unit evidence covers the Firebase branch of `navigateAfterSuccessfulLogin`; this local deterministic E2E does not claim to exercise the real Firebase auto-navigation.
+  - Security re-review: clean; only the allowed spec/report/tracking files were changed, with no new endpoint, secret, dependency, authentication, authorization, persistence, migration, deployment, or billing change.
+  - Full details and exact outputs are recorded in `.superpowers/sdd/2026-08-20-lh-007-auth-onboarding-locale/task-3-report.md`.
+- Review gate: remains `revision`; it must not move to `aprobada` until independent review passes.
 
 ### LH-008: Define optional service-expiration automation
 
