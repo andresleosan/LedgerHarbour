@@ -345,7 +345,8 @@ This file is the canonical source for development status. Specs and plans provid
   - Static verification: `git status --short`.
   - Static verification: `git grep -n "LH-008\|serviceExpiresAt\|automatic suspension\|notification" -- docs/superpowers/specs/2026-08-20-lh-008-service-expiration-automation-design.md docs/superpowers/specs/2026-08-20-lh-008-service-expiration-discovery-brief.md tasks.md`.
   - Report: `.superpowers/sdd/2026-08-20-lh-008-service-expiration-discovery/task-4-report.md`.
-  - No commit: prohibited by the task instructions; no production scheduler, suspension, migration, provider, billing, or external-service action occurred.
+  - Traceability: the subagent did not execute Git writes because Cronos rules prohibit subagents from doing so. After verifying and reviewing the discovery artifacts, the controller created commit `087bc43` (`docs: record service expiration discovery`), affecting `docs/superpowers/specs/2026-08-20-lh-008-service-expiration-discovery-brief.md` and `tasks.md`; the subagent did not create this commit.
+  - Production boundary: no production scheduler, suspension, migration, provider, billing, or external-service action occurred; these prohibitions remain in force.
 
 ## Recently Completed
 
