@@ -33,6 +33,7 @@
 - Modify: `src/app/(auth)/auth/continue/page.tsx`
 - Create: `tests/unit/i18n/locale.test.ts`
 - Create: `tests/unit/auth/post-login-navigation.test.ts`
+- Modify: `tests/unit/auth/production-auth-config.test.ts` to update existing auth-boundary expectations
 
 **Interfaces:**
 - Produces: `resolveLocale(value: string | null | undefined): SupportedLocale`.
@@ -134,6 +135,8 @@
   ```
 
   Also assert that registration, development auth, and deterministic Firebase test flows do not navigate automatically.
+
+  Update `tests/unit/auth/production-auth-config.test.ts` so its existing Firebase continuation assertions include the locale query and its continuation source assertion recognizes the locale-preserving redirect.
 
 - [ ] **Step 8: Run Task 1 focused tests and static checks**
 
