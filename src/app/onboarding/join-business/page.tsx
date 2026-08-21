@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { messages, type SupportedLocale } from "@/i18n/config";
+import { messages } from "@/i18n/config";
 import OnboardingSignOut from "@/ui/OnboardingSignOut";
+import { useUrlLocale } from "@/ui/useUrlLocale";
 
 type BusinessSummary = { id: string; name: string; isActive: boolean };
 type RequestStatus = "pending" | "approved" | "rejected" | "unavailable";
@@ -22,7 +23,7 @@ function messageForError(code: string | undefined, copy: typeof messages.en.onbo
 }
 
 export default function JoinBusinessPage() {
-  const [locale, setLocale] = useState<SupportedLocale>("en");
+  const { locale, setLocale, hrefFor } = useUrlLocale();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<BusinessSummary[]>([]);
   const [requestStates, setRequestStates] = useState<Record<string, RequestStatus | undefined>>({});
@@ -82,7 +83,7 @@ export default function JoinBusinessPage() {
       `}</style>
       <div className="flow-shell">
          <div className="toolbar" aria-label={copy.languageLabel}><span>{copy.languageLabel}</span>{(["en", "es"] as const).map((candidate) => <button className="locale-button" key={candidate} type="button" aria-pressed={locale === candidate} onClick={() => setLocale(candidate)}>{candidate === "en" ? copy.localeEnglish : copy.localeSpanish}</button>)}<OnboardingSignOut label={copy.signOut} /></div>
-        <Link className="back" href="/onboarding">{copy.brand} / {copy.title}</Link>
+         <Link className="back" href={hrefFor("/onboarding")}>{copy.brand} / {copy.title}</Link>
         <section className="flow-card" aria-labelledby="join-business-title">
           <p className="eyebrow">{copy.administratorAccess}</p><h1 id="join-business-title">{copy.joinTitle}</h1><p className="description">{copy.joinDescription}</p>
           <form onSubmit={search} noValidate><label htmlFor="business-search">{copy.searchLabel}<input id="business-search" name="businessSearch" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={copy.searchPlaceholder} /></label><button type="submit" disabled={busy}>{busy ? copy.searching : copy.searchButton}</button></form>

@@ -3,8 +3,9 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { messages, type SupportedLocale } from "@/i18n/config";
+import { messages } from "@/i18n/config";
 import OnboardingSignOut from "@/ui/OnboardingSignOut";
+import { useUrlLocale } from "@/ui/useUrlLocale";
 
 type BusinessResponse = { id: string; name: string; status: "pending" | "active" | "suspended" | "rejected" };
 type ErrorPayload = { error?: { code?: string } };
@@ -16,7 +17,7 @@ function messageForError(code: string | undefined, copy: typeof messages.en.onbo
 }
 
 export default function CreateBusinessPage() {
-  const [locale, setLocale] = useState<SupportedLocale>("en");
+  const { locale, setLocale, hrefFor } = useUrlLocale();
   const [name, setName] = useState("");
   const [result, setResult] = useState<BusinessResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -62,7 +63,7 @@ export default function CreateBusinessPage() {
       `}</style>
       <div className="flow-shell">
          <div className="toolbar" aria-label={copy.languageLabel}><span>{copy.languageLabel}</span>{(["en", "es"] as const).map((candidate) => <button className="locale-button" key={candidate} type="button" aria-pressed={locale === candidate} onClick={() => setLocale(candidate)}>{candidate === "en" ? copy.localeEnglish : copy.localeSpanish}</button>)}<OnboardingSignOut label={copy.signOut} /></div>
-        <Link className="back" href="/onboarding">{copy.brand} / {copy.title}</Link>
+         <Link className="back" href={hrefFor("/onboarding")}>{copy.brand} / {copy.title}</Link>
         <section className="flow-card" aria-labelledby="create-business-title">
           <p className="eyebrow">{copy.ownerRole}</p>
           <h1 id="create-business-title">{copy.createTitle}</h1>

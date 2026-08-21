@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
 
-import { messages, type SupportedLocale } from "@/i18n/config";
+import { messages } from "@/i18n/config";
 import OnboardingSignOut from "@/ui/OnboardingSignOut";
+import { useUrlLocale } from "@/ui/useUrlLocale";
 
 export default function OnboardingPage() {
-  const [locale, setLocale] = useState<SupportedLocale>("en");
+  const { locale, setLocale, hrefFor } = useUrlLocale();
   const copy = messages[locale].onboarding;
 
   return (
@@ -59,11 +59,11 @@ export default function OnboardingPage() {
           <p className="description">{copy.description}</p>
         </section>
         <section className="choice-grid" aria-label={copy.title}>
-          <Link className="choice" href="/onboarding/create-business">
+          <Link className="choice" href={hrefFor("/onboarding/create-business")}>
             <div><h2>{copy.createAction}</h2><p>{copy.createDescription}</p></div>
             <span className="choice-arrow" aria-hidden="true">&gt;</span>
           </Link>
-          <Link className="choice" href="/onboarding/join-business">
+          <Link className="choice" href={hrefFor("/onboarding/join-business")}>
             <div><h2>{copy.joinAction}</h2><p>{copy.joinDescription}</p></div>
             <span className="choice-arrow" aria-hidden="true">&gt;</span>
           </Link>
