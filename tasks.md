@@ -25,7 +25,7 @@ This file is the canonical source for development status. Specs and plans provid
 | LH-004 | P2 | revision | Update repository production-status documentation | Engineering team | 3.75 |
 | LH-006 | P2 | pendiente | Remove the Playwright `allowedDevOrigins` warning | Engineering team | 3.50 |
 | LH-007 | P3 | revision | Consolidate language handling in auth and onboarding | End users | 3.25 |
-| LH-008 | P3 | revision | Define optional service-expiration automation | Platform operator | 3.50 |
+| LH-008 | P3 | revision | Add manual service-expiration dry-run | Platform operator | 3.50 |
 
 ## P0: Production Risks
 
@@ -328,14 +328,14 @@ This file is the canonical source for development status. Specs and plans provid
 - RICE propuesto: `3.50` (`reach 3 / impact 4 / confidence 4 / effort 3`)
 - Why now: `serviceExpiresAt` is currently informational; automatic action could reduce manual work but could also suspend valid customers if temporal and recovery rules are incomplete.
 - Dependencies: Product discovery and explicit operator approval of one behavior.
-- Scope: Compare keeping the date informational, sending alerts, and automatic suspension before implementing any automation.
+- Scope: Implement the approved manual read-only dry-run while keeping automatic suspension deferred.
 - Acceptance:
   - Discovery identifies affected users and a measurable operational outcome.
   - Informational date, notifications, and automatic suspension are compared with trade-offs.
   - Notifications with dry-run/observation are recommended; automatic suspension remains deferred.
   - Timezone, final-day semantics, grace period, eligibility, recipients, notification timing, retries, idempotency, and manual override are addressed.
   - Audit events, rollback/recovery behavior, and provider/job failure modes are specified.
-  - Implementation approval gates are explicit; no implementation approval is granted by this task.
+  - The dry-run emits aggregate JSON only, accepts an optional ISO `--as-of`, and has no scheduler, mutation, notification, or billing behavior.
 - Evidence required:
   - Brief: `docs/superpowers/specs/2026-08-20-lh-008-service-expiration-discovery-brief.md`.
   - Recommendation: notifications preceded by dry-run/observation; automatic suspension remains out of scope.
@@ -347,6 +347,17 @@ This file is the canonical source for development status. Specs and plans provid
   - Report: `.superpowers/sdd/2026-08-20-lh-008-service-expiration-discovery/task-4-report.md`.
   - Traceability: the subagent did not execute Git writes because Cronos rules prohibit subagents from doing so. After verifying and reviewing the discovery artifacts, the controller created commit `087bc43` (`docs: record service expiration discovery`), affecting `docs/superpowers/specs/2026-08-20-lh-008-service-expiration-discovery-brief.md` and `tasks.md`; the subagent did not create this commit.
   - Production boundary: no production scheduler, suspension, migration, provider, billing, or external-service action occurred; these prohibitions remain in force.
+  - Approved design: `docs/superpowers/specs/2026-08-21-lh-008-service-expiration-dry-run-design.md`.
+  - Approved implementation plan: `docs/superpowers/plans/2026-08-21-lh-008-service-expiration-dry-run.md`.
+  - Implementation: `src/modules/operations/service-expiration-dry-run.ts`, `scripts/service-expiration-dry-run.ts`, and package command `db:service-expiration-dry-run`; no migration, scheduler, endpoint, provider, billing, notification, suspension, or persistence change.
+  - RED evidence: the classifier suite failed with `Cannot find module '../../../src/modules/operations/service-expiration-dry-run'` before production code existed; the CLI suite then failed with missing exported functions before the CLI contract was implemented.
+  - Focused final verification: `corepack pnpm exec vitest run tests/unit/operations/service-expiration-dry-run.test.ts tests/unit/operations/service-expiration-dry-run-cli.test.ts` -> `2` files passed, `15` tests passed.
+  - Full final verification: `corepack pnpm test` -> `71` files passed, `2` skipped; `602` tests passed, `3` skipped.
+  - `corepack pnpm lint` -> exit code `0`; `corepack pnpm exec tsc --noEmit` -> exit code `0`; `corepack pnpm build` -> exit code `0`, `18/18` static pages generated.
+  - CLI safety verification: `corepack pnpm db:service-expiration-dry-run --unknown` -> exit code `1`, `Unknown argument`; validation completed before database access.
+  - Security review: no new endpoint, secret, identifier exposure, mutation path, external integration, authentication surface, or public abuse surface; output is aggregate JSON and repository errors are sanitized. `corepack pnpm audit --audit-level high --json` reported `0` vulnerabilities at every severity.
+  - `git diff --check` -> exit code `0`; only the normal LF/CRLF conversion warnings appeared. No production execution, deployment, migration, billing, suspension, scheduler, or notification occurred.
+  - Review gate: `revision`; implementation and self-critique passed with real test evidence, pending operator review of the resulting code changes.
 
 ## Recently Completed
 

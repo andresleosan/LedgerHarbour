@@ -92,3 +92,8 @@ El storage de documentos dispone de `STORAGE_MODE=local|r2`. `local` es el valor
 - R2: ver ADR-004.
 - Vercel Hobby: ver ADR-005.
 - Fake OCR inicial: ver ADR-006.
+La vista manual de expiración vive en `scripts/service-expiration-dry-run.ts` y se ejecuta con
+`pnpm db:service-expiration-dry-run --as-of=2026-08-21T00:00:00Z`. Requiere `DATABASE_URL`, lee
+`businesses` mediante `listBusinesses()`, usa días exactos UTC `14/7/1`, y emite solo un JSON
+agregado. Es una observación manual sin scheduler, mutaciones, suspensión, auditoría de cambios ni
+notificaciones; `automatic suspension` permanece fuera de alcance.
