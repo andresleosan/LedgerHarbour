@@ -2,7 +2,8 @@
 
 ## Estado
 
-Discovery documental completado. Este documento no aprueba LH-008, no autoriza
+Task 2 del discovery documental completada. La propuesta queda en revision para
+la siguiente fase, pero este documento no aprueba LH-008, no autoriza
 implementacion y no cambia el comportamiento de produccion.
 
 ## Current State
@@ -118,3 +119,97 @@ Antes de cualquier implementacion siguen abiertas estas decisiones del diseño:
 La suspension automatica queda fuera de LH-008 y requiere una tarea separada,
 aprobacion explicita del operador y evidencia de que las reglas de fechas y
 destinatarios son confiables: `docs/superpowers/specs/2026-08-20-lh-008-service-expiration-automation-design.md:75-79`.
+
+## Alternativas y decision
+
+| Alternative | Manual-work effect | Customer risk | Reversibility | Decision |
+|---|---|---|---|---|
+| Informational date | Low improvement | Lowest | Immediate | Keep only as fallback |
+| Notifications | Direct improvement | Low if read-only | High | Recommend |
+| Automatic suspension | Highest potential improvement | Highest | Requires recovery | Defer |
+
+Las notificaciones son la siguiente fase recomendada porque atacan directamente
+el trabajo manual de seguimiento sin revocar acceso ni mutar el ciclo de vida.
+El primer paso debe ser un dry-run/observation que clasifique registros y haga
+visible el resultado sin entregar mensajes ni cambiar datos; despues se podra
+medir si la fase reduce horas manuales y si las reglas temporales son confiables.
+
+La suspension automatica no esta autorizada por esta tarea. Aunque podria
+reducir mas trabajo, puede suspender clientes validos por errores de zona
+horaria, renovaciones concurrentes, fechas obsoletas, jobs duplicados o fallas
+de entrega. Requiere recuperacion, guardas transaccionales, auditoria y una
+aprobacion explicita en una tarea separada.
+
+## Plan de medicion
+
+### Resultado primario
+
+Medir las horas de operador y administradores de negocio dedicadas al
+seguimiento manual de expiraciones por periodo de medicion. El baseline se
+establece antes del dry-run y se compara con el mismo metodo durante la
+observacion y, posteriormente, durante las notificaciones. La decision se
+vincula a esta reduccion de trabajo manual, no a mejoras de apariencia o
+polish visual.
+
+### Medidas secundarias
+
+- Registros elegibles identificados antes de la ventana de aviso.
+- Exito de entrega y de reintentos.
+- Alertas duplicadas.
+- Alertas obsoletas despues de una renovacion o correccion de fecha.
+- Tiempo desde la alerta hasta la resolucion del operador.
+- Overrides manuales e incidentes de soporte.
+
+### Baseline de bajo costo
+
+Sin exportar datos de clientes ni conectar un servicio de analitica externo, el
+operador puede registrar por periodo solo conteos agregados de registros
+elegibles, registros identificados, avisos resueltos y horas empleadas. Si los
+conteos no estan disponibles en una vista autorizada, se usa un operator log
+con fecha, periodo, conteos y horas; no se guardan nombres, mensajes, tokens ni
+datos de contacto. El dry-run debe producir como maximo esos agregados y
+referencias internas minimas necesarias para auditar el resultado.
+
+## RICE recalculado
+
+El repositorio usa RICE simplificado con valores del 1 al 5 y esfuerzo inverso:
+5 significa poco trabajo. La formula es:
+
+`RICE = (Alcance + Impacto + Confianza + Esfuerzo) / 4`
+
+Para la fase propuesta de notificaciones precedida por dry-run:
+
+| Componente | Valor | Razon |
+|---|---:|---|
+| Alcance | 3 | Afecta al operador y a administradores de negocios con expiraciones elegibles, no a todos los usuarios. |
+| Impacto | 4 | Reduce directamente el seguimiento manual y conserva el ciclo de vida sin suspension automatica. |
+| Confianza | 4 | El baseline y la direccion aprobada estan claros, pero zona horaria, canal y reglas de elegibilidad siguen abiertos. |
+| Esfuerzo | 3 | La fase requiere dry-run, ventanas, deduplicacion, reintentos, auditoria y observabilidad; no incluye suspension, migracion ni proveedor elegido. |
+
+`RICE = (3 + 4 + 4 + 3) / 4 = 14 / 4 = 3.50`
+
+El `2.75` original de `tasks.md` (`3/3/3/2`) debe cambiar a `3.50` para la
+fase de notificaciones propuesta, porque el discovery confirma un beneficio
+operativo directo, una confianza mayor y un alcance concreto, aunque mantiene
+esfuerzo moderado por las reglas de seguridad pendientes. Este ajuste es una
+revaluacion de la propuesta; Task 2 no modifica `tasks.md` ni el estado
+canonico del ledger.
+
+## Consistencia y concerns
+
+- La recomendacion es notificacion dry-run/observation antes de cualquier
+  entrega, con lectura y clasificacion sin mutaciones.
+- La suspension automatica no se recomienda ni se implementa en LH-008; queda
+  diferida a una decision y tarea separadas.
+- La medida de exito es la reduccion de horas de seguimiento manual, no el
+  polish visual del panel.
+- Siguen bloqueando una implementacion las decisiones sobre zona horaria,
+  semantica del ultimo dia, ventanas y gracia, estados elegibles, renovaciones,
+  destinatarios, canal, reintentos, deduplicacion, auditoria y recuperacion.
+- Un provider outage, job duplicado, clock skew o alerta stale no puede cambiar
+  el ciclo de vida; durante discovery no se selecciona proveedor ni se conecta
+  ningun servicio externo.
+
+El brief queda listo para revision documental. El ledger canonico aun muestra
+LH-008 como `pendiente` porque la actualizacion de `tasks.md` pertenece a Task
+4; no se interpreta este documento como aprobacion de implementacion.
