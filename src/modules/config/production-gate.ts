@@ -6,14 +6,13 @@ const APP_ID_PATTERN = /^1:\d+:web:[a-z0-9]+$/;
 const PROCESSOR_ID_PATTERN = /^[a-zA-Z0-9-]{3,128}$/;
 const BUCKET_NAME_PATTERN = /^[a-z0-9](?:[a-z0-9.-]{0,61}[a-z0-9])?$/;
 const R2_HOST_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.r2\.cloudflarestorage\.com$/;
-const UPSTASH_HOST_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.upstash\.io$/;
 
 const requiredProductionModes = {
   AUTH_MODE: "firebase",
   OCR_PROVIDER: "google-document-ai",
   PERSISTENCE_MODE: "postgres",
   STORAGE_MODE: "r2",
-  RATE_LIMIT_MODE: "upstash",
+  RATE_LIMIT_MODE: "postgres",
 } as const;
 
 const requiredProductionValues = [
@@ -29,8 +28,7 @@ const requiredProductionValues = [
   "R2_BUCKET_NAME",
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
-  "UPSTASH_REDIS_REST_URL",
-  "UPSTASH_REDIS_REST_TOKEN",
+  "RATE_LIMIT_KEY_SECRET",
   "GOOGLE_CLOUD_PROJECT_ID",
   "GOOGLE_CLOUD_LOCATION",
   "GOOGLE_DOCUMENT_AI_PROCESSOR_ID",
@@ -42,7 +40,7 @@ export type ProductionConfiguration = {
   readonly ocrProvider: "google-document-ai";
   readonly persistenceMode: "postgres";
   readonly storageMode: "r2";
-  readonly rateLimitMode: "upstash";
+  readonly rateLimitMode: "postgres";
 };
 
 export class ProductionConfigurationError extends Error {
@@ -130,12 +128,12 @@ function isValidR2Endpoint(value: string | null): boolean {
   return isValidHttpsEndpoint(value, R2_HOST_PATTERN);
 }
 
-function isValidUpstashEndpoint(value: string | null): boolean {
-  return isValidHttpsEndpoint(value, UPSTASH_HOST_PATTERN);
-}
-
 function isValidPrivateKey(value: string | null): boolean {
   return value !== null && PRIVATE_KEY_PATTERN.test(value.replaceAll("\\n", "\n"));
+}
+
+function isValidRateLimitSecret(value: string | null): boolean {
+  return value !== null && value.length >= 32;
 }
 
 function isValidServiceAccount(value: string | null, projectId: string): boolean {
@@ -196,8 +194,7 @@ export function parseProductionConfiguration(
     !BUCKET_NAME_PATTERN.test(requiredValue(environment, "R2_BUCKET_NAME") ?? "") ||
     !requiredValue(environment, "R2_ACCESS_KEY_ID") ||
     !requiredValue(environment, "R2_SECRET_ACCESS_KEY") ||
-    !isValidUpstashEndpoint(requiredValue(environment, "UPSTASH_REDIS_REST_URL")) ||
-    !requiredValue(environment, "UPSTASH_REDIS_REST_TOKEN") ||
+    !isValidRateLimitSecret(requiredValue(environment, "RATE_LIMIT_KEY_SECRET")) ||
     !["us", "eu"].includes(googleLocation ?? "") ||
     !processorId ||
     !PROCESSOR_ID_PATTERN.test(processorId) ||
@@ -209,7 +206,7 @@ export function parseProductionConfiguration(
     ocrProvider: "google-document-ai",
     persistenceMode: "postgres",
     storageMode: "r2",
-    rateLimitMode: "upstash",
+    rateLimitMode: "postgres",
   };
 }
 

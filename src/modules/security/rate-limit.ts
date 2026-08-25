@@ -1,5 +1,4 @@
-import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
+import { createPostgresRateLimiter } from "./postgres-rate-limit";
 
 export interface RateLimitResult {
   readonly success: boolean;
@@ -20,7 +19,6 @@ type RateLimitDefinition = {
   keyPrefix: string;
   maxRequests: number;
   windowMs: number;
-  upstashWindow: Parameters<typeof Ratelimit.fixedWindow>[1];
 };
 
 export interface InMemoryRateLimiterOptions {
@@ -59,21 +57,12 @@ export class InMemoryRateLimiter implements RateLimiter {
   }
 }
 
-class UpstashRateLimiter implements RateLimiter {
-  constructor(private readonly limiter: Pick<Ratelimit, "limit">) {}
-
-  async limit(key: string): Promise<RateLimitResult> {
-    const result = await this.limiter.limit(key);
-    return { success: result.success, remaining: result.remaining, resetAt: result.reset };
-  }
-}
-
 const sharedRateLimiters = new Map<string, RateLimiter>();
 
 function createConfiguredRateLimiter(definition: RateLimitDefinition): RateLimiter {
   const mode = process.env.RATE_LIMIT_MODE ?? (process.env.NODE_ENV === "production" ? "" : "memory");
-  if (process.env.NODE_ENV === "production" && mode !== "upstash") {
-    throw new Error("Upstash rate limiting is required in production");
+  if (process.env.NODE_ENV === "production" && mode !== "postgres") {
+    throw new Error("PostgreSQL rate limiting is required in production");
   }
   if (mode === "memory") {
     const key = `memory:${definition.keyPrefix}`;
@@ -86,20 +75,20 @@ function createConfiguredRateLimiter(definition: RateLimitDefinition): RateLimit
     sharedRateLimiters.set(key, limiter);
     return limiter;
   }
-  if (mode !== "upstash") throw new Error("Unsupported rate limit mode");
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) {
-    throw new Error("Upstash rate limiting requires UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN");
-  }
+  if (mode !== "postgres") throw new Error("Unsupported rate limit mode");
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (!databaseUrl) throw new Error("PostgreSQL rate limiting requires DATABASE_URL");
+  const keySecret = process.env.RATE_LIMIT_KEY_SECRET?.trim();
+  if (!keySecret) throw new Error("PostgreSQL rate limiting requires RATE_LIMIT_KEY_SECRET");
 
-  const key = `upstash:${definition.keyPrefix}`;
+  const key = `postgres:${definition.keyPrefix}`;
   const existing = sharedRateLimiters.get(key);
   if (existing) return existing;
-  const limiter = new UpstashRateLimiter(new Ratelimit({
-    redis: Redis.fromEnv(),
-    limiter: Ratelimit.fixedWindow(definition.maxRequests, definition.upstashWindow),
-    analytics: false,
-    prefix: `ledgerharbour:${definition.keyPrefix}`,
-  }));
+  const limiter = createPostgresRateLimiter(databaseUrl, {
+    maxRequests: definition.maxRequests,
+    windowMs: definition.windowMs,
+    keySecret,
+  });
   sharedRateLimiters.set(key, limiter);
   return limiter;
 }
@@ -108,7 +97,6 @@ const AUTH_RATE_LIMIT: RateLimitDefinition = {
   keyPrefix: "auth",
   maxRequests: 10,
   windowMs: 5 * 60 * 1000,
-  upstashWindow: "5 m",
 };
 
 const AUTHENTICATED_RATE_LIMITS = {
@@ -116,31 +104,26 @@ const AUTHENTICATED_RATE_LIMITS = {
     keyPrefix: "authenticated-upload",
     maxRequests: 10,
     windowMs: 5 * 60 * 1000,
-    upstashWindow: "5 m",
   },
   "ocr-process": {
     keyPrefix: "authenticated-ocr-process",
     maxRequests: 5,
     windowMs: 5 * 60 * 1000,
-    upstashWindow: "5 m",
   },
   "project-request": {
     keyPrefix: "authenticated-project-request",
     maxRequests: 10,
     windowMs: 5 * 60 * 1000,
-    upstashWindow: "5 m",
   },
   "project-membership": {
     keyPrefix: "authenticated-project-membership",
     maxRequests: 20,
     windowMs: 5 * 60 * 1000,
-    upstashWindow: "5 m",
   },
   "platform-administration": {
     keyPrefix: "authenticated-platform-administration",
     maxRequests: 30,
     windowMs: 5 * 60 * 1000,
-    upstashWindow: "5 m",
   },
 } satisfies Record<string, RateLimitDefinition>;
 
@@ -151,31 +134,26 @@ const AGGREGATED_RATE_LIMITS = {
     keyPrefix: "authenticated-upload-address",
     maxRequests: 20,
     windowMs: 5 * 60 * 1000,
-    upstashWindow: "5 m",
   },
   "ocr-process": {
     keyPrefix: "authenticated-ocr-process-address",
     maxRequests: 10,
     windowMs: 5 * 60 * 1000,
-    upstashWindow: "5 m",
   },
   "project-request": {
     keyPrefix: "authenticated-project-request-address",
     maxRequests: 20,
     windowMs: 5 * 60 * 1000,
-    upstashWindow: "5 m",
   },
   "project-membership": {
     keyPrefix: "authenticated-project-membership-address",
     maxRequests: 40,
     windowMs: 5 * 60 * 1000,
-    upstashWindow: "5 m",
   },
   "platform-administration": {
     keyPrefix: "authenticated-platform-administration-address",
     maxRequests: 60,
     windowMs: 5 * 60 * 1000,
-    upstashWindow: "5 m",
   },
 } satisfies Record<AuthenticatedRateLimitScope, RateLimitDefinition>;
 

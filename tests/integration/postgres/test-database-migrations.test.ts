@@ -156,6 +156,7 @@ describe("PGlite test database migrations", () => {
         "0004_membership_lifecycle",
         "0005_projects",
         "0006_business_request_audit",
+        "0007_rate_limit_windows",
       ]);
       await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({
         projects: { applied: true, requiredTableCount: 2, ledgerRecordPresent: true },

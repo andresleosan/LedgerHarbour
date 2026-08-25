@@ -14,7 +14,7 @@ function validProductionEnvironment(): NodeJS.ProcessEnv {
     OCR_PROVIDER: "google-document-ai",
     PERSISTENCE_MODE: "postgres",
     STORAGE_MODE: "r2",
-    RATE_LIMIT_MODE: "upstash",
+    RATE_LIMIT_MODE: "postgres",
     DATABASE_URL: "postgresql://runtime.ledgerharbour.invalid/ledgerharbour",
     FIREBASE_PROJECT_ID: "ledgerharbour-prod",
     FIREBASE_CLIENT_EMAIL: "firebase-adminsdk@ledgerharbour-prod.iam.gserviceaccount.com",
@@ -27,8 +27,7 @@ function validProductionEnvironment(): NodeJS.ProcessEnv {
     R2_BUCKET_NAME: "ledgerharbour-prod",
     R2_ACCESS_KEY_ID: "r2-access-7f3a8c2d",
     R2_SECRET_ACCESS_KEY: "r2-secret-7f3a8c2d",
-    UPSTASH_REDIS_REST_URL: "https://redis-ledgerharbour.upstash.io",
-    UPSTASH_REDIS_REST_TOKEN: "upstash-token-7f3a8c2d",
+    RATE_LIMIT_KEY_SECRET: "rate-limit-key-secret-12345678901234567890",
     GOOGLE_CLOUD_PROJECT_ID: "ledgerharbour-prod",
     GOOGLE_CLOUD_LOCATION: "us",
     GOOGLE_DOCUMENT_AI_PROCESSOR_ID: "processor-id",
@@ -53,7 +52,7 @@ describe("production configuration gate", () => {
   it.each([
     ["DATABASE_URL", "postgresql://replace-with-database-url/ledgerharbour"],
     ["R2_ENDPOINT", "https://<account-id>.r2.cloudflarestorage.com"],
-    ["UPSTASH_REDIS_REST_URL", "https://replace-with-upstash-endpoint.upstash.io"],
+    ["RATE_LIMIT_KEY_SECRET", "replace-with-rate-limit-key-secret"],
     ["R2_ACCESS_KEY_ID", "replace-with-r2-access-key"],
     ["GOOGLE_DOCUMENT_AI_PROCESSOR_ID", "replace-with-invoice-parser-id"],
   ])("rejects placeholders in %s", (name, value) => {
@@ -91,7 +90,7 @@ describe("production configuration gate", () => {
     ["FIREBASE_PROJECT_ID", "example-project"],
     ["NEXT_PUBLIC_FIREBASE_API_KEY", "test-public-api-key"],
     ["R2_ACCESS_KEY_ID", "synthetic-r2-key"],
-    ["UPSTASH_REDIS_REST_TOKEN", "fake-upstash-token"],
+    ["RATE_LIMIT_KEY_SECRET", "fake-rate-limit-secret"],
   ])("rejects obvious synthetic values in %s", (name, value) => {
     const environment = validProductionEnvironment();
     environment[name] = value;
@@ -112,11 +111,6 @@ describe("production configuration gate", () => {
     ["R2_ENDPOINT", "https://account-id.r2.cloudflarestorage.com#fragment"],
     ["R2_ENDPOINT", "https://user:pass@account-id.r2.cloudflarestorage.com"],
     ["R2_ENDPOINT", "https://account-id.r2.cloudflarestorage.com:443"],
-    ["UPSTASH_REDIS_REST_URL", "https://redis-ledgerharbour.upstash.io/path"],
-    ["UPSTASH_REDIS_REST_URL", "https://redis-ledgerharbour.upstash.io?token=value"],
-    ["UPSTASH_REDIS_REST_URL", "https://redis-ledgerharbour.upstash.io#fragment"],
-    ["UPSTASH_REDIS_REST_URL", "https://user:pass@redis-ledgerharbour.upstash.io"],
-    ["UPSTASH_REDIS_REST_URL", "https://redis-ledgerharbour.upstash.io:443"],
     ["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "ledgerharbour-prod.firebaseapp.com/path"],
     ["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "ledgerharbour-prod.firebaseapp.com?query=value"],
     ["NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN", "user@ledgerharbour-prod.firebaseapp.com"],
@@ -134,7 +128,6 @@ describe("production configuration gate", () => {
   it.each([
     ["DATABASE_URL", "not-a-database-url"],
     ["R2_ENDPOINT", "http://account-id.r2.cloudflarestorage.com"],
-    ["UPSTASH_REDIS_REST_URL", "not-a-redis-url"],
   ])("rejects invalid URL in %s", (name, value) => {
     const environment = validProductionEnvironment();
     environment[name] = value;
@@ -178,7 +171,7 @@ describe("production configuration gate", () => {
       DATABASE_URL: "postgresql://secret.example/database",
       GOOGLE_SERVICE_ACCOUNT_JSON: "secret-json",
       R2_SECRET_ACCESS_KEY: "secret-r2",
-      UPSTASH_REDIS_REST_TOKEN: "secret-upstash",
+      RATE_LIMIT_KEY_SECRET: "secret-rate-limit-key",
       FIREBASE_PRIVATE_KEY: "secret-firebase",
     });
 
@@ -186,7 +179,7 @@ describe("production configuration gate", () => {
     expect(effective).not.toHaveProperty("DATABASE_URL");
     expect(effective).not.toHaveProperty("GOOGLE_SERVICE_ACCOUNT_JSON");
     expect(effective).not.toHaveProperty("R2_SECRET_ACCESS_KEY");
-    expect(effective).not.toHaveProperty("UPSTASH_REDIS_REST_TOKEN");
+    expect(effective).not.toHaveProperty("RATE_LIMIT_KEY_SECRET");
     expect(effective).not.toHaveProperty("FIREBASE_PRIVATE_KEY");
   });
 
@@ -205,7 +198,7 @@ describe("production configuration gate", () => {
     expect(source).not.toContain("GOOGLE_SERVICE_ACCOUNT_JSON:");
     expect(source).not.toContain("FIREBASE_PRIVATE_KEY:");
     expect(source).not.toContain("R2_SECRET_ACCESS_KEY:");
-    expect(source).not.toContain("UPSTASH_REDIS_REST_TOKEN:");
+    expect(source).not.toContain("RATE_LIMIT_KEY_SECRET:");
   });
 
   it("keeps Vitest on Firebase test auth instead of development sessions", () => {

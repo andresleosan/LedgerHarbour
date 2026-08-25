@@ -6,7 +6,7 @@ MVP local de revisión de documentos e invoices.
 
 - Desarrollo local y pruebas deterministas: respaldados por evidencia local documentada; esta linea no implica una nueva ejecucion ni evidencia productiva.
 - Integraciones de proveedores: adapters y contratos implementados donde se indica en `docs/STACK.md`.
-- Operacion productiva: activacion y estado externo no revalidados por este repositorio; requieren evidencia del operador.
+- Operacion productiva: existe un deployment controlado y evidencia operativa redactada en `tasks.md`; la activacion completa de proveedores y billing sigue bajo control del operador.
 
 ## Requisitos
 
@@ -59,10 +59,11 @@ Con `DATABASE_URL` configurada, el operador puede ejecutar una vista de solo lec
 ```powershell
 corepack pnpm db:service-expiration-dry-run --as-of=2026-08-21T00:00:00Z
 ```
+
 Las matrices de seguridad viven en `tests/security/`; cubren servicios y rutas HTTP reales, incluyendo multipart/DTO seguro, currency mutation y mutaciones de miembros. El flujo browser crítico está en `tests/e2e/critical-path.spec.ts` y cubre upload real, review, corrección, aprobación, estado aprobado, inmutabilidad y navegación cross-tenant. El reporte de performance está en `docs/verification/ledgerharbour-mvp-performance.md`.
 
 El harness Playwright usa `NODE_ENV=test`, `AUTH_MODE=firebase` y el adapter Firebase determinista; no necesita credenciales Firebase reales. El baseline PowerShell no sigue redirects automáticamente: las rutas públicas se validan como `200` con contenido esperado y las rutas privadas se registran explícitamente como `307` a `/login` sin sesión. No debe interpretarse como medición autenticada de pantallas privadas.
 
 ## Límites
 
-La autenticación de desarrollo y los repositorios in-memory solo sirven para verificación local. La producción sigue bloqueada hasta contar con PostgreSQL durable, Firebase Auth, rate limiting, OCR real, auditoría reproducible de dependencias y un proceso de despliegue aprobado.
+La autenticación de desarrollo y los repositorios in-memory solo sirven para verificación local. La activación comercial completa sigue bloqueada hasta cerrar los controles de Firebase, rate limiting, OCR real, alertas de billing, scopes mínimos, auditoría reproducible de dependencias y el proceso operativo aprobado.

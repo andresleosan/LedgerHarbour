@@ -19,5 +19,5 @@ export function useUrlLocale() {
     router.replace(hrefFor(pathname, candidate));
   };
 
-  return { locale, setLocale, hrefFor };
+  return { locale, setLocale, hrefFor, searchParams };
 }

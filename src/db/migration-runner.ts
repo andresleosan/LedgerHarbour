@@ -14,6 +14,8 @@ const PROJECTS_MIGRATION_VERSION = "0005_projects";
 const PROJECTS_MIGRATION_FILE = new URL("./migrations/0005_projects.sql", import.meta.url);
 const BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION = "0006_business_request_audit";
 const BUSINESS_REQUEST_AUDIT_MIGRATION_FILE = new URL("./migrations/0006_business_request_audit.sql", import.meta.url);
+const RATE_LIMIT_MIGRATION_VERSION = "0007_rate_limit_windows";
+const RATE_LIMIT_MIGRATION_FILE = new URL("./migrations/0007_rate_limit_windows.sql", import.meta.url);
 const REQUIRED_TABLES = [
   "users",
   "businesses",
@@ -33,6 +35,7 @@ const PROJECTS_REQUIRED_TABLES = ["projects", "project_memberships"] as const;
 const MEMBERSHIP_LIFECYCLE_ROLLBACK_FILE = new URL("./migrations/rollback/0004_membership_lifecycle_down.sql", import.meta.url);
 const PROJECTS_ROLLBACK_FILE = new URL("./migrations/rollback/0005_projects_down.sql", import.meta.url);
 const BUSINESS_REQUEST_AUDIT_ROLLBACK_FILE = new URL("./migrations/rollback/0006_business_request_audit_down.sql", import.meta.url);
+const RATE_LIMIT_ROLLBACK_FILE = new URL("./migrations/rollback/0007_rate_limit_windows_down.sql", import.meta.url);
 
 export type MigrationQueryResult<Row = Record<string, unknown>> = {
   rows: Row[];
@@ -74,6 +77,7 @@ export type MigrationSequence<T> = {
   membershipLifecycle: T;
   projects: T;
   businessRequestAudit: T;
+  rateLimit: T;
 };
 
 export function assertRequiredMigrations(
@@ -83,6 +87,7 @@ export function assertRequiredMigrations(
   membershipLifecycle?: MigrationCheck,
   projects?: MigrationCheck,
   businessRequestAudit?: MigrationCheck,
+  rateLimit?: MigrationCheck,
 ): void {
   if (
     initial.version !== MIGRATION_VERSION
@@ -113,6 +118,9 @@ export function assertRequiredMigrations(
   }
   if (businessRequestAudit && (!businessRequestAudit.applied || businessRequestAudit.version !== BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION)) {
     throw new Error("Required PostgreSQL business request audit migration is not applied");
+  }
+  if (rateLimit && (!rateLimit.applied || rateLimit.version !== RATE_LIMIT_MIGRATION_VERSION || rateLimit.requiredTableCount !== 1)) {
+    throw new Error("Required PostgreSQL rate-limit migration is not applied");
   }
 }
 
@@ -575,6 +583,83 @@ export async function checkBusinessRequestAuditMigration(
   }
 }
 
+export async function applyRateLimitMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, BUSINESS_REQUEST_AUDIT_MIGRATION_VERSION))) {
+      throw new Error("Business request audit migration must be applied before rate-limit migration");
+    }
+    if (await migrationWasApplied(client, RATE_LIMIT_MIGRATION_VERSION)) {
+      return { version: RATE_LIMIT_MIGRATION_VERSION, applied: false };
+    }
+    if (await hasPartialSchema(client, ["rate_limit_windows"])) {
+      throw new Error("Database has rate-limit schema tables without a migration record");
+    }
+    const migrationSql = withoutTransactionMarkers(await readFile(RATE_LIMIT_MIGRATION_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, migrationSql);
+    await client.query("INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)", [RATE_LIMIT_MIGRATION_VERSION]);
+    await client.query("COMMIT");
+    return { version: RATE_LIMIT_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function rollbackRateLimitMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, RATE_LIMIT_MIGRATION_VERSION))) {
+      return { version: RATE_LIMIT_MIGRATION_VERSION, applied: false };
+    }
+    const rollbackSql = withoutTransactionMarkers(await readFile(RATE_LIMIT_ROLLBACK_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, rollbackSql);
+    await client.query("COMMIT");
+    return { version: RATE_LIMIT_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function checkRateLimitMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationCheck> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    const applied = await migrationWasApplied(client, RATE_LIMIT_MIGRATION_VERSION);
+    const tables = await client.query<{ table_name: string }>(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'rate_limit_windows'`,
+    );
+    return {
+      version: RATE_LIMIT_MIGRATION_VERSION,
+      applied,
+      requiredTableCount: tables.rowCount ?? 0,
+      ledgerRecordPresent: applied,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
 export async function applyAllMigrations(
   config: MigrationConfig,
   clientFactory: MigrationClientFactory = connect,
@@ -585,7 +670,8 @@ export async function applyAllMigrations(
   const membershipLifecycle = await applyMembershipLifecycleMigration(config, clientFactory);
   const projects = await applyProjectsMigration(config, clientFactory);
   const businessRequestAudit = await applyBusinessRequestAuditMigration(config, clientFactory);
-  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit };
+  const rateLimit = await applyRateLimitMigration(config, clientFactory);
+  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit };
 }
 
 export async function checkAllMigrations(
@@ -598,6 +684,7 @@ export async function checkAllMigrations(
   const membershipLifecycle = await checkMembershipLifecycleMigration(config, clientFactory);
   const projects = await checkProjectsMigration(config, clientFactory);
   const businessRequestAudit = await checkBusinessRequestAuditMigration(config, clientFactory);
-  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit);
-  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit };
+  const rateLimit = await checkRateLimitMigration(config, clientFactory);
+  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit);
+  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit };
 }

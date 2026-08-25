@@ -41,7 +41,7 @@ Suspender conserva datos historicos, pero deniega el acceso efectivo del negocio
 
 ## Seguridad operativa
 
-- Las mutaciones globales siempre pasan por autorizacion server-side y rate limiting Upstash en produccion.
+- Las mutaciones globales siempre pasan por autorización server-side y rate limiting PostgreSQL/Neon en producción.
 - Las respuestas de listados no contienen claves privadas de R2, tokens, service-account JSON ni bytes de documentos.
 - No desactives el registro append-only de `platform_audit_events`.
 - Si se sospecha una credencial expuesta, rota la credencial en el proveedor antes de volver a activar el entorno; editar `.env.example` no revoca una clave.

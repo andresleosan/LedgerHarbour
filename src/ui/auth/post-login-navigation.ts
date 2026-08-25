@@ -9,6 +9,7 @@ interface SuccessfulLoginNavigationInput {
   authMode: "development" | "firebase";
   isDeterministicFirebaseTest: boolean;
   locale: SupportedLocale;
+  currentSearchParams: URLSearchParams | string;
 }
 
 export function navigateAfterSuccessfulLogin(
@@ -24,5 +25,5 @@ export function navigateAfterSuccessfulLogin(
     return;
   }
 
-  replace(withLocale("/auth/continue", "", input.locale));
+  replace(withLocale("/auth/continue", input.currentSearchParams, input.locale));
 }

@@ -29,21 +29,21 @@ describe("InMemoryRateLimiter", () => {
     await expect(limiter.limit("ip:one")).resolves.toMatchObject({ success: false });
   });
 
-  it("fails closed when Upstash mode has no credentials", () => {
-    vi.stubEnv("RATE_LIMIT_MODE", "upstash");
-    vi.stubEnv("UPSTASH_REDIS_REST_URL", "");
-    vi.stubEnv("UPSTASH_REDIS_REST_TOKEN", "");
+  it("fails closed when PostgreSQL mode has no database URL", () => {
+    vi.stubEnv("RATE_LIMIT_MODE", "postgres");
+    vi.stubEnv("DATABASE_URL", "");
+    vi.stubEnv("RATE_LIMIT_KEY_SECRET", "test-rate-limit-secret");
 
-    expect(() => createAuthRateLimiter()).toThrow("Upstash rate limiting requires");
+    expect(() => createAuthRateLimiter()).toThrow("PostgreSQL rate limiting requires DATABASE_URL");
     vi.unstubAllEnvs();
   });
 
-  it("requires Upstash instead of memory in production", () => {
+  it("requires PostgreSQL instead of memory in production", () => {
     vi.stubEnv("NODE_ENV", "production");
     process.env.RATE_LIMIT_MODE = "memory";
 
     try {
-      expect(() => createAuthenticatedRateLimiter("upload")).toThrow("Upstash rate limiting is required");
+      expect(() => createAuthenticatedRateLimiter("upload")).toThrow("PostgreSQL rate limiting is required");
     } finally {
       vi.unstubAllEnvs();
       vi.unstubAllEnvs();

@@ -36,7 +36,7 @@ interface AuthFormProps {
 const interpolate = (message: string, email: string) => message.replace("{email}", email);
 
 export default function AuthForm({ mode, providerActions, authMode = "firebase", firebaseConfig }: AuthFormProps) {
-  const { locale, setLocale, hrefFor } = useUrlLocale();
+  const { locale, setLocale, hrefFor, searchParams } = useUrlLocale();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [feedback, setFeedback] = useState<Feedback>(null);
@@ -75,6 +75,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
           authMode,
           isDeterministicFirebaseTest,
           locale,
+          currentSearchParams: searchParams,
         }, (destination) => router.replace(destination));
       })
       .catch((error) => {
@@ -86,7 +87,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
       });
 
     return () => { cancelled = true; };
-  }, [authMode, firebaseConfig, isDeterministicFirebaseTest, isFirebase, isLogin, locale, mode, provider, router]);
+  }, [authMode, firebaseConfig, isDeterministicFirebaseTest, isFirebase, isLogin, locale, mode, provider, router, searchParams]);
 
   const clearFeedback = () => {
     setFeedback(null);
@@ -121,6 +122,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
         authMode,
         isDeterministicFirebaseTest,
         locale,
+        currentSearchParams: searchParams,
       }, (destination) => router.replace(destination));
     } catch (error) {
       const authError = toAuthError(error);

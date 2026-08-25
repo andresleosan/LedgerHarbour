@@ -29,6 +29,7 @@ describe("PostgreSQL initial migration", () => {
         "platform_members",
         "project_memberships",
         "projects",
+        "rate_limit_windows",
         "users",
       ]);
 

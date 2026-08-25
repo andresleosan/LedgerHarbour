@@ -168,3 +168,31 @@ remota ni despliegue.
 - Para volver al comportamiento local, configurar `PERSISTENCE_MODE=memory`; no se requiere migración destructiva ni se modifica la migración SQL versionada.
 
 **Task 5: verificada localmente, no aprobada para producción.**
+
+## LH-009: Gate PostgreSQL nativo desechable
+
+La verificación diferida se cerró el 2026-08-24 con PostgreSQL 18 nativo en un clúster temporal limitado a `127.0.0.1`. Se usaron bases vacías con nombres desechables; no se leyó ni modificó Neon, producción, credenciales externas o datos de la aplicación. El clúster se detuvo y su directorio validado bajo `%TEMP%` se eliminó al terminar.
+
+### Evidencia RED/GREEN
+
+- RED: el test histórico falló porque esperaba 7 tablas iniciales y el contrato canónico devolvió 10; tampoco recorría las migraciones `0002` a `0006`.
+- Gate explícito sin `TEST_DATABASE_URL`: exit `1` antes de ejecutar Vitest.
+- Target remoto sintético: rechazado antes de conectar; el gate solo acepta loopback y nombres de base explícitamente desechables.
+- GREEN: `corepack pnpm db:native-check` ejecutó `1` archivo y `5` pruebas verdes sobre una base PostgreSQL 18 nueva.
+
+### Contrato nativo cubierto
+
+- Aplicación y verificación ordenada de `0001_initial` a `0006_business_request_audit`.
+- Presencia de 15 tablas, incluida la tabla de ledger, y una selección representativa de constraints, índices y triggers tenant-aware.
+- Rollback y reaplicación de `0006` con paridad del ledger.
+- Rechazo de uploader cruzado entre negocios y mutación de auditoría append-only.
+- Rollback de una transacción ordinaria sin persistir la fila de prueba.
+
+### Gates finales
+
+- Suite secuencial sin URL nativa: `71` archivos pasaron, `2` omitidos; `602` pruebas pasaron, `7` omitidas.
+- Lint, TypeScript, build y `git diff --check`: exit `0`; build `18/18` páginas estáticas.
+- Auditoría de dependencias: `0` vulnerabilidades en todas las severidades.
+- Las pruebas de carga se excluyeron porque la migración es una operación one-shot y no una ruta de tráfico runtime.
+
+**LH-009: aprobada como gate local nativo.** Esta evidencia no autoriza una migración productiva ni sustituye backup, snapshot, rollback operativo y confirmación explícita antes de cualquier cambio externo.

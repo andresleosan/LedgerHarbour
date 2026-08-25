@@ -56,6 +56,11 @@ export async function createTestDatabase(): Promise<{
       "utf8",
     );
     await applyMigration(client, businessRequestAuditMigration);
+    const rateLimitMigration = await readFile(
+      new URL("./migrations/0007_rate_limit_windows.sql", import.meta.url),
+      "utf8",
+    );
+    await applyMigration(client, rateLimitMigration);
   } catch (error) {
     await client.close();
     throw error;

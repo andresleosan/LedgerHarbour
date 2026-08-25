@@ -64,6 +64,7 @@ describe("production authentication boundary", () => {
       authMode: "firebase",
       isDeterministicFirebaseTest: false,
       locale: "en",
+      currentSearchParams: "",
     }, replace);
 
     expect(replace).toHaveBeenCalledOnce();
@@ -79,6 +80,7 @@ describe("production authentication boundary", () => {
       authMode: "firebase",
       isDeterministicFirebaseTest: false,
       locale: "en",
+      currentSearchParams: "",
     }, replace);
 
     expect(replace).toHaveBeenCalledOnce();
@@ -96,6 +98,7 @@ describe("production authentication boundary", () => {
         authMode: "firebase",
         isDeterministicFirebaseTest: true,
         locale: "en",
+        currentSearchParams: "",
       }, replace);
 
       expect(replace).not.toHaveBeenCalled();
@@ -111,6 +114,7 @@ describe("production authentication boundary", () => {
       authMode: "firebase",
       isDeterministicFirebaseTest: false,
       locale: "en",
+      currentSearchParams: "",
     }, replace);
 
     expect(replace).not.toHaveBeenCalled();
