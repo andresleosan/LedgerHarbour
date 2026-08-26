@@ -36,13 +36,16 @@ This file is the canonical source for development status. Specs and plans provid
 - Priority: `P0`
 - State: `revision`
 - Primary user: Authenticated users
-- Why now: Production login reached `/auth/continue` but PostgreSQL rejected a verified Firebase identity whose email already belonged to a local user with a previous `provider_id`.
-- Scope: Resolve a verified Firebase identity to the existing local user without creating duplicates or changing the stored provider link; preserve conflict behavior for unverified identities and protect concurrent platform claims with a transaction.
+- Why now: Production login reached `/auth/continue` and PostgreSQL rejected an identity whose email already belonged to a local user with a previous `provider_id`; the live Firebase token was then confirmed as unverified.
+- Scope: Resolve a verified Firebase identity to the existing local user without creating duplicates or changing the stored provider link; preserve conflict behavior for unverified identities, clear stale sessions, show actionable verification guidance, and protect concurrent platform claims with a transaction.
 - Verification evidence:
-  - Focused tenancy, platform-claim, and post-login tests: `31 passed`.
-  - Full unit/integration suite: `73 files passed`, `601 tests passed`, `7 skipped`.
+  - Focused tenancy, platform-claim, authentication, and security tests: `7 files passed`, `68 tests passed`.
+  - Full unit/integration suite: `73 files passed`, `602 tests passed`, `7 skipped`.
   - Lint, TypeScript, and production build: passed; build generated `18/18` pages.
   - Migration CLI and read-only check now report all migrations through `0007_rate_limit_windows`.
+  - Commits `5daea22`, `6e586d4`, `28a4e75`, and `6bbdaab` pushed to `origin/main`; Vercel production deployment `ledger-harbour-oq9mplaas-andres-leo-san-s-projects.vercel.app` is `Ready`.
+  - Real QA: admin now receives the visible `Verify your email address before signing in.` guidance without a server exception; unauthenticated `/admin` and `/portfolio` redirect to `/login`; `/` loads; browser console errors and Vercel exceptions were absent in the final route check.
+- External acceptance gate: the supplied Firebase admin identity is not email-verified, and the supplied client credentials were rejected by Firebase before the server action. Verify the Firebase accounts and rerun the real-user acceptance check before changing this task to `desplegada`.
 - Rollback: revert the release commit and redeploy; no data rollback is required.
 
 ### LH-001: Fix date hydration in `/admin`
