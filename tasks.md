@@ -1,6 +1,6 @@
 # LedgerHarbour Development Tasks
 
-Updated: 2026-08-24
+Updated: 2026-08-26
 
 This file is the canonical source for development status. Specs and plans provide detail but do not override the state recorded here.
 
@@ -173,8 +173,9 @@ This file is the canonical source for development status. Specs and plans provid
   - Advanced QA: migration contract, rollback/reapply, tenant isolation, append-only audit behavior, and transaction rollback passed on native PostgreSQL. Load testing is not applicable to this one-shot migration gate and was explicitly excluded.
   - The temporary cluster was restricted to `127.0.0.1`, stopped after verification, and its exact validated directory under `%TEMP%` was removed (`temporary_cluster_removed=True`). No external or production database, Neon project, provider, credential, billing setting, deployment, or application data was accessed or changed.
   - Gap check: existing `graphify`, `pragmatic-path-selection`, `advanced-qa-strategy`, `self-critique-loop`, and `security-baseline` instructions covered the work; no capability gap entry was required.
-  - No commit was created. The adopted native test remains an intentional untracked working-tree file until the controller creates a separate commit.
-- Review gate: `aprobada`; implementation, native PostgreSQL execution, security correction, advanced QA, full sequential verification, build, audit, cleanup, and self-critique passed.
+  - At the time of the earlier verification, no commit was created; the adopted native test remained an intentional untracked working-tree file until the controller created a separate commit.
+  - Review gate: `aprobada`; implementation, native PostgreSQL execution, security correction, advanced QA, full sequential verification, build, audit, cleanup, and self-critique passed.
+ - Post-commit verification (2026-08-26): commit `9234ca0` (`test: add native PostgreSQL migration gate`) contains only `tests/integration/postgres/native-schema.test.ts`; `corepack pnpm test` -> `73` files passed, `2` skipped; `599` tests passed, `7` skipped; `corepack pnpm lint`, `corepack pnpm exec tsc --noEmit`, and `corepack pnpm build` passed with `18/18` static pages; `corepack pnpm audit --audit-level high --json` -> `0` vulnerabilities at every severity across `554` dependencies; `git diff --check` passed and the worktree is clean.
 
 ## P2: Operations And Documentation
 
