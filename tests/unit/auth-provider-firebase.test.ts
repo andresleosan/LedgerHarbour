@@ -61,6 +61,20 @@ describe("FirebaseAuthProvider", () => {
     await expect(provider.signInWithEmail({ email: "other@example.com", idToken: "id-token" })).rejects.toMatchObject({ code: "AUTH_PROVIDER_FAILURE" });
   });
 
+  it("rejects an unverified email login before creating a session cookie", async () => {
+    const { auth, sessions, sessionCookieCalls } = setup();
+    auth.verifyIdToken = async () => ({ ...decoded, email_verified: false });
+    const provider = new FirebaseAuthProvider({ auth, sessions });
+
+    await expect(provider.signInWithEmail({
+      email: "user@example.com",
+      idToken: "id-token",
+      requireVerified: true,
+    })).rejects.toMatchObject({ code: "AUTH_EMAIL_NOT_VERIFIED" });
+    await expect(sessions.get()).resolves.toBeNull();
+    expect(sessionCookieCalls).toHaveLength(0);
+  });
+
   it("loads and clears the Firebase session without using the development cookie", async () => {
     const { auth, sessions } = setup();
     const provider = new FirebaseAuthProvider({ auth, sessions });

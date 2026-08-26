@@ -11,6 +11,7 @@ export interface AuthIdentity {
 export interface EmailSignInInput {
   readonly email: string;
   readonly idToken?: string;
+  readonly requireVerified?: boolean;
 }
 
 export interface GoogleSignInInput {

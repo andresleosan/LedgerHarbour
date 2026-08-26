@@ -1,6 +1,7 @@
 export const AUTH_ERROR_CODES = {
   INVALID_EMAIL: "AUTH_INVALID_EMAIL",
   MISSING_IDENTITY: "AUTH_MISSING_IDENTITY",
+  EMAIL_NOT_VERIFIED: "AUTH_EMAIL_NOT_VERIFIED",
   DEVELOPMENT_MODE_REQUIRED: "AUTH_DEVELOPMENT_MODE_REQUIRED",
   PROVIDER_FAILURE: "AUTH_PROVIDER_FAILURE",
 } as const;
@@ -10,6 +11,7 @@ export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[keyof typeof AUTH_ERROR_CO
 const publicMessages: Record<AuthErrorCode, string> = {
   [AUTH_ERROR_CODES.INVALID_EMAIL]: "Enter a valid email address.",
   [AUTH_ERROR_CODES.MISSING_IDENTITY]: "We could not find an active identity.",
+  [AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED]: "Verify your email address before signing in.",
   [AUTH_ERROR_CODES.DEVELOPMENT_MODE_REQUIRED]: "Development authentication is unavailable.",
   [AUTH_ERROR_CODES.PROVIDER_FAILURE]: "Authentication is temporarily unavailable.",
 };

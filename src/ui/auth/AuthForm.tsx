@@ -24,7 +24,7 @@ import { navigateAfterSuccessfulLogin } from "./post-login-navigation";
 
 type AuthFormMode = "login" | "register";
 type Feedback = { type: "signedIn" | "created"; email: string } | null;
-type ErrorKey = "invalidEmail" | "missingIdentity" | "providerError" | "developmentUnavailable";
+type ErrorKey = "invalidEmail" | "missingIdentity" | "emailNotVerified" | "providerError" | "developmentUnavailable";
 
 interface AuthFormProps {
   mode: AuthFormMode;
@@ -106,6 +106,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
       const identity = await provider.signInWithEmail({
         email: firebaseCredential?.user.email ?? email,
         idToken: firebaseCredential ? await firebaseCredential.user.getIdToken() : undefined,
+        requireVerified: isFirebase && isLogin,
       });
 
       if (!identity) {
@@ -131,6 +132,8 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
           ? "invalidEmail"
           : authError.code === AUTH_ERROR_CODES.MISSING_IDENTITY
             ? "missingIdentity"
+          : authError.code === AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED
+            ? "emailNotVerified"
           : "providerError",
       );
     } finally {

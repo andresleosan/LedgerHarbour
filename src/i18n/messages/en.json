@@ -61,6 +61,7 @@
     "developmentUnavailable": "Development authentication is unavailable.",
     "invalidEmail": "Enter a valid email address.",
     "missingIdentity": "We could not find an active identity.",
+    "emailNotVerified": "Verify your email address before signing in.",
     "providerError": "Authentication is temporarily unavailable.",
     "login": {
       "eyebrow": "LedgerHarbour workspace",

@@ -61,6 +61,7 @@
     "developmentUnavailable": "La autenticación de desarrollo no está disponible.",
     "invalidEmail": "Introduce una dirección de correo válida.",
     "missingIdentity": "No encontramos una identidad activa.",
+    "emailNotVerified": "Verifica tu correo electrónico antes de iniciar sesión.",
     "providerError": "La autenticación no está disponible temporalmente.",
     "login": {
       "eyebrow": "Espacio de trabajo LedgerHarbour",

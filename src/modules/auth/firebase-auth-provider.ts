@@ -48,14 +48,18 @@ export class FirebaseAuthProvider implements AuthProvider {
   async signInWithEmail(input: EmailSignInInput): Promise<AuthIdentity> {
     const email = typeof input?.email === "string" ? input.email : undefined;
     const idToken = typeof input?.idToken === "string" ? input.idToken : undefined;
-    return this.signInWithToken(idToken, email);
+    return this.signInWithToken(idToken, email, input?.requireVerified === true);
   }
 
   async signInWithGoogle(input: GoogleSignInInput = {}): Promise<AuthIdentity> {
     return this.signInWithToken(typeof input?.idToken === "string" ? input.idToken : undefined);
   }
 
-  private async signInWithToken(idToken: string | undefined, expectedEmail?: string): Promise<AuthIdentity> {
+  private async signInWithToken(
+    idToken: string | undefined,
+    expectedEmail?: string,
+    requireVerified = false,
+  ): Promise<AuthIdentity> {
     try {
       if (typeof idToken !== "string" || !idToken.trim() || idToken.length > 8192) throw new Error("Invalid Firebase token");
       const decoded = await this.auth.verifyIdToken(idToken, true);
@@ -63,6 +67,9 @@ export class FirebaseAuthProvider implements AuthProvider {
         throw new Error("Firebase email mismatch");
       }
       const identity = identityFromToken(decoded);
+      if (requireVerified && !identity.emailVerified) {
+        throw new AuthError(AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED);
+      }
       const session = await this.auth.createSessionCookie(idToken, { expiresIn: FIREBASE_SESSION_MAX_AGE * 1000 });
       await this.sessions.set(session);
       return identity;
