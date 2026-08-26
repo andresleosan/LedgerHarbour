@@ -103,6 +103,10 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
       const firebaseCredential = isFirebase
         ? await signInWithFirebaseEmail(firebaseConfig!, email, password, !isLogin)
         : null;
+      if (isFirebase && isLogin && firebaseCredential && !firebaseCredential.user.emailVerified) {
+        await signOutFirebaseUser(firebaseConfig);
+        throw new AuthError(AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED);
+      }
       const identity = await provider.signInWithEmail({
         email: firebaseCredential?.user.email ?? email,
         idToken: firebaseCredential ? await firebaseCredential.user.getIdToken() : undefined,
