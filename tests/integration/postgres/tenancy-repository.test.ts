@@ -108,7 +108,42 @@ describe("PostgreSQL onboarding repository contract", () => {
     }
   }, 30_000);
 
-  it("enforces unique normalized emails across providers", async () => {
+  it("resolves a verified Firebase identity when the provider user id changed", async () => {
+    const { db, close } = await createTestDatabase();
+
+    try {
+      const repository = createPostgresOnboardingRepository(db);
+      const firstId = await repository.upsertUser({
+        provider: "firebase",
+        providerUserId: "normalized-email-first",
+        email: "normalized-email@example.com",
+        displayName: "First",
+        emailVerified: true,
+      });
+
+      await expect(repository.upsertUser({
+        provider: "firebase",
+        providerUserId: "normalized-email-second",
+        email: " NORMALIZED-EMAIL@EXAMPLE.COM ",
+        displayName: "Second",
+        emailVerified: true,
+      })).resolves.toBe(firstId);
+
+      const users = await db.execute<{ id: string; provider_id: string; display_name: string; verification_state: string }>(
+        sql`SELECT id, provider_id, display_name, verification_state FROM users`,
+      );
+      expect(users.rows).toEqual([{
+        id: firstId,
+        provider_id: "normalized-email-first",
+        display_name: "First",
+        verification_state: "verified",
+      }]);
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
+  it("rejects an unverified identity for an occupied normalized email", async () => {
     const { db, close } = await createTestDatabase();
 
     try {
@@ -126,7 +161,7 @@ describe("PostgreSQL onboarding repository contract", () => {
         providerUserId: "normalized-email-second",
         email: " NORMALIZED-EMAIL@EXAMPLE.COM ",
         displayName: "Second",
-        emailVerified: true,
+        emailVerified: false,
       })).rejects.toMatchObject({ code: ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT });
     } finally {
       await close();

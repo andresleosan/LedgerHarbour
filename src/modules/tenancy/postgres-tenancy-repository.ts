@@ -46,6 +46,8 @@ function isDomainError(error: unknown): error is Error & { code: string } {
     "CategoryError",
     "CurrencyError",
     "InvoiceError",
+    "PlatformError",
+    "ProjectError",
   ].includes(candidate.name) && typeof candidate.code === "string";
 }
 
@@ -157,26 +159,54 @@ function createRepository(db: Database, transactionCount: { value: number }): On
     },
 
     async upsertUser(identity: AuthIdentity): Promise<UserId> {
+      const normalized = normalizedEmail(identity.email);
+      const values = {
+        email: identity.email.trim(),
+        normalizedEmail: normalized,
+        displayName: identity.displayName.trim(),
+        verificationState: identity.emailVerified ? "verified" as const : "unverified" as const,
+        updatedAt: new Date(),
+      };
+      const canRelinkByVerifiedFirebaseEmail = identity.provider === "firebase" && identity.emailVerified;
+
       try {
-        const [row] = await db.insert(users).values({
-          id: randomUUID(),
-          providerId: identity.providerUserId,
-          email: identity.email.trim(),
-          normalizedEmail: normalizedEmail(identity.email),
-          displayName: identity.displayName.trim(),
-          verificationState: identity.emailVerified ? "verified" : "unverified",
-        }).onConflictDoUpdate({
-          target: users.providerId,
-          set: {
-            email: identity.email.trim(),
-            normalizedEmail: normalizedEmail(identity.email),
-            displayName: identity.displayName.trim(),
-            verificationState: identity.emailVerified ? "verified" : "unverified",
-            updatedAt: new Date(),
-          },
-        }).returning({ id: users.id });
-        if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
-        return id<UserId>(row.id);
+        const [providerUser] = await db.select({ id: users.id }).from(users)
+          .where(eq(users.providerId, identity.providerUserId)).limit(1);
+        if (providerUser) {
+          const [row] = await db.update(users).set(values).where(eq(users.id, providerUser.id)).returning({ id: users.id });
+          if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+          return id<UserId>(row.id);
+        }
+
+        if (canRelinkByVerifiedFirebaseEmail) {
+          const [emailUser] = await db.select({ id: users.id }).from(users)
+            .where(eq(users.normalizedEmail, normalized)).limit(1);
+          if (emailUser) {
+            return id<UserId>(emailUser.id);
+          }
+        }
+
+        const [created] = await db.insert(users).values({ id: randomUUID(), providerId: identity.providerUserId, ...values })
+          .onConflictDoNothing().returning({ id: users.id });
+        if (created) return id<UserId>(created.id);
+
+        const [concurrentProviderUser] = await db.select({ id: users.id }).from(users)
+          .where(eq(users.providerId, identity.providerUserId)).limit(1);
+        if (concurrentProviderUser) {
+          const [row] = await db.update(users).set(values).where(eq(users.id, concurrentProviderUser.id)).returning({ id: users.id });
+          if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+          return id<UserId>(row.id);
+        }
+
+        if (canRelinkByVerifiedFirebaseEmail) {
+          const [concurrentEmailUser] = await db.select({ id: users.id }).from(users)
+            .where(eq(users.normalizedEmail, normalized)).limit(1);
+          if (concurrentEmailUser) {
+            return id<UserId>(concurrentEmailUser.id);
+          }
+        }
+
+        throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
       } catch (error) {
         return preserveOrMap(error);
       }

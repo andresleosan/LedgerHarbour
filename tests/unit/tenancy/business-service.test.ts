@@ -62,7 +62,26 @@ describe("business onboarding service", () => {
     expect(first).not.toBe("provider-user");
   });
 
-  it("rejects a second provider for an occupied normalized email", async () => {
+  it("resolves a verified Firebase provider for an occupied normalized email", async () => {
+    const repository = createInMemoryOnboardingRepository();
+    const firstId = await repository.upsertUser({
+      provider: "firebase",
+      providerUserId: "provider-first",
+      email: "Owner@Example.com",
+      displayName: "First",
+      emailVerified: true,
+    });
+
+    await expect(repository.upsertUser({
+      provider: "firebase",
+      providerUserId: "provider-second",
+      email: " owner@example.com ",
+      displayName: "Second",
+      emailVerified: true,
+    })).resolves.toBe(firstId);
+  });
+
+  it("rejects an unverified provider for an occupied normalized email", async () => {
     const repository = createInMemoryOnboardingRepository();
     await repository.upsertUser({
       provider: "firebase",
@@ -77,7 +96,7 @@ describe("business onboarding service", () => {
       providerUserId: "provider-second",
       email: " owner@example.com ",
       displayName: "Second",
-      emailVerified: true,
+      emailVerified: false,
     })).rejects.toMatchObject({ code: ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT });
   });
 

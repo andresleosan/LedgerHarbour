@@ -144,7 +144,7 @@ function toPlatformAdministratorRecord(member: PlatformMember): PlatformAdminMem
   };
 }
 
-async function claimPlatformMemberForActor(
+async function claimPlatformMemberForActorInTransaction(
   actor: AuthIdentity,
   tenancy: OnboardingRepository,
   platform: PlatformRepository,
@@ -161,6 +161,19 @@ async function claimPlatformMemberForActor(
   const linkedMember = await platform.claimMemberByEmail(actor.email, userId);
   if (!linkedMember) throw new PlatformError(PLATFORM_ERROR_CODES.REPOSITORY_CONFLICT);
   return linkedMember;
+}
+
+async function claimPlatformMemberForActor(
+  actor: AuthIdentity,
+  tenancy: OnboardingRepository,
+  platform: PlatformRepository,
+): Promise<PlatformMember> {
+  if (platform.transaction) {
+    return platform.transaction((transactionPlatform) => tenancy.transaction((transactionTenancy) =>
+      claimPlatformMemberForActorInTransaction(actor, transactionTenancy, transactionPlatform)));
+  }
+  return tenancy.transaction((transactionTenancy) =>
+    claimPlatformMemberForActorInTransaction(actor, transactionTenancy, platform));
 }
 
 export function toPlatformBusinessDto(business: Business): PlatformBusinessDto {

@@ -225,7 +225,10 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
     const existing = this.userIdsByProvider.get(identity.providerUserId);
     const emailOwner = this.userIdsByNormalizedEmail.get(normalizedEmail);
     if (emailOwner && emailOwner !== existing) {
-      throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+      if (identity.provider !== "firebase" || !identity.emailVerified) {
+        throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+      }
+      return emailOwner;
     }
     if (existing) {
       const previousEmail = this.normalizedEmailsByProvider.get(identity.providerUserId);

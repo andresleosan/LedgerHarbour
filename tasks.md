@@ -22,6 +22,7 @@ This file is the canonical source for development status. Specs and plans provid
 | LH-002 | P0 | aprobada | Fail E2E on browser console errors | All users | 4.00 |
 | LH-003 | P1 | aprobada | Add safe production verification for an ordinary user | Platform operator | 4.25 |
 | LH-009 | P1 | aprobada | Close the disposable native PostgreSQL migration gate | Engineering team | 4.25 |
+| LH-010 | P0 | revision | Recover verified Firebase identities after provider recreation | Authenticated users | 4.75 |
 | LH-005 | P2 | aprobada | Verify provider alerts and limits | Platform operator | 4.25 |
 | LH-004 | P2 | aprobada | Update repository production-status documentation | Engineering team | 3.75 |
 | LH-006 | P2 | aprobada | Remove the Playwright `allowedDevOrigins` warning | Engineering team | 3.50 |
@@ -29,6 +30,20 @@ This file is the canonical source for development status. Specs and plans provid
 | LH-008 | P3 | aprobada | Add manual service-expiration dry-run | Platform operator | 3.50 |
 
 ## P0: Production Risks
+
+### LH-010: Recover verified Firebase identities after provider recreation
+
+- Priority: `P0`
+- State: `revision`
+- Primary user: Authenticated users
+- Why now: Production login reached `/auth/continue` but PostgreSQL rejected a verified Firebase identity whose email already belonged to a local user with a previous `provider_id`.
+- Scope: Resolve a verified Firebase identity to the existing local user without creating duplicates or changing the stored provider link; preserve conflict behavior for unverified identities and protect concurrent platform claims with a transaction.
+- Verification evidence:
+  - Focused tenancy, platform-claim, and post-login tests: `31 passed`.
+  - Full unit/integration suite: `73 files passed`, `601 tests passed`, `7 skipped`.
+  - Lint, TypeScript, and production build: passed; build generated `18/18` pages.
+  - Migration CLI and read-only check now report all migrations through `0007_rate_limit_windows`.
+- Rollback: revert the release commit and redeploy; no data rollback is required.
 
 ### LH-001: Fix date hydration in `/admin`
 
