@@ -65,6 +65,7 @@ describe("FirebaseAuthProvider", () => {
     const { auth, sessions, sessionCookieCalls } = setup();
     auth.verifyIdToken = async () => ({ ...decoded, email_verified: false });
     const provider = new FirebaseAuthProvider({ auth, sessions });
+    await sessions.set("stale-session-cookie");
 
     await expect(provider.signInWithEmail({
       email: "user@example.com",

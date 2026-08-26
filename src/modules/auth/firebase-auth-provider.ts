@@ -68,6 +68,7 @@ export class FirebaseAuthProvider implements AuthProvider {
       }
       const identity = identityFromToken(decoded);
       if (requireVerified && !identity.emailVerified) {
+        await this.sessions.clear();
         throw new AuthError(AUTH_ERROR_CODES.EMAIL_NOT_VERIFIED);
       }
       const session = await this.auth.createSessionCookie(idToken, { expiresIn: FIREBASE_SESSION_MAX_AGE * 1000 });
