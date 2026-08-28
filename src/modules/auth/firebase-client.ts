@@ -29,6 +29,7 @@ const googleRedirectResults = new Map<string, Promise<UserCredential | null>>();
 export interface FirebaseGoogleCredential {
   readonly user: {
     readonly email?: string | null;
+    readonly emailVerified?: boolean;
     getIdToken(): Promise<string>;
   };
 }
@@ -43,6 +44,7 @@ function deterministicCredential(email: string): FirebaseGoogleCredential {
   return {
     user: {
       email: normalized,
+      emailVerified: true,
       getIdToken: async () => testToken(normalized),
     },
   };

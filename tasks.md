@@ -22,7 +22,7 @@ This file is the canonical source for development status. Specs and plans provid
 | LH-002 | P0 | aprobada | Fail E2E on browser console errors | All users | 4.00 |
 | LH-003 | P1 | aprobada | Add safe production verification for an ordinary user | Platform operator | 4.25 |
 | LH-009 | P1 | aprobada | Close the disposable native PostgreSQL migration gate | Engineering team | 4.25 |
-| LH-010 | P0 | revision | Recover verified Firebase identities after provider recreation | Authenticated users | 4.75 |
+| LH-010 | P0 | aprobada | Recover verified Firebase identities after provider recreation | Authenticated users | 4.75 |
 | LH-005 | P2 | aprobada | Verify provider alerts and limits | Platform operator | 4.25 |
 | LH-004 | P2 | aprobada | Update repository production-status documentation | Engineering team | 3.75 |
 | LH-006 | P2 | aprobada | Remove the Playwright `allowedDevOrigins` warning | Engineering team | 3.50 |
@@ -45,7 +45,12 @@ This file is the canonical source for development status. Specs and plans provid
   - Migration CLI and read-only check now report all migrations through `0007_rate_limit_windows`.
   - Commits `5daea22`, `6e586d4`, `28a4e75`, and `6bbdaab` pushed to `origin/main`; Vercel production deployment `ledger-harbour-oq9mplaas-andres-leo-san-s-projects.vercel.app` is `Ready`.
   - Real QA: admin now receives the visible `Verify your email address before signing in.` guidance without a server exception; unauthenticated `/admin` and `/portfolio` redirect to `/login`; `/` loads; browser console errors and Vercel exceptions were absent in the final route check.
-- External acceptance gate: the supplied Firebase admin identity is not email-verified, and the supplied client credentials were rejected by Firebase before the server action. Verify the Firebase accounts and rerun the real-user acceptance check before changing this task to `desplegada`.
+  - Local E2E QA rerun after correcting the deterministic Firebase client credential: `corepack pnpm exec playwright test --config=playwright.qa.local.config.ts` with the test-only environment and local Chrome -> `42 tests passed` in `4.2m`; authentication, onboarding, tenancy, documents, invoices, platform, mobile/locale flows, and browser diagnostics passed.
+  - Read-only Firebase console review (2026-08-27): project `LedgerHarbour` (`ledgerharbour`) is accessible; Email/Password and Google providers are enabled; four authentication identities are present. No account, permission, provider, or credential was changed.
+  - Real Chrome acceptance (2026-08-27): an authorized Google identity completed Firebase login and reached `/admin?locale=en`; `/admin/administrators` loaded; browser error logs remained empty; sign-out returned to `/login`; unauthenticated `/auth/continue?locale=en` returned to `/login?locale=en`. No administrative mutation was executed.
+  - Authorized Firebase Admin repair (2026-08-27): the synthetic identity `admin@admin.com` changed from `emailVerified: false` to `emailVerified: true`; the temporary service-account key was deleted in Google Cloud and the downloaded JSON was removed locally. No other account, permission, provider, or credential was changed.
+  - Real email/password acceptance (2026-08-28): after the user entered the synthetic account credentials directly in Chrome, production reached `/onboarding?locale=en`; `/auth/continue?locale=en` redirected to the same onboarding destination; the sign-out control was visible and browser error logs remained empty. The password was not read or recorded.
+- External acceptance gate: satisfied for the real sign-in flow. Keep this task in `aprobada`; deployment status remains unchanged and no production deployment was performed in this turn.
 - Rollback: revert the release commit and redeploy; no data rollback is required.
 
 ### LH-001: Fix date hydration in `/admin`

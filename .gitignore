@@ -9,6 +9,7 @@ storage/
 private-storage/
 test-results/
 playwright-report/
+qa/reports/
 coverage/
 *.tsbuildinfo
 .superpowers/
