@@ -34,7 +34,7 @@ This file is the canonical source for development status. Specs and plans provid
 ### LH-010: Recover verified Firebase identities after provider recreation
 
 - Priority: `P0`
-- State: `revision`
+- State: `aprobada`
 - Primary user: Authenticated users
 - Why now: Production login reached `/auth/continue` and PostgreSQL rejected an identity whose email already belonged to a local user with a previous `provider_id`; the live Firebase token was then confirmed as unverified.
 - Scope: Resolve a verified Firebase identity to the existing local user without creating duplicates or changing the stored provider link; preserve conflict behavior for unverified identities, clear stale sessions, show actionable verification guidance, and protect concurrent platform claims with a transaction.
