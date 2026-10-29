@@ -19,6 +19,7 @@ overrides:
   js-yaml@>=4 <5: 4.3.2
   nanoid@>=3 <4: 3.3.20
   vitest@>=4 <5: 4.1.12
+  re2js@>=2 <3: 2.8.7
 
 importers:
 
@@ -2391,9 +2392,9 @@ packages:
     resolution: {integrity: sha512-vYt7UD1U9Wg6138shLtLOvdAu+8DsC/ilFtEVHcH+wydcSpNE20AfSOduf6MkRFahL5FY7X1oU7nKVZFtfq8Fg==}
     engines: {node: '>=6'}
 
-  re2js@2.8.6:
-    resolution: {integrity: sha512-xLgQil4kIUCrAzVk9fRSkxkFNwmygLFjVxXrLc65aE1F0+Zsb8rxumFBy4XKyvgMCTL6kilDq3EZ0piE2dP/Dg==}
-    engines: {node: '>=18.0.0'}
+  re2js@2.8.7:
+    resolution: {integrity: sha512-bRSL/vn3KAmlGfGNoVpcsBXLaVvl6AbuvMMWbz0m3vBj60nj+p2/biozfBUOSBP+5XTduF6mr6IO/ZVjmqqkVQ==}
+    engines: {node: '>=20.0.0'}
 
   react-dom@19.3.1:
     resolution: {integrity: sha512-Y0bARz53lhEC1NMCASs0/j+faB/zqt3R8hpvg1e8+61ZVJ4UL0UdC4cBbXfZMcIuhrfgeILTLe+ZeBCavQPtKQ==}
@@ -3220,7 +3221,7 @@ snapshots:
       '@firebase/webchannel-wrapper': 1.0.6
       '@grpc/grpc-js': 1.14.5
       '@grpc/proto-loader': 0.7.15
-      re2js: 2.8.6
+      re2js: 2.8.7
       tslib: 2.8.1
 
   '@firebase/functions-compat@0.4.6(@firebase/app-compat@0.5.16)(@firebase/app@0.16.0)':
@@ -5100,7 +5101,7 @@ snapshots:
 
   punycode@2.3.1: {}
 
-  re2js@2.8.6: {}
+  re2js@2.8.7: {}
 
   react-dom@19.3.1(react@19.3.1):
     dependencies:
