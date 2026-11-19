@@ -339,6 +339,7 @@ export default function MovementsPage({ params }: { params: Promise<{ businessId
           <p className="page-eyebrow">{copy.eyebrow}</p>
           <h1 className="page-title" id="movements-title">{copy.title}</h1>
           <p className="page-description">{copy.description}</p>
+          <Link className="money-link" href={hrefFor(`/business/${businessId}/movements/import`)}>{messages[locale].statementImport.link}</Link>
           {readOnly && <p className="page-empty">{copy.readOnly}</p>}
           {loadError && <p className="page-error" role="alert">{loadError}</p>}
           {loaded && !ready && <p className="page-empty">{copy.notReady} <Link className="money-link" href={hrefFor(`/business/${businessId}/settings/accounts`)}>{copy.notReadyLink}</Link></p>}
