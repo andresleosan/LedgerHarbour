@@ -118,6 +118,17 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .upload-drop { display: grid; gap: 12px; margin-top: 24px; padding: 22px; border: 2px dashed #8db6b0; border-radius: 14px; background: #f5fbf8; }
          .upload-hint { margin: 0; font-size: .88rem; }
          .upload-drop button { justify-self: start; }
+         .upload-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+         .upload-actions button { flex: 1 1 160px; }
+         .upload-queue { display: grid; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; }
+         .upload-item { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--lh-border); border-radius: 12px; background: var(--lh-surface); }
+         .upload-thumb { display: grid; place-items: center; width: 56px; height: 56px; border: 1px solid var(--lh-border); border-radius: 8px; object-fit: cover; background: #edf7f3; color: var(--lh-muted); font-size: .78rem; font-weight: 800; }
+         .upload-item-body { display: grid; gap: 6px; min-width: 0; }
+         .upload-item-body p { margin: 0; }
+         .upload-name { color: var(--lh-navy); font-weight: 800; overflow-wrap: anywhere; }
+         .upload-item progress { width: 100%; height: 8px; accent-color: var(--lh-teal); }
+         .upload-links { display: flex; flex-wrap: wrap; gap: 0 16px; }
+         .upload-links a { display: inline-flex; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
          .invoice-shell { max-width: 1040px; }
          .invoice-hero { display: flex; justify-content: space-between; gap: 24px; align-items: flex-end; margin-bottom: 22px; padding: 28px; border-radius: 16px; background: var(--lh-navy); color: #fff; }
          .invoice-hero .page-eyebrow { color: #a8d5c9; }

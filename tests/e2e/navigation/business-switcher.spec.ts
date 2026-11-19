@@ -77,10 +77,9 @@ test("authenticates, switches authorized businesses, preserves locale, and keeps
     await route.fulfill({ json: {} });
   });
   await page.goto(`/business/${secondId}/upload?locale=es&source=review`);
-  await page.locator("#invoice-file").setInputFiles({ name: "invoice.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7") });
-  await page.getByRole("button", { name: "Subir documento" }).click();
-  await expect(page.getByRole("status")).toContainText("uploaded");
-  await page.getByRole("button", { name: "Procesar con OCR" }).click();
+  await page.locator('input[type="file"][multiple]').setInputFiles({ name: "invoice.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.7") });
+  await expect(page.getByRole("status")).toContainText("Lista para revisar");
+  await page.getByRole("link", { name: "Revisar facturas" }).click();
   await expect(page).toHaveURL(`/business/${secondId}/invoices?locale=es&source=review`);
   await expect(page.getByRole("navigation", { name: "Configuración financiera" })).toBeVisible();
   await page.locator(".page-back").focus();
