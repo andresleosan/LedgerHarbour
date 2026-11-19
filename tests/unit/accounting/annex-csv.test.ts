@@ -19,7 +19,7 @@ function emptyAnnex(): YearAnnex {
 }
 
 const invoice = (fields: Partial<YearAnnex["unpaidInvoices"][number]>) => ({
-  id: "invoice" as InvoiceId, supplier: "Supplier", invoiceNumber: "INV-1", invoiceDate: "2026-05-01", total: "10.00", currency: "GBP", undated: false, ...fields,
+  id: "invoice" as InvoiceId, supplier: "Supplier", invoiceNumber: "INV-1", invoiceDate: "2026-05-01", total: "10.00", currency: "GBP", kind: "invoice" as const, undated: false, ...fields,
 });
 const asset = (fields: Partial<YearAnnex["assetPurchases"][number]>) => ({
   movementId: "movement", date: "2026-06-01", narrative: "Laptop", amount: "900.00", headingName: "Equipment", accountName: "Main bank", ...fields,
@@ -114,6 +114,17 @@ describe("closing annex CSV", () => {
     const [unpaid] = rows.filter((r) => r[0] === "Unpaid at year end");
     const [purchase] = rows.filter((r) => r[0] === "Fixed asset purchases");
     for (const cell of [unpaid[2], unpaid[3], unpaid[6], purchase[2], purchase[3], purchase[4]]) expect(cell).toBe(`'${hostile}`);
+  });
+
+  it("marks a credit note in the detail and writes its negative amount as a plain number", () => {
+    const annex = emptyAnnex();
+    annex.unpaidInvoices = [invoice({ supplier: "Refunder", total: "-12.30", kind: "credit_note" }), invoice({ supplier: "Undated refunder", invoiceDate: null, undated: true, total: "-1.00", kind: "credit_note" })];
+    annex.totals.unpaidInvoices = { count: 2, byCurrency: [{ currency: "GBP", count: 2, amount: "-13.30" }] };
+    const csv = annexCsv(annex);
+    expect(csv).toContain("\r\nUnpaid at year end,2026-05-01,Refunder,INV-1,Credit note,-12.30,GBP\r\n");
+    expect(csv).toContain("\r\nUnpaid at year end,,Undated refunder,INV-1,Credit note; Undated,-1.00,GBP\r\n");
+    expect(csv).toContain("\r\nUnpaid at year end,,Total,,2 items,-13.30,GBP\r\n");
+    expect(csv).not.toContain("'-");
   });
 
   it("never prefixes the amount column, even when negative", () => {

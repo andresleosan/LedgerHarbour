@@ -15,6 +15,8 @@ import { listFinancialYears, listMoneyAccounts, listMovements, type MoneyDepende
 export type AnnexDependencies = MoneyDependencies & InvoiceDependencies;
 
 export interface AnnexInvoice extends InvoiceCreditorItem {
+  /** Negative for a credit note: the supplier owes the business. */
+  total: string | null;
   undated: boolean;
 }
 
@@ -51,7 +53,7 @@ export async function buildYearAnnex(businessId: BusinessId, yearId: string, act
 
   const invoices = (items: InvoiceCreditorItem[], keep: (date: string) => boolean): AnnexInvoice[] => items
     .filter((item) => item.invoiceDate === null || keep(item.invoiceDate))
-    .map((item) => ({ ...item, total: item.total === null ? null : formatPence(parsePounds(item.total)), undated: item.invoiceDate === null }))
+    .map((item) => ({ ...item, total: item.total === null ? null : formatPence((item.kind === "credit_note" ? -1 : 1) * parsePounds(item.total)), undated: item.invoiceDate === null }))
     .sort((left, right) => Number(left.undated) - Number(right.undated) || (left.invoiceDate ?? "").localeCompare(right.invoiceDate ?? "") || (left.supplier ?? "").localeCompare(right.supplier ?? "") || left.id.localeCompare(right.id));
   const unpaidInvoices = invoices(await listUnpaidInvoices(businessId, actor, dependencies), (date) => date <= year.endDate);
   const privatelyPaidInvoices = invoices(await listPrivatelyPaidInvoices(businessId, actor, dependencies), (date) => year.startDate <= date && date <= year.endDate);

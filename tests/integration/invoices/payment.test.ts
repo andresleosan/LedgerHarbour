@@ -162,8 +162,8 @@ describe("paying an approved invoice", () => {
       await approveInvoice(privately.id, owner, dependencies, { status: "paid_privately" });
 
       expect([...money.movements.values()]).toEqual([]);
-      await expect(listUnpaidInvoices(businessId, owner, dependencies)).resolves.toEqual([{ id: unpaid.id, supplier: "Builder Ltd", invoiceNumber: "B-1", invoiceDate: "2026-08-11", total: "120.00", currency: "GBP" }]);
-      await expect(listPrivatelyPaidInvoices(businessId, owner, dependencies)).resolves.toEqual([{ id: privately.id, supplier: "Acme Ltd", invoiceNumber: "INV-private", invoiceDate: "2026-08-11", total: "120.00", currency: "GBP" }]);
+      await expect(listUnpaidInvoices(businessId, owner, dependencies)).resolves.toEqual([{ id: unpaid.id, supplier: "Builder Ltd", invoiceNumber: "B-1", invoiceDate: "2026-08-11", total: "120.00", currency: "GBP", kind: "invoice" }]);
+      await expect(listPrivatelyPaidInvoices(businessId, owner, dependencies)).resolves.toEqual([{ id: privately.id, supplier: "Acme Ltd", invoiceNumber: "INV-private", invoiceDate: "2026-08-11", total: "120.00", currency: "GBP", kind: "invoice" }]);
       expect((await listUnpaidInvoices(businessId, owner, dependencies)).map((item) => item.id)).not.toContain(draft.id);
     });
 

@@ -18,6 +18,7 @@ import {
   writeInvoiceMovements,
   type Invoice,
   type InvoiceDependencies,
+  type InvoiceKind,
   type InvoiceTransactionDependencies,
   type PaymentStatus,
 } from "./invoice-service";
@@ -32,6 +33,8 @@ export interface InvoiceCreditorItem {
   invoiceDate: string | null;
   total: string | null;
   currency: string | null;
+  /** A credit note is money the supplier owes the business. */
+  kind: InvoiceKind;
 }
 
 function resolve(input: InvoiceDependencies): InvoiceTransactionDependencies {
@@ -119,7 +122,7 @@ async function listByPaymentStatus(businessId: BusinessId, status: PaymentStatus
   return (await resolved.invoices.listByBusinessId(businessId))
     .filter((invoice) => invoice.reviewState === "approved" && !invoice.voidedAt && invoice.paymentStatus === status)
     .sort((left, right) => (left.invoiceDate ?? "").localeCompare(right.invoiceDate ?? "") || left.id.localeCompare(right.id))
-    .map((invoice) => ({ id: invoice.id, supplier: invoice.supplier, invoiceNumber: invoice.invoiceNumber, invoiceDate: invoice.invoiceDate, total: invoice.total, currency: invoice.currencyReference }));
+    .map((invoice) => ({ id: invoice.id, supplier: invoice.supplier, invoiceNumber: invoice.invoiceNumber, invoiceDate: invoice.invoiceDate, total: invoice.total, currency: invoice.currencyReference, kind: invoice.kind ?? "invoice" }));
 }
 
 /** Approved invoices not paid yet: the year-end creditors. */

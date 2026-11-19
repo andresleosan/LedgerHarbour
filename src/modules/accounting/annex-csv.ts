@@ -19,7 +19,7 @@ const line = (section: string, row: Row) =>
   [...[section, ...row.cells].map(text), row.amount === null ? "" : formatPence(parsePounds(row.amount)), text(row.currency)].join(",");
 
 const invoiceRows = (items: AnnexInvoice[]): Row[] => items.map((i) => ({
-  cells: [i.invoiceDate ?? "", i.supplier ?? "", i.invoiceNumber ?? "", i.undated ? "Undated" : ""], amount: i.total, currency: i.currency ?? "",
+  cells: [i.invoiceDate ?? "", i.supplier ?? "", i.invoiceNumber ?? "", [i.kind === "credit_note" && "Credit note", i.undated && "Undated"].filter(Boolean).join("; ")], amount: i.total, currency: i.currency ?? "",
 }));
 const assetRows = (items: AnnexAssetLine[]): Row[] => items.map((a) => ({ cells: [a.date, a.narrative, a.accountName, a.headingName], amount: a.amount, currency: "GBP" }));
 /** One row per currency; an empty section still gets a zero total. */

@@ -124,7 +124,7 @@ describe("invoice payment isolation through the route handlers", () => {
     mockedIdentity.mockResolvedValue(ownerA);
     expect(await result(await paymentPatch(json("PATCH", paidFrom(b.bank.id)), params(a.approved.id)))).toMatchObject({ status: 400, body: { error: { code: "MONEY_ACCOUNT_NOT_FOUND" } } });
     expect(await result(await reviewPatch(json("PATCH", { action: "approve", payment: paidFrom(b.bank.id) }), params(a.draft.id)))).toMatchObject({ status: 400, body: { error: { code: "MONEY_ACCOUNT_NOT_FOUND" } } });
-    expect(await result(await unpaidGet(new Request("http://localhost/api"), { params: Promise.resolve({ businessId: a.business.id }) }))).toEqual({ status: 200, body: { unpaid: [{ id: a.approved.id, supplier: "Shared Supplier", invoiceNumber: a.approved.id, invoiceDate: "2026-08-11", total: "50.00", currency: "GBP" }], paidPrivately: [] } });
+    expect(await result(await unpaidGet(new Request("http://localhost/api"), { params: Promise.resolve({ businessId: a.business.id }) }))).toEqual({ status: 200, body: { unpaid: [{ id: a.approved.id, supplier: "Shared Supplier", invoiceNumber: a.approved.id, invoiceDate: "2026-08-11", total: "50.00", currency: "GBP", kind: "invoice" }], paidPrivately: [] } });
 
     expect(await result(await paymentPatch(json("PATCH", paidFrom(a.bank.id)), params(a.approved.id)))).toMatchObject({ status: 200, body: { paymentStatus: "paid", paidAccountId: a.bank.id } });
     await expect(stores.money.listInvoiceMovements(a.business.id, a.approved.id)).resolves.toHaveLength(1);

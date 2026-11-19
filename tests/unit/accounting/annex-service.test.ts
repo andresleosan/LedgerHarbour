@@ -69,7 +69,7 @@ describe("closing annex", () => {
 
     expect(annex.year).toEqual({ id: f.year.id, startDate: "2026-04-06", endDate: "2027-04-05" });
     expect(annex.unpaidInvoices.map((i) => i.id)).toEqual([earlier.id, sameDayA.id, sameDayB.id, lastDay.id, undated.id]);
-    expect(annex.unpaidInvoices[0]).toEqual({ id: earlier.id, supplier: "Older year", invoiceNumber: earlier.invoiceNumber, invoiceDate: "2025-11-30", total: "7.50", currency: "GBP", undated: false });
+    expect(annex.unpaidInvoices[0]).toEqual({ id: earlier.id, supplier: "Older year", invoiceNumber: earlier.invoiceNumber, invoiceDate: "2025-11-30", total: "7.50", currency: "GBP", kind: "invoice", undated: false });
     expect(annex.unpaidInvoices.at(-1)).toMatchObject({ invoiceDate: null, undated: true });
     expect(annex.totals.unpaidInvoices).toEqual({ count: 5, byCurrency: [{ currency: "GBP", count: 5, amount: "207.50" }] });
   });
@@ -103,6 +103,27 @@ describe("closing annex", () => {
 
     expect(totals.unpaidInvoices).toEqual({ count: 3, byCurrency: [{ currency: "EUR", count: 1, amount: "5.50" }, { currency: "GBP", count: 2, amount: "10.01" }] });
     expect(totals.privatelyPaidInvoices).toEqual({ count: 2, byCurrency: [{ currency: "GBP", count: 1, amount: "0.01" }, { currency: "USD", count: 1, amount: "99.99" }] });
+  });
+
+  it("shows a credit note as a negative line and nets it against invoices of the same currency only", async () => {
+    const f = await fixture();
+    const invoice = await f.invoice({ supplier: "Builder", total: "120.00" });
+    const credit = await f.invoice({ supplier: "Builder", total: "20.30", kind: "credit_note", invoiceDate: "2026-08-12" });
+    await f.invoice({ supplier: "Euro credit", total: "12.30", kind: "credit_note", currencyReference: "EUR" });
+    await f.invoice({ supplier: "After year end", total: "99.00", kind: "credit_note", invoiceDate: "2027-04-06" });
+    const lastDay = await f.invoice({ supplier: "Last day credit", total: "1.00", kind: "credit_note", invoiceDate: "2027-04-05" });
+    const privateCredit = await f.invoice({ supplier: "Private credit", total: "5.00", kind: "credit_note", paymentStatus: "paid_privately" });
+    await f.invoice({ supplier: "Private credit before", total: "5.00", kind: "credit_note", paymentStatus: "paid_privately", invoiceDate: "2026-04-05" });
+
+    const annex = await buildYearAnnex(f.business.id, f.year.id, owner, f.dependencies);
+
+    expect(annex.unpaidInvoices.find((i) => i.id === invoice.id)).toMatchObject({ kind: "invoice", total: "120.00" });
+    expect(annex.unpaidInvoices.find((i) => i.id === credit.id)).toMatchObject({ kind: "credit_note", total: "-20.30" });
+    expect(annex.unpaidInvoices.find((i) => i.id === lastDay.id)).toMatchObject({ kind: "credit_note", total: "-1.00" });
+    expect(annex.unpaidInvoices).toHaveLength(4);
+    expect(annex.totals.unpaidInvoices).toEqual({ count: 4, byCurrency: [{ currency: "EUR", count: 1, amount: "-12.30" }, { currency: "GBP", count: 3, amount: "98.70" }] });
+    expect(annex.privatelyPaidInvoices).toEqual([expect.objectContaining({ id: privateCredit.id, kind: "credit_note", total: "-5.00" })]);
+    expect(annex.totals.privatelyPaidInvoices).toEqual({ count: 1, byCurrency: [{ currency: "GBP", count: 1, amount: "-5.00" }] });
   });
 
   it("lists money out on asset headings as purchases and money in as receipts, never netted", async () => {
