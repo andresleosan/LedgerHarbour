@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getPersistenceContext } from "../persistence/repository-factory";
+import { ExportError } from "./export-service";
 import { MONEY_ERROR_CODES, MoneyError, type MoneyErrorCode } from "./money-repository";
 import type { MoneyDependencies } from "./money-service";
 
@@ -53,4 +54,10 @@ export function moneyDependencies(): MoneyDependencies {
     headings: persistence.headingRepository,
     templates: persistence.templateRepository,
   };
+}
+
+/** The export routes: a failed read-back is a server error; the rest maps like the money routes. */
+export function exportErrorResponse(error: unknown): NextResponse {
+  if (error instanceof ExportError) return NextResponse.json({ error: { code: error.code, message: error.message } }, { status: 500 });
+  return moneyErrorResponse(error);
 }

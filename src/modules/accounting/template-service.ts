@@ -282,3 +282,24 @@ export async function getTemplate(businessId: BusinessId, actor: OnboardingActor
     throw mapBoundaryError(error);
   }
 }
+
+/** The business's current template row and its file from private storage; null before any upload. */
+export async function getTemplateFile(businessId: BusinessId, actor: OnboardingActor, dependencies: TemplateDependencies = {}): Promise<{ template: BusinessTemplate; data: Uint8Array } | null> {
+  const tenancy = dependencies.tenancyRepository ?? defaultOnboardingRepository;
+  const templates = dependencies.templates ?? resolveDefaultTemplateRepository();
+  const storage = dependencies.storage ?? resolveDefaultStorage();
+  const actorId = await resolveOnboardingActor(tenancy, actor);
+  const id = await authorize(businessId, actorId, tenancy, "read_finance");
+  let template: BusinessTemplate | null;
+  try {
+    template = await templates.findByBusinessId(id);
+  } catch (error) {
+    throw mapBoundaryError(error);
+  }
+  if (!template) return null;
+  try {
+    return { template, data: new Uint8Array(await new Response(await storage.get(template.privateObjectKey)).arrayBuffer()) };
+  } catch {
+    throw new TemplateError(TEMPLATE_ERROR_CODES.TEMPLATE_STORAGE_FAILURE);
+  }
+}

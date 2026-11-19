@@ -80,3 +80,28 @@ export function zip(entries: ZipEntry[]): Buffer {
   end.writeUInt32LE(offset, 16);
   return Buffer.concat([...locals, directoryBytes, end]);
 }
+
+/** Entries as stored: name, method, CRC and the compressed bytes, in archive order. */
+export function rawEntries(bytes: Buffer): Array<{ name: string; method: number; crc: number; compressed: Buffer; data: Buffer }> {
+  let end = bytes.length - 22;
+  while (end >= 0 && bytes.readUInt32LE(end) !== 0x06054b50) end--;
+  const count = bytes.readUInt16LE(end + 10);
+  let p = bytes.readUInt32LE(end + 16);
+  const entries = [];
+  for (let i = 0; i < count; i++) {
+    const method = bytes.readUInt16LE(p + 10);
+    const nameLength = bytes.readUInt16LE(p + 28);
+    const local = bytes.readUInt32LE(p + 42);
+    const start = local + 30 + bytes.readUInt16LE(local + 26) + bytes.readUInt16LE(local + 28);
+    const compressed = bytes.subarray(start, start + bytes.readUInt32LE(p + 20));
+    entries.push({
+      name: bytes.toString("utf8", p + 46, p + 46 + nameLength),
+      method,
+      crc: bytes.readUInt32LE(p + 16),
+      compressed,
+      data: method === 8 ? inflateRawSync(compressed) : Buffer.from(compressed),
+    });
+    p += 46 + nameLength + bytes.readUInt16LE(p + 30) + bytes.readUInt16LE(p + 32);
+  }
+  return entries;
+}

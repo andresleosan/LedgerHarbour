@@ -67,6 +67,10 @@ export interface SyntheticTemplateOptions {
   dataRows?: number;
   /** More account sheets like the cash one, named "Account 1", "Account 2"… (for size tests). */
   extraAccountSheets?: number;
+  /** Sample rows typed into the input cells of every account sheet's first data rows, as templates arrive. */
+  sampleRows?: number;
+  /** The date column's data cells have no date number format. */
+  plainDateColumn?: boolean;
 }
 
 const blockLabels: Record<Exclude<HeadingGroup, "cost_of_sales">, string> = {
@@ -143,7 +147,13 @@ export async function buildSyntheticTemplate(options: SyntheticTemplateOptions =
     const master = `${col(masterColumn)}${firstDataRow}`;
     for (let r = firstDataRow; r <= last; r++) {
       ws.getCell(r, columns.balance).value = { formula: `+${col(columns.balance)}${r - 1}+${col(columns.amount)}${r}` };
-      ws.getCell(r, columns.date).numFmt = "dd/mm/yyyy";
+      if (!options.plainDateColumn) ws.getCell(r, columns.date).numFmt = "dd/mm/yyyy";
+      if (r - firstDataRow < (options.sampleRows ?? 0)) {
+        ws.getCell(r, columns.date).value = new Date(Date.UTC(2020, 0, 1 + r));
+        ws.getCell(r, columns.narrative).value = `Sample line ${r}`;
+        ws.getCell(r, columns.code).value = "Sales";
+        ws.getCell(r, columns.amount).value = 9.99;
+      }
       ws.getCell(r, columns.amount).numFmt = "#,##0.00";
       ws.getCell(r, columns.code).dataValidation = {
         type: "list",
