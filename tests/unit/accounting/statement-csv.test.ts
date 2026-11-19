@@ -161,6 +161,14 @@ describe("statement CSV: amounts", () => {
 
   it("refuses an empty single amount", () => expect(one("")).toBe("MISSING_AMOUNT"));
 
+  it("refuses an oversized amount cell without backtracking over it", () => {
+    const started = Date.now();
+    expect(one(`1${" ".repeat(200_000)}X`)).toBe("INVALID_AMOUNT");
+    expect(one(`${"1".repeat(65)} CR`)).toBe("INVALID_AMOUNT");
+    // A regression is quadratic: tens of seconds for this one cell.
+    expect(Date.now() - started).toBeLessThan(2_000);
+  });
+
   it("skips zero amounts", () => {
     expect(one("0")).toBe("skipped");
     expect(pence("-0.00").skipped.zero).toBe(1);

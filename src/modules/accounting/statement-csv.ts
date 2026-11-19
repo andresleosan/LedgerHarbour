@@ -61,6 +61,7 @@ const NAMED_DATE = /^(\d{1,2})[ -]([A-Za-z]{3,9})[ -](\d{4})$/;
 const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
 const FULL_MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
 // Optional sign before or after "£" (not both), UK thousands grouping, 0–2 decimals, at most 12 integer digits.
+const MAX_VALUE_CELL = 64;
 const AMOUNT = /^([+-]?)£?([+-]?)(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?$/;
 
 const normalise = (header: string) => header.trim().toLowerCase().replace(/\s+/g, " ");
@@ -170,6 +171,7 @@ function calendar(year: number, month: number, day: number): string | null {
 type ReadDate = { iso: string | null } | { dayFirst: string | null; monthFirst: string | null };
 
 function readDate(text: string): ReadDate {
+  if (text.length > MAX_VALUE_CELL) return { iso: null };
   const iso = ISO_DATE.exec(text);
   if (iso) return { iso: calendar(Number(iso[1]), Number(iso[2]), Number(iso[3])) };
   const numeric = NUMERIC_DATE.exec(text);
@@ -188,11 +190,13 @@ function readDate(text: string): ReadDate {
 
 /** Signed pence, or null when the text is not an amount this reader accepts. */
 function readAmount(text: string): number | null {
+  // No real amount is this long; refusing first keeps every check below linear in a hostile cell.
+  if (text.length > MAX_VALUE_CELL) return null;
   let value = text;
   let sign = 1;
   let marked = false;
-  const suffix = /^(.*?)\s*(CR|DR)$/i.exec(value);
-  if (suffix) { value = suffix[1]; sign = suffix[2].toUpperCase() === "DR" ? -1 : 1; marked = true; }
+  const suffix = value.slice(-2).toUpperCase();
+  if (suffix === "CR" || suffix === "DR") { value = value.slice(0, -2).trimEnd(); sign = suffix === "DR" ? -1 : 1; marked = true; }
   if (value.startsWith("(") && value.endsWith(")")) {
     if (marked) return null;
     value = value.slice(1, -1);
