@@ -3,7 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { StorageAdapter } from "../documents/storage-adapter";
 import { resolveDefaultStorage } from "../invoices/invoice-service";
 import { readTemplate } from "../workbook/read-template";
-import { TemplateReadError, type AccountSheet, type TemplateDefect, type TemplateProfile } from "../workbook/template-profile";
+import { TEMPLATE_MAX_BYTES, TemplateReadError, type AccountSheet, type TemplateDefect, type TemplateProfile } from "../workbook/template-profile";
 import { defaultOnboardingRepository, resolveOnboardingActor, type OnboardingActor, type OnboardingRepository } from "../tenancy/business-service";
 import type { BusinessId, UserId } from "../tenancy/types";
 import {
@@ -16,7 +16,7 @@ import {
 } from "./heading-service";
 
 /** Route and service limit for an uploaded template. */
-export const TEMPLATE_MAX_SIZE_BYTES = 10 * 1024 * 1024;
+export const TEMPLATE_MAX_SIZE_BYTES = TEMPLATE_MAX_BYTES;
 export const TEMPLATE_MAX_FILE_NAME_LENGTH = 255;
 const XLSX_MIME_TYPES = new Set(["application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "application/octet-stream"]);
 const ZIP_MAGIC = [0x50, 0x4b, 0x03, 0x04];

@@ -14,7 +14,7 @@ const MAX_TEMPLATE_REQUEST_BODY_BYTES = TEMPLATE_MAX_SIZE_BYTES + 64 * 1024;
 function responseFor(error: unknown): NextResponse {
   if (error instanceof TemplateError) {
     if (error.code === TEMPLATE_ERROR_CODES.TEMPLATE_UNREADABLE) {
-      return NextResponse.json({ error: { code: error.readerCode ?? error.code, message: error.message } }, { status: 422 });
+      return NextResponse.json({ error: { code: error.readerCode ?? error.code, message: error.message } }, { status: error.readerCode === "TOO_LARGE" ? 413 : 422 });
     }
     const status = error.code === TEMPLATE_ERROR_CODES.BUSINESS_ACCESS_DENIED ? 404 :
       error.code === TEMPLATE_ERROR_CODES.INSUFFICIENT_CAPABILITY || error.code === TEMPLATE_ERROR_CODES.INACTIVE_BUSINESS ? 403 :
