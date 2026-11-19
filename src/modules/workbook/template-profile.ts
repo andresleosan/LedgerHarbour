@@ -67,7 +67,11 @@ export const TEMPLATE_READ_ERROR_CODES = {
   NOT_A_WORKBOOK: "NOT_A_WORKBOOK",
   NO_ACCOUNT_SHEET: "NO_ACCOUNT_SHEET",
   UNRECOGNISED_LAYOUT: "UNRECOGNISED_LAYOUT",
+  TOO_LARGE: "TOO_LARGE",
 } as const;
+
+/** Largest template file accepted, in bytes. */
+export const TEMPLATE_MAX_BYTES = 10 * 1024 * 1024;
 
 export type TemplateReadErrorCode = (typeof TEMPLATE_READ_ERROR_CODES)[keyof typeof TEMPLATE_READ_ERROR_CODES];
 
