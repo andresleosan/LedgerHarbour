@@ -109,7 +109,7 @@ describe("PostgreSQL invoice payments", () => {
 
       await changeInvoicePayment(id, a.owner, { status: "unpaid" }, dependencies);
       expect(await movementsOf(a.business.id, id)).toEqual([]);
-      await expect(listUnpaidInvoices(a.business.id, a.owner, dependencies)).resolves.toEqual([{ id, supplier: "Acme Ltd", invoiceNumber: "INV-flow", invoiceDate: "2026-08-11", total: "120.00", currency: "GBP" }]);
+      await expect(listUnpaidInvoices(a.business.id, a.owner, dependencies)).resolves.toEqual([{ id, supplier: "Acme Ltd", invoiceNumber: "INV-flow", invoiceDate: "2026-08-11", total: "120.00", currency: "GBP", kind: "invoice" }]);
       await expect(listUnpaidInvoices(b.business.id, a.owner, dependencies)).rejects.toMatchObject({ code: "BUSINESS_ACCESS_DENIED" });
 
       await voidInvoice(id, a.owner, dependencies);
