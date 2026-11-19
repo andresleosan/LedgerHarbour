@@ -404,6 +404,7 @@ async function findManualMovement(context: MovementWriteContext, movementId: str
   const movement = typeof movementId === "string" ? await context.money.findMovement(movementId, context.businessId) : null;
   if (!movement || movement.deletedAt !== null) throw new MoneyError(MONEY_ERROR_CODES.MOVEMENT_NOT_FOUND);
   if (movement.origin !== "manual") throw new MoneyError(MONEY_ERROR_CODES.MOVEMENT_ORIGIN_NOT_EDITABLE);
+  if (movement.transferGroupId !== null) throw new MoneyError(MONEY_ERROR_CODES.MOVEMENT_ORIGIN_NOT_EDITABLE);
   await assertYearOpen(context, movement);
   return movement;
 }
@@ -448,4 +449,126 @@ export async function deleteMovement(businessId: BusinessId, movementId: string,
   } catch (error) {
     throw mapBoundaryError(error);
   }
+}
+
+// ---------------------------------------------------------------- transfers (LH-022)
+
+export interface TransferInput {
+  fromAccountId: string;
+  toAccountId: string;
+  date: string;
+  /** Positive pounds; the from-account gets it negative, the to-account positive. */
+  amount: string;
+  headingId: string;
+  narrative?: string;
+}
+
+export type TransferChanges = Partial<TransferInput>;
+
+export interface Transfer {
+  transferGroupId: string;
+  from: Movement;
+  to: Movement;
+}
+
+const DEFAULT_TRANSFER_NARRATIVE = "Transfer";
+
+/** The two legs of a transfer, both with the same date, heading and narrative. */
+function transferRows(input: TransferInput, transferGroupId: string): [InternalMovementInput, InternalMovementInput] {
+  let pence: number;
+  try {
+    pence = parsePounds(input.amount);
+  } catch {
+    throw new MoneyError(MONEY_ERROR_CODES.INVALID_AMOUNT);
+  }
+  if (pence <= 0) throw new MoneyError(MONEY_ERROR_CODES.INVALID_AMOUNT);
+  if (typeof input.headingId !== "string" || input.fromAccountId === input.toAccountId) throw new MoneyError(MONEY_ERROR_CODES.INVALID_MOVEMENT);
+  if (input.narrative !== undefined && typeof input.narrative !== "string") throw new MoneyError(MONEY_ERROR_CODES.INVALID_MOVEMENT);
+  const narrative = input.narrative?.trim() || DEFAULT_TRANSFER_NARRATIVE;
+  const leg = (accountId: string, value: number): InternalMovementInput => ({ accountId, date: input.date, narrative, headingId: input.headingId, amount: formatPence(value), origin: "manual", transferGroupId });
+  return [leg(input.fromAccountId, -pence), leg(input.toAccountId, pence)];
+}
+
+const transferAudit = (type: string, transfer: Transfer) => ({ type, entityId: transfer.transferGroupId, metadata: { movementIds: [transfer.from.id, transfer.to.id] } });
+
+async function liveTransferLegs(context: MovementWriteContext): Promise<Movement[]> {
+  const legs: Movement[] = [];
+  for (const year of await context.money.listYears(context.businessId)) {
+    legs.push(...(await context.money.listMovements(context.businessId, year.id)).filter((movement) => movement.transferGroupId !== null && movement.origin === "manual"));
+  }
+  return legs;
+}
+
+async function findTransfer(context: MovementWriteContext, transferGroupId: string): Promise<Transfer> {
+  const legs = typeof transferGroupId === "string" && transferGroupId ? (await liveTransferLegs(context)).filter((movement) => movement.transferGroupId === transferGroupId) : [];
+  const from = legs.find((movement) => movement.amount.startsWith("-"));
+  const to = legs.find((movement) => !movement.amount.startsWith("-"));
+  if (legs.length !== 2 || !from || !to) throw new MoneyError(MONEY_ERROR_CODES.MOVEMENT_NOT_FOUND);
+  await assertYearOpen(context, from);
+  await assertYearOpen(context, to);
+  return { transferGroupId, from, to };
+}
+
+async function transferWrite(businessId: BusinessId, actor: OnboardingActor, dependencies: MoneyDependencies, operation: (context: MovementWriteContext) => Promise<{ transfer: Transfer; auditType: string }>): Promise<Transfer> {
+  const context = await authorize(businessId, actor, dependencies, "edit_finance");
+  try {
+    return await context.money.transaction(async () => {
+      const { transfer, auditType } = await operation(context);
+      await appendAudit(context, transferAudit(auditType, transfer));
+      return transfer;
+    });
+  } catch (error) {
+    throw mapBoundaryError(error);
+  }
+}
+
+export async function createTransfer(businessId: BusinessId, input: TransferInput, actor: OnboardingActor, dependencies: MoneyDependencies = {}): Promise<Transfer> {
+  return transferWrite(businessId, actor, dependencies, async (context) => {
+    const transferGroupId = randomUUID();
+    const [from, to] = await createMovementsInTransaction(context, transferRows(input ?? ({} as TransferInput), transferGroupId));
+    return { transfer: { transferGroupId, from, to }, auditType: "transfer_created" };
+  });
+}
+
+export async function updateTransfer(businessId: BusinessId, transferGroupId: string, changes: TransferChanges, actor: OnboardingActor, dependencies: MoneyDependencies = {}): Promise<Transfer> {
+  if (typeof changes !== "object" || changes === null || Object.keys(changes).length === 0) throw new MoneyError(MONEY_ERROR_CODES.INVALID_MOVEMENT);
+  return transferWrite(businessId, actor, dependencies, async (context) => {
+    const current = await findTransfer(context, transferGroupId);
+    const rows = transferRows({
+      fromAccountId: changes.fromAccountId ?? current.from.moneyAccountId,
+      toAccountId: changes.toAccountId ?? current.to.moneyAccountId,
+      date: changes.date ?? current.from.movementDate,
+      amount: changes.amount ?? current.to.amount,
+      headingId: changes.headingId ?? current.from.headingId ?? "",
+      narrative: changes.narrative ?? current.from.narrative,
+    }, current.transferGroupId);
+    const saved: Movement[] = [];
+    for (const [leg, row] of [[current.from, rows[0]], [current.to, rows[1]]] as const) {
+      const fields = await resolveRow(context, row);
+      const movement = await context.money.updateMovement({ ...leg, ...fields, updatedAt: new Date().toISOString() }, context.businessId);
+      await appendAudit(context, movementAudit("movement_updated", movement));
+      saved.push(movement);
+    }
+    return { transfer: { transferGroupId: current.transferGroupId, from: saved[0], to: saved[1] }, auditType: "transfer_updated" };
+  });
+}
+
+export async function deleteTransfer(businessId: BusinessId, transferGroupId: string, actor: OnboardingActor, dependencies: MoneyDependencies = {}): Promise<Transfer> {
+  return transferWrite(businessId, actor, dependencies, async (context) => {
+    const current = await findTransfer(context, transferGroupId);
+    const from = await softDelete(context, current.from);
+    const to = await softDelete(context, current.to);
+    return { transfer: { transferGroupId: current.transferGroupId, from, to }, auditType: "transfer_deleted" };
+  });
+}
+
+/** The heading of the most recently created live transfer while it is still usable; null otherwise. */
+export async function suggestTransferHeading(businessId: BusinessId, actor: OnboardingActor, dependencies: MoneyDependencies = {}): Promise<{ headingId: string | null }> {
+  const context = await authorize(businessId, actor, dependencies, "read_finance");
+  return read(async () => {
+    let latest: Movement | null = null;
+    for (const leg of await liveTransferLegs(context)) if (!latest || leg.createdAt >= latest.createdAt) latest = leg;
+    const heading = latest?.headingId ? await context.headings.findById(latest.headingId, context.businessId) : null;
+    return { headingId: heading && heading.isActive && heading.blockedReason === null ? heading.id : null };
+  });
 }

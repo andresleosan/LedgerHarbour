@@ -37,6 +37,7 @@ export default function AppShell({ children, identity, businesses, locale, platf
         upload: "Cargar",
         invoices: "Facturas / revisión",
         documents: "Documentos",
+        movements: "Movimientos",
         settings: "Configuración",
         signOut: "Cerrar sesión",
          workspace: "Espacio de trabajo",
@@ -47,6 +48,7 @@ export default function AppShell({ children, identity, businesses, locale, platf
         upload: "Upload",
         invoices: "Invoices / review",
         documents: "Documents",
+        movements: "Movements",
         settings: "Settings",
         signOut: "Sign out",
          workspace: "Workspace",
@@ -198,6 +200,21 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .money-hint { margin: 0; color: var(--lh-muted); font-size: .88rem; line-height: 1.5; }
          .money-shell .page-card > .money-hint { margin: 12px 0; }
          .money-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--lh-teal); font-weight: 800; }
+         .movement-kinds > div { display: grid; gap: 8px; }
+         .movement-kinds label { min-height: 52px; padding: 10px 14px; border: 1px solid var(--lh-border); border-radius: 12px; background: #fff; }
+         .movement-kinds label:has(input:checked) { border-color: var(--lh-teal); background: #edf7f3; }
+         .movement-balances { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 12px; }
+         .movement-balance { min-width: 0; padding: 15px; border: 1px solid #d0ded8; border-radius: 12px; }
+         .money-shell .movement-balance h3 { margin: 0 0 8px; overflow-wrap: anywhere; }
+         .movement-balance dl { display: grid; gap: 6px; margin: 0; }
+         .movement-balance dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; }
+         .movement-balance dt { color: var(--lh-muted); }
+         .movement-balance dd, .movement-amount { margin: 0; color: var(--lh-navy); font-weight: 850; font-variant-numeric: tabular-nums; white-space: nowrap; }
+         .movement-filter { max-width: 22rem; }
+         .movement-side { display: grid; justify-items: end; gap: 8px; }
+         .movement-side .page-actions { margin-top: 0; }
+         .movement-origin { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #edf7f3; color: #315b60; font-size: .78rem; font-weight: 800; }
+         @media (max-width: 650px) { .movement-side { justify-items: stretch; } }
          .app-shell select:focus-visible { outline: 3px solid var(--lh-coral-focus); outline-offset: 3px; }
          .member-info { min-width: 0; }
          .transfer-panel { margin-top: 22px; padding: 18px; border: 1px solid #e1b9a8; border-radius: 12px; background: #fff6ef; }
@@ -223,6 +240,7 @@ export default function AppShell({ children, identity, businesses, locale, platf
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/upload`)}>{copy.upload}</a> : <span className="shell-nav-disabled">{copy.upload}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/invoices`)}>{copy.invoices}</a> : <span className="shell-nav-disabled">{copy.invoices}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/documents`)}>{copy.documents}</a> : <span className="shell-nav-disabled">{copy.documents}</span>}
+           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/movements`)}>{copy.movements}</a> : <span className="shell-nav-disabled">{copy.movements}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/settings/members`)}>{copy.settings}</a> : <span className="shell-nav-disabled">{copy.settings}</span>}
         </nav>
           <div className="shell-user"><LanguageSwitcher locale={activeLocale} /><span><strong>{identity.displayName}</strong>{identity.email}</span><form action={signOutAction} onSubmit={async (event) => { event.preventDefault(); try { await signOutFirebaseUser(firebaseConfig); } finally { await signOutAction(); } }}><button className="sign-out" type="submit">{copy.signOut}</button></form></div>
