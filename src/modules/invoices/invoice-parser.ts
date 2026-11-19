@@ -44,7 +44,10 @@ const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/;
 // ponytail: printed dates are read day first (DD/MM/YYYY) because the product serves UK/Jersey businesses.
 const PRINTED_DATE_PATTERN = /^(\d{1,2})([/.-])(\d{1,2})\2(\d{4})$/;
-const CURRENCY_NOISE = /[£€$\s]|(?<![A-Za-z])[A-Za-z]{3}(?![A-Za-z])/g;
+// A currency symbol or seeded ISO code is only accepted at the start or end of the whole value.
+const CURRENCY_AFFIX = /^(?:[£€$]|GBP|EUR|USD)\s*(?=\d)|(?<=\d)\s*(?:[£€$]|GBP|EUR|USD)$/gi;
+const SPACE_GROUPED = /^\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?$/;
+const AMBIGUOUS_AMOUNT = /^\d+[.,]\d{3}$/;
 const THOUSANDS_GROUPING = /^\d{1,3}([.,])\d{3}(?:\1\d{3})*$/;
 const CURRENCY_SYMBOLS: Record<string, string> = { "£": "GBP", "€": "EUR", "$": "USD" };
 
@@ -85,8 +88,15 @@ function decimal(value: string): string | null {
 // own is a thousands mark. A single "," followed by exactly three digits ("1,234") is ambiguous; it is
 // read as thousands, following UK convention, while a single "." ("1.234") stays a decimal mark.
 // Signs and parentheses are not part of the model, so negative amounts are left unreadable.
+// Whitespace inside the number is only a thousands separator with valid groups ("1 234.56"); any other
+// letters, symbols or spacing make the amount unreadable rather than merging digits.
+function bareAmount(value: string): string {
+  const bare = value.replace(CURRENCY_AFFIX, "");
+  return SPACE_GROUPED.test(bare) ? bare.replace(/[ \u00a0\u202f]/g, "") : bare;
+}
+
 function printedAmount(value: string): string | null {
-  const bare = value.replace(CURRENCY_NOISE, "");
+  const bare = bareAmount(value);
   if (!/^[\d.,]+$/.test(bare)) return null;
   const marks = bare.replace(/\d/g, "");
   const onlyThousands = marks.length === 0 || (marks.length > 1 && new Set(marks).size === 1) ||
@@ -121,6 +131,7 @@ export function parseInvoice(result: OcrResult, source: InvoiceInputSource = "hu
 
   const ocr = source === "ocr";
   const unreadable: (keyof OcrExtractedFields)[] = [];
+  const ambiguous: (keyof OcrExtractedFields)[] = [];
   // An OCR value that cannot be normalized is left empty for human review; a human value is rejected.
   const read = (field: keyof OcrExtractedFields, normalize: (value: string) => string | null): string | null => {
     const value = text(fields[field]);
@@ -132,24 +143,31 @@ export function parseInvoice(result: OcrResult, source: InvoiceInputSource = "hu
     return null;
   };
   const date = ocr ? printedDate : isoDate;
-  const amount = ocr ? printedAmount : decimal;
+  const amount = (field: keyof OcrExtractedFields): string | null => {
+    if (!ocr) return read(field, decimal);
+    const parsed = read(field, printedAmount);
+    // A lone "," or "." before exactly three digits was resolved by the UK rule above; a human confirms it.
+    if (parsed !== null && AMBIGUOUS_AMOUNT.test(bareAmount(text(fields[field])!))) ambiguous.push(field);
+    return parsed;
+  };
 
   const draft: Omit<InvoiceDraft, "confidenceData" | "reviewState"> = {
     supplier: text(fields.supplier),
     invoiceNumber: text(fields.invoiceNumber),
     invoiceDate: read("invoiceDate", date),
     dueDate: read("dueDate", date),
-    subtotal: read("subtotal", amount),
-    taxAmount: read("taxAmount", amount),
-    total: read("total", amount),
+    subtotal: amount("subtotal"),
+    taxAmount: amount("taxAmount"),
+    total: amount("total"),
     currencyReference: ocr ? read("currencyReference", printedCurrency) : text(fields.currencyReference),
     expenseCategoryReference: text(fields.expenseCategoryReference),
     notes: text(fields.notes),
   };
 
   for (const field of unreadable) confidenceData[field] = 0;
+  for (const field of ambiguous) confidenceData[field] = Math.min(confidenceData[field], CONFIDENCE_THRESHOLD - 0.01);
 
-  const needsReview = unreadable.length > 0 ||
+  const needsReview = unreadable.length > 0 || ambiguous.length > 0 ||
     REQUIRED_FIELDS.some((field) => draft[field] === null) ||
     REQUIRED_FIELDS.some((field) => confidenceData[field] < CONFIDENCE_THRESHOLD);
 
