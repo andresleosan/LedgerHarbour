@@ -43,9 +43,9 @@ export default function InvoiceReviewPage({ params }: { params: Promise<{ busine
     setBusy(true); setError(null); setStatus(null);
     try {
       const response = await fetch(`/api/invoices/${invoiceId}/review`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(values) });
-      const result = await response.json() as ReviewPayload;
+      const result = await response.json() as Invoice & { error?: { code?: string } };
       if (!response.ok) { setError(messageForError(result.error?.code, copy)); return; }
-      setPayload((current) => current ? { ...current, invoice: result.invoice } : result);
+      setPayload((current) => current && { ...current, invoice: result });
       setStatus(copy.saved);
     } catch { setError(messageForError("NETWORK_ERROR", copy)); } finally { setBusy(false); }
   };
@@ -55,9 +55,9 @@ export default function InvoiceReviewPage({ params }: { params: Promise<{ busine
     setBusy(true); setError(null); setStatus(null);
     try {
       const response = await fetch(`/api/invoices/${invoiceId}/review`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action: "approve" }) });
-      const result = await response.json() as ReviewPayload;
+      const result = await response.json() as Invoice & { error?: { code?: string } };
       if (!response.ok) { setError(messageForError(result.error?.code, copy)); return; }
-      setPayload((current) => current ? { ...current, invoice: result.invoice } : result);
+      setPayload((current) => current && { ...current, invoice: result });
       setStatus(copy.approved);
     } catch { setError(messageForError("NETWORK_ERROR", copy)); } finally { setBusy(false); }
   };
