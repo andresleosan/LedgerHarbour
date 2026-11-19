@@ -37,7 +37,6 @@ export default function AppShell({ children, identity, businesses, locale, platf
         upload: "Cargar",
         invoices: "Facturas / revisión",
         documents: "Documentos",
-        unavailable: "No disponible aún",
         settings: "Configuración",
         signOut: "Cerrar sesión",
          workspace: "Espacio de trabajo",
@@ -48,7 +47,6 @@ export default function AppShell({ children, identity, businesses, locale, platf
         upload: "Upload",
         invoices: "Invoices / review",
         documents: "Documents",
-        unavailable: "Not available yet",
         settings: "Settings",
         signOut: "Sign out",
          workspace: "Workspace",
@@ -193,7 +191,7 @@ export default function AppShell({ children, identity, businesses, locale, platf
             {platformAdmin && <a href={hrefFor("/admin")} aria-current={pathname.startsWith("/admin") ? "page" : undefined}>{copy.platform}</a>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/upload`)}>{copy.upload}</a> : <span className="shell-nav-disabled">{copy.upload}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/invoices`)}>{copy.invoices}</a> : <span className="shell-nav-disabled">{copy.invoices}</span>}
-           <span className="shell-nav-disabled" aria-disabled="true" title={copy.unavailable}>{copy.documents}</span>
+           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/documents`)}>{copy.documents}</a> : <span className="shell-nav-disabled">{copy.documents}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/settings/members`)}>{copy.settings}</a> : <span className="shell-nav-disabled">{copy.settings}</span>}
         </nav>
           <div className="shell-user"><LanguageSwitcher locale={activeLocale} /><span><strong>{identity.displayName}</strong>{identity.email}</span><form action={signOutAction} onSubmit={async (event) => { event.preventDefault(); try { await signOutFirebaseUser(firebaseConfig); } finally { await signOutAction(); } }}><button className="sign-out" type="submit">{copy.signOut}</button></form></div>

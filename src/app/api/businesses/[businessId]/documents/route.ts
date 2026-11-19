@@ -7,6 +7,7 @@ import {
   DOCUMENT_ERROR_CODES,
   toSafeDocument,
 } from "../../../../../modules/documents/document-service";
+import { listDocuments } from "../../../../../modules/documents/document-list-service";
 import { MAX_UPLOAD_REQUEST_BODY_BYTES, MAX_UPLOAD_SIZE_BYTES, UploadValidationError, UPLOAD_ERROR_CODES, validateUpload } from "../../../../../modules/documents/file-validation";
 import type { BusinessId } from "../../../../../modules/tenancy/types";
 import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
@@ -73,9 +74,29 @@ export async function POST(request: Request, context: RouteContext) {
       tenancyRepository: persistence.tenancyRepository,
       documentRepository: persistence.documentRepository,
       storage: persistence.storage,
+      jobs: persistence.jobRepository,
     });
     return NextResponse.json(toSafeDocument(document), { status: 201 });
   } catch (error) {
     return errorResponse(error);
+  }
+}
+
+export async function GET(_request: Request, context: RouteContext) {
+  const identity = await getCurrentIdentity();
+  if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
+  const { businessId } = await context.params;
+  try {
+    const persistence = getPersistenceContext();
+    const documents = await listDocuments(businessId as BusinessId, identity, {
+      tenancyRepository: persistence.tenancyRepository,
+      documentRepository: persistence.documentRepository,
+      invoices: persistence.invoiceRepository,
+      jobs: persistence.jobRepository,
+    });
+    return NextResponse.json({ documents }, { headers: { "Cache-Control": "private, no-store" } });
+  } catch (error) {
+    if (error instanceof DocumentError) return errorResponse(error);
+    return NextResponse.json({ error: { code: "DOCUMENT_LIST_FAILED", message: "The documents could not be listed." } }, { status: 500 });
   }
 }

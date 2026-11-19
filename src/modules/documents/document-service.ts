@@ -13,6 +13,8 @@ import type { BusinessId, UserId } from "../tenancy/types";
 import { createStorageAdapter } from "./storage-factory";
 import type { StorageAdapter } from "./storage-adapter";
 import type { ValidatedUpload } from "./file-validation";
+import type { JobRepository } from "../jobs/job-service";
+import type { DocumentId } from "../invoices/ocr-provider";
 
 export const DOCUMENT_ERROR_CODES = {
   INACTIVE_BUSINESS: "INACTIVE_BUSINESS",
@@ -42,6 +44,19 @@ export class DocumentError extends Error {
   }
 }
 
+/**
+ * In development every route bundle has its own copy of this module while the in-memory
+ * repository is shared through globalThis, so its errors can fail `instanceof DocumentError`.
+ */
+export function asDocumentError(error: unknown): DocumentError | null {
+  if (error instanceof DocumentError) return error;
+  const candidate = error as { name?: unknown; code?: unknown } | null;
+  if (candidate?.name === "DocumentError" && typeof candidate.code === "string" && Object.hasOwn(publicMessages, candidate.code)) {
+    return new DocumentError(candidate.code as DocumentErrorCode);
+  }
+  return null;
+}
+
 export interface Document {
   id: string;
   businessId: BusinessId;
@@ -62,9 +77,14 @@ export interface CreateDocumentInput {
   upload: ValidatedUpload;
 }
 
+export type ReplacementUpload = Pick<Document, "privateObjectKey" | "originalFileName" | "originalMimeType" | "originalSizeBytes">;
+
 export interface DocumentRepository {
   transaction<T>(operation: () => Promise<T>): Promise<T>;
   create(document: Document): Promise<Document>;
+  findByChecksum?(businessId: BusinessId, checksum: string): Promise<Document | null>;
+  /** Points a failed document at a new upload and resets it to "uploaded"; null when it is no longer failed. */
+  replaceFailedUpload?(documentId: string, replacement: ReplacementUpload): Promise<Document | null>;
   findById(documentId: string): Promise<Document | null>;
   getStatus(documentId: string): Promise<Document["status"] | null>;
   setStatus(documentId: string, status: Document["status"]): Promise<Document | null>;
@@ -110,6 +130,19 @@ class MemoryDocumentRepository implements InMemoryDocumentRepository {
   async findById(documentId: string): Promise<Document | null> {
     const document = this.documents.get(documentId);
     return document ? { ...document } : null;
+  }
+
+  async findByChecksum(businessId: BusinessId, checksum: string): Promise<Document | null> {
+    const document = [...this.documents.values()].find((candidate) => candidate.businessId === businessId && candidate.checksum === checksum);
+    return document ? { ...document } : null;
+  }
+
+  async replaceFailedUpload(documentId: string, replacement: ReplacementUpload): Promise<Document | null> {
+    const document = this.documents.get(documentId);
+    if (document?.status !== "failed") return null;
+    const updated = { ...document, ...replacement, status: "uploaded" as const };
+    this.documents.set(documentId, updated);
+    return { ...updated };
   }
 
   async getStatus(documentId: string): Promise<Document["status"] | null> {
@@ -170,9 +203,10 @@ export interface DocumentDependencies {
   tenancyRepository?: OnboardingRepository;
   documentRepository?: DocumentRepository;
   storage?: StorageAdapter;
+  jobs?: JobRepository;
 }
 
-function mapBoundaryError(error: unknown): DocumentError {
+export function mapBoundaryError(error: unknown): DocumentError {
   if (error instanceof BusinessLifecycleError) {
     if (error.code === LIFECYCLE_ERROR_CODES.INACTIVE_BUSINESS) return new DocumentError(DOCUMENT_ERROR_CODES.INACTIVE_BUSINESS);
     if (error.code === LIFECYCLE_ERROR_CODES.BUSINESS_NOT_FOUND) return new DocumentError(DOCUMENT_ERROR_CODES.BUSINESS_NOT_FOUND);
@@ -221,9 +255,11 @@ export async function createDocument(
   }
 
   let storedObjectKey: string | undefined;
+  let replacedObjectKey: string | undefined;
   try {
-    return await repository.transaction(async () => {
-      const documentId = randomUUID();
+    const saved = await repository.transaction(async () => {
+      const failed = await failedDocumentWithChecksum(repository, business.id, input.upload.checksum);
+      const documentId = failed?.id ?? randomUUID();
       const document: Document = {
         id: documentId,
         businessId: business.id,
@@ -239,19 +275,46 @@ export async function createDocument(
       storedObjectKey = document.privateObjectKey;
       try {
         await storage.put({ objectKey: document.privateObjectKey, data: input.upload.data });
-        return await repository.create(document);
+        if (!failed) return await repository.create(document);
+        // The same file failed to be read before: give that document the new upload and a fresh reading.
+        const replaced = await repository.replaceFailedUpload!(failed.id, {
+          privateObjectKey: document.privateObjectKey,
+          originalFileName: document.originalFileName,
+          originalMimeType: document.originalMimeType,
+          originalSizeBytes: document.originalSizeBytes,
+        });
+        if (!replaced) throw new DocumentError(DOCUMENT_ERROR_CODES.DUPLICATE_CHECKSUM);
+        await resetReading(failed.id, actorId, dependencies.jobs);
+        replacedObjectKey = failed.privateObjectKey;
+        return replaced;
       } catch (error) {
-        if (error instanceof DocumentError) throw error;
-        throw new DocumentError(DOCUMENT_ERROR_CODES.STORAGE_FAILURE);
+        throw asDocumentError(error) ?? new DocumentError(DOCUMENT_ERROR_CODES.STORAGE_FAILURE);
       }
     });
+    if (replacedObjectKey) {
+      try { await storage.delete?.(replacedObjectKey); } catch { /* the old object is unreferenced; removal is best effort */ }
+    }
+    return saved;
   } catch (error) {
     if (storedObjectKey) {
       try { await storage.delete?.(storedObjectKey); } catch { /* cleanup is best effort; public error remains stable */ }
     }
-    if (error instanceof DocumentError) throw error;
-    throw new DocumentError(DOCUMENT_ERROR_CODES.STORAGE_FAILURE);
+    throw asDocumentError(error) ?? new DocumentError(DOCUMENT_ERROR_CODES.STORAGE_FAILURE);
   }
+}
+
+async function failedDocumentWithChecksum(repository: DocumentRepository, businessId: BusinessId, checksum: string): Promise<Document | null> {
+  if (!checksum || !repository.findByChecksum || !repository.replaceFailedUpload) return null;
+  const existing = await repository.findByChecksum(businessId, checksum);
+  return existing?.status === "failed" ? existing : null;
+}
+
+async function resetReading(documentId: string, actorId: UserId, injectedJobs?: JobRepository): Promise<void> {
+  // Loaded lazily: the jobs module depends on this one.
+  const jobs = injectedJobs ?? (await import("../jobs/job-service")).resolveDefaultJobRepository();
+  const job = await jobs.findByDocumentId(documentId as DocumentId);
+  if (!job) return;
+  await jobs.update({ ...job, status: "queued", retryCount: 0, errorSummary: null, requestedBy: actorId, updatedAt: new Date().toISOString() });
 }
 
 export async function getDocumentForDownload(
