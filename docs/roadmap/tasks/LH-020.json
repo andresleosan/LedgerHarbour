@@ -1,0 +1,30 @@
+{
+  "id": "LH-020",
+  "titulo": "Codificar la factura al revisarla",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "El código se elige de la lista del plan de cuentas del negocio; no se escribe un identificador.",
+    "No se puede aprobar una factura sin código.",
+    "La app propone el último código usado con ese proveedor y se puede cambiar.",
+    "Una factura puede repartirse entre varios códigos y la suma debe cuadrar con el total."
+  ],
+  "depende": [
+    "LH-014"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/invoices/**",
+    "src/app/(app)/business/[businessId]/invoices/**",
+    "src/app/api/invoices/**",
+    "tests/unit/invoices/**",
+    "tests/e2e/invoices/**",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Regla de validación «sin código no se aprueba», con su prueba.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

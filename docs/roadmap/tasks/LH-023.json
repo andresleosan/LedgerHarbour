@@ -1,0 +1,31 @@
+{
+  "id": "LH-023",
+  "titulo": "Importar el extracto del banco",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Se sube el CSV del banco y cada línea se convierte en un movimiento de esa cuenta.",
+    "No duplica lo ya importado ni los pagos que ya creó una factura: los empareja por importe y fecha cercana.",
+    "Las líneas sin código quedan en una bandeja «por codificar»; ninguna llega a la exportación sin código.",
+    "Pruebas con un extracto sintético."
+  ],
+  "depende": [
+    "LH-015"
+  ],
+  "comprueba": [
+    "LH-021"
+  ],
+  "recursos": [
+    "src/modules/bank-import/**",
+    "src/app/(app)/business/[businessId]/import/**",
+    "src/app/api/businesses/[businessId]/import/**",
+    "tests/unit/bank-import/**",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Formato del CSV: pedir un extracto de ejemplo sin datos reales o construir uno sintético con sus columnas.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

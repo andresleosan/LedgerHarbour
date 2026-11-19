@@ -1,0 +1,25 @@
+{
+  "id": "LH-026",
+  "titulo": "Anexo de cierre para el contable",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Lista de facturas sin pagar a fin de ejercicio (proveedor, fecha, importe) y de compras de inmovilizado (artículo, fecha, coste).",
+    "Se descarga junto con el libro, sin tocar la plantilla."
+  ],
+  "depende": [
+    "LH-021",
+    "LH-024"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/workbook/**",
+    "src/app/api/businesses/[businessId]/export/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Definir el formato del anexo en el spec de LH-012.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

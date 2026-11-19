@@ -1,0 +1,31 @@
+{
+  "id": "LH-016",
+  "titulo": "Captura desde la cámara del móvil",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "En el móvil, «Hacer foto» abre la cámara trasera; también se pueden elegir varias fotos o PDF de una vez.",
+    "Cada archivo muestra vista previa, progreso y resultado; subir y procesar es un solo toque.",
+    "Comprobado a 390 px y 1280 px sin errores de consola; textos en inglés y español."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/app/(app)/business/[businessId]/upload/**",
+    "tests/e2e/documents/**",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "Pantalla de subida con «Hacer foto» (cámara trasera) y «Elegir archivos» (varios a la vez); cada archivo se sube y se lee solo, con miniatura, progreso y resultado. Textos en inglés y español.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "Commit ee25942 (cherry-pick de f07d810).",
+    "flock /tmp/lh-e2e.lock corepack pnpm test:e2e tests/e2e/documents/upload.spec.ts tests/e2e/critical-path.spec.ts tests/e2e/navigation/business-switcher.spec.ts → 9 pasadas, con la puerta de errores de consola, a 390 px y 1280 px y sin desbordamiento horizontal a 390.",
+    "Verificación de lote sobre ee25942 + ajuste de prueba: lint 0, tsc 0, vitest --no-file-parallelism 661 pasadas y 7 omitidas (73 archivos), build 0.",
+    "No comprobable aquí: la cámara de un móvil real (Chromium sin pantalla solo permite comprobar capture=\"environment\"). Trasladado a LH-030.",
+    "Decisión: el enlace de éxito va a la lista de facturas porque la respuesta de lectura solo trae el trabajo. Fuente: opción más simple.",
+    "El duplicado se prueba simulando el 409 en el navegador: un 4xx real dispara la puerta de consola."
+  ],
+  "actualizado": "2026-11-19"
+}

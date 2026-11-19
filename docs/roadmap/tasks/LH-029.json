@@ -1,0 +1,20 @@
+{
+  "id": "LH-029",
+  "titulo": "Publicar y activar en producción lo construido",
+  "estado": "pendiente",
+  "responsable": "operador",
+  "criterio": [
+    "Los commits de la rama `avanzar` están en `origin/main` con el CI en verde.",
+    "Las migraciones nuevas están aplicadas en la base de producción.",
+    "El recorrido real, de la foto al libro exportado, se comprobó en producción."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "Revisar la rama `avanzar`, publicarla (push o PR a `main`, que despliega en producción) y aplicar las migraciones nuevas. O autorizar al bucle a hacerlo y decir hasta dónde.",
+  "siguiente": "",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

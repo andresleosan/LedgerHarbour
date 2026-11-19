@@ -1,0 +1,32 @@
+{
+  "id": "LH-014",
+  "titulo": "Plan de cuentas por negocio, importado de la plantilla",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Cada negocio tiene rótulos con código estable, etiqueta exacta, grupo (ingresos, coste de ventas, gastos, activo, pasivo, patrimonio), orden y activo o inactivo.",
+    "Se cargan desde el lector de la plantilla y pueden renombrarse sin perder lo ya codificado.",
+    "Funciona en modo memoria y en postgres; la migración está escrita y probada en PGlite, sin aplicarse en producción.",
+    "Pruebas de permisos y de aislamiento entre negocios."
+  ],
+  "depende": [
+    "LH-012"
+  ],
+  "comprueba": [
+    "LH-013"
+  ],
+  "recursos": [
+    "src/modules/accounting/**",
+    "src/db/**",
+    "tests/unit/accounting/**",
+    "tests/unit/db/**",
+    "tests/integration/**",
+    "src/app/api/businesses/[businessId]/categories/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Decidir en el spec si los rótulos sustituyen a las categorías actuales o las amplían.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

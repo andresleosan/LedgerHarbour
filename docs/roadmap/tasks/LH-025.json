@@ -1,0 +1,28 @@
+{
+  "id": "LH-025",
+  "titulo": "Resumen del ejercicio en la app",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Pantalla con totales por código y por cuenta, saldo de cada cuenta, y cuántos movimientos faltan por codificar y cuántas facturas por pagar.",
+    "Los totales coinciden al céntimo con los de la exportación.",
+    "Solo lo ven los miembros del negocio con permiso de finanzas; el panel general sigue sin mostrar importes."
+  ],
+  "depende": [
+    "LH-015"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/app/(app)/business/[businessId]/summary/**",
+    "src/app/api/businesses/[businessId]/summary/**",
+    "src/modules/accounting/summary",
+    "tests/unit/accounting/summary",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Servicio de totales con pruebas; después la pantalla.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

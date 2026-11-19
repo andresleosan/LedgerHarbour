@@ -1,0 +1,21 @@
+{
+  "id": "LH-027",
+  "titulo": "Lectura real de facturas con Google Document AI",
+  "estado": "pendiente",
+  "responsable": "operador",
+  "criterio": [
+    "Una factura real fotografiada se lee de principio a fin en el entorno que el operador autorice.",
+    "Queda anotado en qué formato devuelve el proveedor las fechas y los importes reales."
+  ],
+  "depende": [],
+  "comprueba": [
+    "LH-017"
+  ],
+  "recursos": [],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "Vincular la facturación al proyecto de Google Cloud, aceptar ese gasto y autorizar la primera lectura con una factura real.",
+  "siguiente": "",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

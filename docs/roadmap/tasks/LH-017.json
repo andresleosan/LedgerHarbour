@@ -1,0 +1,32 @@
+{
+  "id": "LH-017",
+  "titulo": "Lectura robusta de facturas reales",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "El lector acepta fechas e importes como vienen impresos (16/08/2026, £120.60, 1,234.56, 1.234,56) y prefiere los valores normalizados del proveedor cuando existen.",
+    "Un campo ilegible queda vacío para revisarlo; no hace fallar la factura entera.",
+    "Pruebas con respuestas sintéticas del proveedor; nada se envía a un servicio real."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/invoices/invoice-parser.ts",
+    "src/modules/invoices/google-document-ai-provider.ts",
+    "tests/unit/invoices/invoice-parser",
+    "tests/unit/invoices/google-document-ai"
+  ],
+  "hecho": "El lector acepta fechas día/mes/año e importes con símbolo, código y miles en ambos estilos; prefiere los valores normalizados del proveedor; un valor ilegible o ambiguo queda vacío o marcado para revisión en vez de tumbar la factura. Lo que escribe una persona se sigue validando estricto.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "Commits 9e164d3 y 041bcd6 (cherry-pick de ad6b4b5 y df0e1f0).",
+    "corepack pnpm exec vitest run tests/unit/invoices/ → 93 pasadas; integración ocr-workflow 27 y review 17 pasadas. Las pruebas nuevas fallaron antes del código.",
+    "Verificación de lote sobre ee25942 + ajuste de prueba: lint 0, tsc 0, vitest --no-file-parallelism 661 pasadas y 7 omitidas (73 archivos), build 0.",
+    "Aviso de seguridad atendido en 041bcd6: símbolo o código de moneda solo al principio o al final, espacios solo como miles válidos; «12 34» o «1 GBP 2» quedan ilegibles; «1,234» y «1.234» bajan la confianza a 0,79.",
+    "Revisión del diff por el orquestador (toca dinero): sin más casos que cambien una cifra en silencio.",
+    "No comprobado: respuestas reales de Google Document AI (LH-027). Fechas siempre día primero (Reino Unido y Jersey)."
+  ],
+  "actualizado": "2026-11-19"
+}

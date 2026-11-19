@@ -1,0 +1,29 @@
+{
+  "id": "LH-015",
+  "titulo": "Cuentas de dinero y movimientos",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Cuentas de banco y caja por negocio, cada una ligada a una hoja de la plantilla, con su saldo inicial.",
+    "Un movimiento guarda cuenta, fecha, concepto, código del plan, importe con signo en libras (entrada positiva, salida negativa) y origen (factura, manual o extracto).",
+    "El ejercicio tiene fecha de inicio y de fin; un movimiento fuera del ejercicio abierto se rechaza.",
+    "Memoria y postgres, migración probada en PGlite; pruebas de céntimos exactos y de aislamiento entre negocios."
+  ],
+  "depende": [
+    "LH-014"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/accounting/**",
+    "src/db/**",
+    "tests/unit/accounting/**",
+    "tests/unit/db/**",
+    "tests/integration/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Modelo y pruebas del servicio de movimientos antes de tocar la base de datos.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

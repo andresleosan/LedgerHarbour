@@ -1,0 +1,18 @@
+{
+  "id": "LH-028",
+  "titulo": "Respuestas del contable sobre su plantilla",
+  "estado": "pendiente",
+  "responsable": "operador y contable",
+  "criterio": [
+    "Cada respuesta queda anotada en el spec de LH-012 y, si cambia el resultado, en la ficha afectada."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "Preguntar al contable: si acepta una plantilla reparada o hay que usar la suya tal cual; si las facturas sin pagar a fin de año entran como acreedores; si el negocio está registrado en GST; qué cuenta va detrás de cada rótulo sin nombre; cuáles son los saldos iniciales; qué rótulo llevan los traspasos entre cuentas propias; si se paga en efectivo o con dinero privado; y las fechas del ejercicio. La tabla completa está al final del spec de LH-012.",
+  "siguiente": "",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

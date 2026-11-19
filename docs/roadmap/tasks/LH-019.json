@@ -1,0 +1,27 @@
+{
+  "id": "LH-019",
+  "titulo": "Una lectura fallida no deja la factura bloqueada",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Tras un fallo de lectura se puede reintentar y, si vuelve a fallar, rellenar la factura a mano.",
+    "El mismo archivo puede volver a subirse cuando su lectura falló.",
+    "Hay una lista de documentos con el estado de cada uno."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/jobs/**",
+    "src/modules/documents/**",
+    "src/app/api/documents/**",
+    "src/app/(app)/business/[businessId]/documents/**",
+    "tests/unit/documents/**",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "",
+  "falta": "Comprobar al tomarla: en el servidor de desarrollo en modo memoria, subir un duplicado devolvió 500 en vez de 409 una vez cargada la ruta de lectura (sospecha sin confirmar: instanceof entre dos copias del módulo de documentos).",
+  "bloqueo": "",
+  "siguiente": "Prueba que reproduce el callejón sin salida: lectura fallida, reintento rechazado y resubida rechazada.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

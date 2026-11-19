@@ -1,0 +1,33 @@
+{
+  "id": "LH-024",
+  "titulo": "Exportar el libro del contable relleno",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Devuelve una copia de la plantilla del negocio con cada movimiento en la hoja de su cuenta (fecha, concepto, código e importe con signo), en orden de fecha, y el saldo inicial.",
+    "No modifica ninguna fórmula ni celda que no sea de entrada; el archivo abre sin avisos de reparación.",
+    "Cada código se escribe con la etiqueta y el tipo exactos de su rótulo; ningún movimiento sale sin código.",
+    "Si los movimientos no caben en las filas útiles, o la plantilla tiene defectos que falsean el resultado, lo dice en un informe de control en vez de callarlo.",
+    "Al releer el archivo exportado, los totales por código y por cuenta coinciden con los de la app."
+  ],
+  "depende": [
+    "LH-013",
+    "LH-015"
+  ],
+  "comprueba": [
+    "LH-028"
+  ],
+  "recursos": [
+    "src/modules/workbook/**",
+    "tests/unit/workbook/**",
+    "src/app/api/businesses/[businessId]/export/**",
+    "src/app/(app)/business/[businessId]/export/**",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Prueba de ida y vuelta sobre la plantilla sintética: escribir filas y comprobar que las fórmulas siguen intactas.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

@@ -1,0 +1,27 @@
+{
+  "id": "LH-022",
+  "titulo": "Movimientos sin factura desde el móvil",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Formulario para ingresos, retiros del dueño, comisiones y traspasos entre cuentas propias, con el código elegido de la lista.",
+    "Un traspaso crea sus dos patas y no altera el resultado.",
+    "Editar y borrar dejan rastro de auditoría."
+  ],
+  "depende": [
+    "LH-015"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/app/(app)/business/[businessId]/transactions/**",
+    "src/app/api/businesses/[businessId]/transactions/**",
+    "tests/e2e/transactions/**",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Ruta de API con sus pruebas de permisos.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

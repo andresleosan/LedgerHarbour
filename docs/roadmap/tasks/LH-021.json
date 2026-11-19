@@ -1,0 +1,31 @@
+{
+  "id": "LH-021",
+  "titulo": "De factura aprobada a movimiento pagado",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Al aprobar se indica con qué cuenta se pagó, en qué fecha (por defecto la de la factura) y el importe cargado en libras.",
+    "Se crea el movimiento en negativo con concepto «proveedor + número» y el código elegido; una nota de abono entra en positivo.",
+    "Una factura sin pagar queda marcada y aparece en la lista de acreedores de cierre.",
+    "Corregir o anular la factura corrige su movimiento; nunca quedan duplicados."
+  ],
+  "depende": [
+    "LH-015",
+    "LH-020"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/invoices/**",
+    "src/modules/accounting/**",
+    "src/app/(app)/business/[businessId]/invoices/**",
+    "src/app/api/invoices/**",
+    "tests/unit/invoices/**",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Pruebas de signo e importe antes de la interfaz.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "LH-013",
+  "titulo": "Lector de la plantilla del contable y plantilla sintética de pruebas",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Un generador de pruebas crea una plantilla .xlsx sintética con la misma forma: hojas de cuenta, fila de rótulos, columnas de análisis con fórmula, fila de totales y balance de comprobación.",
+    "El lector devuelve las hojas de cuenta, los rótulos en orden con su grupo y su tipo, y las filas útiles de cada hoja.",
+    "Informa de los defectos que falsean el resultado: rótulo vacío, espacios finales, rótulos numéricos, referencias rotas y columnas de fórmula truncadas.",
+    "Si se añade una dependencia para leer hojas de cálculo, pasa `pnpm audit --audit-level high`.",
+    "Pruebas unitarias sobre la sintética; contrastado a mano con la plantilla real privada sin copiar nada de ella al repositorio."
+  ],
+  "depende": [
+    "LH-012"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/workbook/**",
+    "tests/unit/workbook/**",
+    "tests/fixtures/workbook/**",
+    "package.json",
+    "pnpm-lock.yaml"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Leer en el spec de LH-012 «Reading the template», «The synthetic test template» y la prueba de «nada más cambió» de «Exporting»; la librería se elige con esa prueba.",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

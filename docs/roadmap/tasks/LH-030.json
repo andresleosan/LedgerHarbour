@@ -1,0 +1,19 @@
+{
+  "id": "LH-030",
+  "titulo": "Vista previa privada con el código nuevo",
+  "estado": "pendiente",
+  "responsable": "operador",
+  "criterio": [
+    "La vista previa del tailnet sirve la rama `avanzar` con el Node que fija el proyecto.",
+    "Se puede iniciar sesión y recorrer captura y revisión desde el móvil."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [],
+  "hecho": "",
+  "falta": "Comprobar en un móvil real que «Hacer foto» abre la cámara trasera (LH-016 solo pudo comprobar el atributo).",
+  "bloqueo": "Autorizar al bucle a reiniciar el contenedor de la vista previa con Node 26 apuntando a la copia de avance.",
+  "siguiente": "",
+  "evidencia": [],
+  "actualizado": "2026-11-19"
+}

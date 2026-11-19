@@ -1,0 +1,28 @@
+{
+  "id": "LH-018",
+  "titulo": "Arreglar el fallo al guardar y aprobar en la pantalla de revisión",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Guardar y Aprobar terminan sin error en pantalla con la respuesta real de la API.",
+    "Una prueba e2e usa la API real, sin simular su respuesta, y falla antes del arreglo."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/app/(app)/business/[businessId]/invoices/**",
+    "tests/e2e/invoices/**"
+  ],
+  "hecho": "Guardar y Aprobar terminan sin error: la página lee la factura tal como la devuelve la API.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "Commit 7feaf3a (cherry-pick de 42ebcdd) más el ajuste de la prueba a la subida de un toque.",
+    "Antes del arreglo, la prueba nueva sin simular la API falla: pageerror «Cannot read properties of undefined (reading 'confidenceData')».",
+    "flock /tmp/lh-e2e.lock corepack pnpm test:e2e tests/e2e/invoices/review.spec.ts → 4 pasadas (46 s) en la copia de avance.",
+    "Verificación de lote sobre ee25942 + ajuste de prueba: lint 0, tsc 0, vitest --no-file-parallelism 661 pasadas y 7 omitidas (73 archivos), build 0.",
+    "Decisión: se arregla la página y no la API, porque el servicio, la otra ruta PATCH y critical-path usan la forma plana. Fuente: código."
+  ],
+  "actualizado": "2026-11-19"
+}
