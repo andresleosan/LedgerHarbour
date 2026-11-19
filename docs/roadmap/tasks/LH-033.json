@@ -1,0 +1,22 @@
+{
+  "id": "LH-033",
+  "titulo": "Abrir en Excel un libro exportado de prueba",
+  "estado": "pendiente",
+  "responsable": "operador",
+  "criterio": [
+    "El archivo de prueba abre en Excel sin aviso de reparación.",
+    "En cada hoja de cuenta se ven las 12 filas de prueba con fecha, concepto, código e importe, y el saldo corre.",
+    "Queda anotado si las fechas se ven como fecha y si alguna celda sale con error nuevo."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "Abrir en Excel el archivo de prueba que indica `.claude/avanzar-privado.md` (plantilla real con filas inventadas) y decir si abre sin aviso de reparación y si las filas y fechas se ven bien.",
+  "siguiente": "",
+  "evidencia": [
+    "Creada el 2026-11-19 al cerrar LH-024: en la VPS no hay Excel ni LibreOffice."
+  ],
+  "actualizado": "2026-11-19"
+}

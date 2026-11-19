@@ -1,7 +1,7 @@
 {
   "id": "LH-020",
   "titulo": "Codificar la factura al revisarla",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "El código se elige de la lista del plan de cuentas del negocio; no se escribe un identificador.",
@@ -21,10 +21,17 @@
     "tests/e2e/invoices/**",
     "src/i18n/messages/**"
   ],
-  "hecho": "",
+  "hecho": "En la revisión, el código se elige de la lista del plan de cuentas agrupada por sección; la app propone el último usado con ese proveedor; la factura puede repartirse entre varios códigos que deben sumar el total; no se aprueba sin código. Migración 0011. Se quitó la caja de texto de categoría.",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Regla de validación «sin código no se aprueba», con su prueba.",
-  "evidencia": [],
+  "siguiente": "",
+  "evidencia": [
+    "Commit 0623abc.",
+    "coding.test 16, invoice-coding-repository (PGlite) 4, invoice-coding-permissions 3, migraciones 8; e2e coding.spec y review.spec pasadas a 390 px y 1280 px.",
+    "La primera pasada e2e destapó un fallo real (una carga tardía borraba el reparto) corregido antes de entregar.",
+    "Las pruebas se escribieron después del código; contra un servicio roto a propósito fallan 5.",
+    "Migración 0011 probada en PGlite; sin aplicar en ninguna base real.",
+    "Verificación de lote 3 sobre 87424be: lint 0, tsc 0, vitest --no-file-parallelism 1018 pasadas y 7 omitidas (101 archivos), build 0; e2e documentos, facturas, ajustes, critical-path y navegación 16 pasadas en el puerto alternativo 3101 (el 3100 lo ocupa un servidor huérfano)."
+  ],
   "actualizado": "2026-11-19"
 }

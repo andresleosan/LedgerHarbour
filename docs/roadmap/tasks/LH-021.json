@@ -25,7 +25,7 @@
   "hecho": "",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Pruebas de signo e importe antes de la interfaz.",
+  "siguiente": "Leer «From an approved invoice to a movement» del spec de LH-012. Piezas ya hechas: getInvoiceCoding (facturas) y replaceInvoiceMovements / removeInvoiceMovements (money-service).",
   "evidencia": [],
   "actualizado": "2026-11-19"
 }

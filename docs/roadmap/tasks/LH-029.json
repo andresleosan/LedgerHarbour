@@ -12,7 +12,7 @@
   "comprueba": [],
   "recursos": [],
   "hecho": "",
-  "falta": "Hay dos migraciones nuevas por aplicar (0008 y 0009). Antes de activar la subida de plantilla en producción, comprobar el límite de memoria de las funciones: leer el libro real pide cerca de 1 GB (LH-032).",
+  "falta": "Hay dos migraciones nuevas por aplicar (0008 y 0009). Antes de activar la subida de plantilla en producción, comprobar el límite de memoria de las funciones: leer el libro real pide cerca de 1 GB (LH-032). Ya son cuatro migraciones por aplicar: 0008 a 0011.",
   "bloqueo": "Revisar la rama `avanzar`, publicarla (push o PR a `main`, que despliega en producción) y aplicar las migraciones nuevas. O autorizar al bucle a hacerlo y decir hasta dónde.",
   "siguiente": "",
   "evidencia": [],

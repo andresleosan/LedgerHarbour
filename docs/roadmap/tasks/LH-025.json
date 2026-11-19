@@ -20,7 +20,7 @@
     "src/i18n/messages/**"
   ],
   "hecho": "",
-  "falta": "",
+  "falta": "Incluir en esta pantalla el botón de descarga del libro y el informe de control de LH-024 en palabras llanas (GET …/export y …/export/report); la suma está en year-summary.ts.",
   "bloqueo": "",
   "siguiente": "Servicio de totales con pruebas; después la pantalla.",
   "evidencia": [],

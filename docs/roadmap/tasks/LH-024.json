@@ -1,7 +1,7 @@
 {
   "id": "LH-024",
   "titulo": "Exportar el libro del contable relleno",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "Devuelve una copia de la plantilla del negocio con cada movimiento en la hoja de su cuenta (fecha, concepto, código e importe con signo), en orden de fecha, y el saldo inicial.",
@@ -24,10 +24,19 @@
     "src/app/(app)/business/[businessId]/export/**",
     "src/i18n/messages/**"
   ],
-  "hecho": "",
+  "hecho": "Exporta una copia de la plantilla del negocio con los movimientos del ejercicio en la hoja de su cuenta y el saldo inicial, parcheando solo las celdas de entrada. Limpia las filas de muestra. Informe de control con bloqueos, capacidad, defectos y totales. Relee su propia salida y compara totales al céntimo. API: GET …/financial-years/{id}/export y …/export/report.",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Prueba de ida y vuelta sobre la plantilla sintética: escribir filas y comprobar que las fórmulas siguen intactas.",
-  "evidencia": [],
+  "siguiente": "",
+  "evidencia": [
+    "Commit f783c34.",
+    "write-workbook 15, write-workbook-limits 1, export-service 11, workbook-export-permissions 11; todas pasadas.",
+    "Prueba de «nada más cambió» sobre la sintética: todas las demás partes del archivo idénticas byte a byte (también comprimidas), fórmulas intactas, workbook.xml solo cambia el indicador de recálculo.",
+    "Contraste a mano con la plantilla real, fuera del repositorio: mismas pruebas con filas inventadas; perfil idéntico tras exportar; cerca de 300 MB de memoria.",
+    "No observable aquí: abrir el archivo en Excel sin aviso de reparación y ver los estados recalculados (no hay Excel ni LibreOffice). Trasladado a LH-033 con un archivo de prueba ya generado.",
+    "Decisión: un libro con sistema de fechas 1904 se rechaza; el formato de fecha se conserva y solo se añade uno a styles.xml si la columna no lo tiene. Fuente: opción más simple.",
+    "Sin pantalla: el botón de descarga y el informe en palabras llanas van en LH-025.",
+    "Verificación de lote 3 sobre 87424be: lint 0, tsc 0, vitest --no-file-parallelism 1018 pasadas y 7 omitidas (101 archivos), build 0; e2e documentos, facturas, ajustes, critical-path y navegación 16 pasadas en el puerto alternativo 3101 (el 3100 lo ocupa un servidor huérfano)."
+  ],
   "actualizado": "2026-11-19"
 }

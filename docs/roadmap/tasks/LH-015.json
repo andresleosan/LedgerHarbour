@@ -1,7 +1,7 @@
 {
   "id": "LH-015",
   "titulo": "Cuentas de dinero y movimientos",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "Cuentas de banco y caja por negocio, cada una ligada a una hoja de la plantilla, con su saldo inicial.",
@@ -20,10 +20,17 @@
     "tests/unit/db/**",
     "tests/integration/**"
   ],
-  "hecho": "",
+  "hecho": "Ejercicios (uno abierto por negocio), cuentas de banco y caja ligadas a una hoja de la plantilla con saldo inicial por ejercicio, y movimientos con cuenta, fecha, concepto, rótulo, importe con signo y origen. Migración 0010. API de ejercicios, cuentas y movimientos. Memoria y postgres.",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Leer «Money accounts», «Financial year» y «Movements» del spec de LH-012. Las hojas de la plantilla del negocio están en business_templates.profile.sheets (template-service.getTemplate).",
-  "evidencia": [],
+  "siguiente": "",
+  "evidencia": [
+    "Commit a6c7fa8.",
+    "money.test 52, money-service 40, money-repository (PGlite) 20, money-permissions 11, migraciones 7; todas pasadas. Céntimos exactos con enteros seguros, sin coma flotante.",
+    "Un movimiento fuera del ejercicio abierto se rechaza (MOVEMENT_OUTSIDE_OPEN_YEAR); un ejercicio cerrado es de solo lectura.",
+    "Las pruebas de servicio se escribieron después del código; el subagente rompió tres reglas a propósito y las pruebas las detectaron.",
+    "Migración 0010 probada en PGlite con vuelta atrás; sin aplicar en ninguna base real. native-schema omitida (necesita TEST_DATABASE_URL).",
+    "Verificación de lote 3 sobre 87424be: lint 0, tsc 0, vitest --no-file-parallelism 1018 pasadas y 7 omitidas (101 archivos), build 0; e2e documentos, facturas, ajustes, critical-path y navegación 16 pasadas en el puerto alternativo 3101 (el 3100 lo ocupa un servidor huérfano)."
+  ],
   "actualizado": "2026-11-19"
 }
