@@ -7,6 +7,8 @@ import { resolveDefaultHeadingRepository, type HeadingRepository } from "../acco
 import { createPostgresHeadingRepository } from "../accounting/postgres-heading-repository";
 import { resolveDefaultTemplateRepository, type TemplateRepository } from "../accounting/template-service";
 import { createPostgresTemplateRepository } from "../accounting/postgres-template-repository";
+import { resolveDefaultMoneyRepository, type MoneyRepository } from "../accounting/money-repository";
+import { createPostgresMoneyRepository } from "../accounting/postgres-money-repository";
 import { resolveDefaultDocumentRepository, resolveDefaultInvoiceRepository } from "../invoices/invoice-service";
 import { createPostgresInvoiceRepository } from "../invoices/postgres-invoice-repository";
 import { resolveDefaultJobRepository } from "../jobs/job-service";
@@ -38,6 +40,7 @@ export type PersistenceContext = {
   currencyRepository: CurrencyRepository;
   headingRepository: HeadingRepository;
   templateRepository: TemplateRepository;
+  moneyRepository: MoneyRepository;
   storage: StorageAdapter;
   database?: Database;
   transaction?: <T>(operation: (tenancyRepository: OnboardingRepository) => Promise<T>) => Promise<T>;
@@ -91,6 +94,7 @@ export function createPersistenceContext(input: PersistenceInput = {}): Persiste
       currencyRepository: resolveDefaultCurrencyRepository(),
       headingRepository: resolveDefaultHeadingRepository(),
       templateRepository: resolveDefaultTemplateRepository(),
+      moneyRepository: resolveDefaultMoneyRepository(),
       storage,
       close: async () => {},
     };
@@ -122,6 +126,7 @@ function postgresContext(database: Database, pool: Pool | undefined, storage: St
     currencyRepository: createPostgresCurrencyRepository(database),
     headingRepository: createPostgresHeadingRepository(database),
     templateRepository: createPostgresTemplateRepository(database),
+    moneyRepository: createPostgresMoneyRepository(database),
     storage,
     database,
     transaction: async (operation) => {

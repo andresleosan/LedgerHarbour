@@ -19,6 +19,9 @@ import {
   checkProjectsMigration,
   rollbackAccountHeadingsMigration,
   rollbackBusinessTemplatesMigration,
+  applyMoneyMovementsMigration,
+  checkMoneyMovementsMigration,
+  rollbackMoneyMovementsMigration,
   rollbackMembershipLifecycleMigration,
   rollbackProjectsMigration,
   type MigrationClientFactory,
@@ -165,6 +168,7 @@ describe("PGlite test database migrations", () => {
         "0007_rate_limit_windows",
         "0008_account_headings",
         "0009_business_templates",
+        "0010_money_movements",
       ]);
       await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({
         projects: { applied: true, requiredTableCount: 2, ledgerRecordPresent: true },
@@ -201,6 +205,8 @@ describe("PGlite test database migrations", () => {
     try {
       const config = { databaseUrl: "pglite://lh014", allowStagingMigration: true as const };
       await applyAllMigrations(config, clientFactory);
+      // 0010 movements reference account_headings, so the later migration is rolled back first.
+      await rollbackMoneyMovementsMigration(config, clientFactory);
       const withHeadings = await schemaObjects();
       await expect(checkAccountHeadingsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 1, ledgerRecordPresent: true });
 
@@ -281,6 +287,92 @@ describe("PGlite test database migrations", () => {
 
       await expect(applyBusinessTemplatesMigration(config, clientFactory)).resolves.toEqual({ version: "0009_business_templates", applied: true });
       expect(await schemaObjects()).toEqual(withTemplates);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("applies, rolls back exactly, and reapplies money movements 0010", async () => {
+    const client = new PGlite();
+    const clientFactory: MigrationClientFactory = async () => ({
+      query: async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+        if (!values && /^(BEGIN|COMMIT|ROLLBACK)\b/i.test(text.trim())) {
+          await client.exec(text);
+          return { rows: [] as Row[], rowCount: 0 };
+        }
+        const result = await client.query<Row>(text, values ? [...values] : undefined);
+        return { rows: result.rows, rowCount: result.rows.length };
+      },
+      exec: (text: string) => client.exec(text),
+      end: async () => undefined,
+    });
+    const schemaObjects = async () => {
+      const relations = await client.query<{ name: string }>(`
+        SELECT relname AS name FROM pg_class WHERE relnamespace = 'public'::regnamespace
+        UNION
+        SELECT conname AS name FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND contype <> 'n'
+        ORDER BY name
+      `);
+      return relations.rows.map((row) => row.name);
+    };
+    const ledger = async () => (await client.query<{ version: string }>("SELECT version FROM ledgerharbour_schema_migrations ORDER BY version")).rows.map((row) => row.version);
+    try {
+      const config = { databaseUrl: "pglite://lh015", allowStagingMigration: true as const };
+      await applyAllMigrations(config, clientFactory);
+      const withMoney = await schemaObjects();
+      await expect(checkMoneyMovementsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 4, ledgerRecordPresent: true });
+      await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({ moneyMovements: { version: "0010_money_movements", applied: true } });
+
+      await expect(rollbackMoneyMovementsMigration(config, clientFactory)).resolves.toEqual({ version: "0010_money_movements", applied: true });
+      const withoutMoney = await schemaObjects();
+      expect(withMoney.filter((name) => !withoutMoney.includes(name))).toEqual([
+        "financial_years",
+        "financial_years_business_id_fkey",
+        "financial_years_business_id_unique",
+        "financial_years_business_start_unique",
+        "financial_years_dates_check",
+        "financial_years_one_open_per_business",
+        "financial_years_pkey",
+        "financial_years_status_check",
+        "money_account_openings",
+        "money_account_openings_account_fk",
+        "money_account_openings_pkey",
+        "money_account_openings_year_fk",
+        "money_accounts",
+        "money_accounts_active_name_unique",
+        "money_accounts_active_sheet_unique",
+        "money_accounts_business_id_fkey",
+        "money_accounts_business_id_unique",
+        "money_accounts_kind_check",
+        "money_accounts_name_check",
+        "money_accounts_pkey",
+        "money_accounts_sheet_name_check",
+        "movements",
+        "movements_account_fk",
+        "movements_amount_check",
+        "movements_business_id_fkey",
+        "movements_created_seq_seq",
+        "movements_creator_business_fk",
+        "movements_heading_check",
+        "movements_heading_fk",
+        "movements_listing_idx",
+        "movements_narrative_check",
+        "movements_origin_check",
+        "movements_pkey",
+        "movements_source_invoice_check",
+        "movements_source_invoice_fk",
+        "movements_source_invoice_idx",
+        "movements_year_fk",
+      ]);
+      expect(withoutMoney.every((name) => withMoney.includes(name))).toBe(true);
+      expect(await ledger()).not.toContain("0010_money_movements");
+      expect(await ledger()).toContain("0009_business_templates");
+      await expect(checkMoneyMovementsMigration(config, clientFactory)).resolves.toMatchObject({ applied: false, requiredTableCount: 0, ledgerRecordPresent: false });
+      await expect(checkAllMigrations(config, clientFactory)).rejects.toThrow("money movements migration");
+
+      await expect(applyMoneyMovementsMigration(config, clientFactory)).resolves.toEqual({ version: "0010_money_movements", applied: true });
+      await expect(applyMoneyMovementsMigration(config, clientFactory)).resolves.toEqual({ version: "0010_money_movements", applied: false });
+      expect(await schemaObjects()).toEqual(withMoney);
     } finally {
       await client.close();
     }

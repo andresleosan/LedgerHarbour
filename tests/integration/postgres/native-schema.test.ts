@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   applyAllMigrations,
   checkAllMigrations,
-  applyBusinessTemplatesMigration,
-  checkBusinessTemplatesMigration,
-  rollbackBusinessTemplatesMigration,
+  applyMoneyMovementsMigration,
+  checkMoneyMovementsMigration,
+  rollbackMoneyMovementsMigration,
   type MigrationConfig,
 } from "../../../src/db/migration-runner";
 
@@ -67,6 +67,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       "0007_rate_limit_windows",
       "0008_account_headings",
       "0009_business_templates",
+      "0010_money_movements",
     ]);
     expect(Object.values(applied).every((migration) => migration.applied)).toBe(true);
     expect(checked).toMatchObject({
@@ -79,6 +80,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       rateLimit: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
       accountHeadings: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
       businessTemplates: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
+      moneyMovements: { applied: true, requiredTableCount: 4, ledgerRecordPresent: true },
     });
   });
 
@@ -100,11 +102,15 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       "categories",
       "currencies",
       "documents",
+      "financial_years",
       "invoices",
       "jobs",
       "join_requests",
       "ledgerharbour_schema_migrations",
       "memberships",
+      "money_account_openings",
+      "money_accounts",
+      "movements",
       "platform_audit_events",
       "platform_members",
       "project_memberships",
@@ -181,19 +187,19 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
   }, 30_000);
 
   it("rolls back and reapplies the latest migration with ledger parity", async () => {
-    await expect(rollbackBusinessTemplatesMigration(config)).resolves.toEqual({
-      version: "0009_business_templates",
+    await expect(rollbackMoneyMovementsMigration(config)).resolves.toEqual({
+      version: "0010_money_movements",
       applied: true,
     });
-    await expect(checkBusinessTemplatesMigration(config)).resolves.toMatchObject({
+    await expect(checkMoneyMovementsMigration(config)).resolves.toMatchObject({
       applied: false,
       ledgerRecordPresent: false,
     });
-    await expect(applyBusinessTemplatesMigration(config)).resolves.toEqual({
-      version: "0009_business_templates",
+    await expect(applyMoneyMovementsMigration(config)).resolves.toEqual({
+      version: "0010_money_movements",
       applied: true,
     });
-    await expect(checkBusinessTemplatesMigration(config)).resolves.toMatchObject({
+    await expect(checkMoneyMovementsMigration(config)).resolves.toMatchObject({
       applied: true,
       ledgerRecordPresent: true,
     });

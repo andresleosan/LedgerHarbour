@@ -20,6 +20,9 @@ const ACCOUNT_HEADINGS_MIGRATION_VERSION = "0008_account_headings";
 const ACCOUNT_HEADINGS_MIGRATION_FILE = new URL("./migrations/0008_account_headings.sql", import.meta.url);
 const BUSINESS_TEMPLATES_MIGRATION_VERSION = "0009_business_templates";
 const BUSINESS_TEMPLATES_MIGRATION_FILE = new URL("./migrations/0009_business_templates.sql", import.meta.url);
+const MONEY_MOVEMENTS_MIGRATION_VERSION = "0010_money_movements";
+const MONEY_MOVEMENTS_MIGRATION_FILE = new URL("./migrations/0010_money_movements.sql", import.meta.url);
+const MONEY_MOVEMENTS_REQUIRED_TABLES = ["financial_years", "money_accounts", "money_account_openings", "movements"] as const;
 const REQUIRED_TABLES = [
   "users",
   "businesses",
@@ -42,6 +45,7 @@ const BUSINESS_REQUEST_AUDIT_ROLLBACK_FILE = new URL("./migrations/rollback/0006
 const RATE_LIMIT_ROLLBACK_FILE = new URL("./migrations/rollback/0007_rate_limit_windows_down.sql", import.meta.url);
 const ACCOUNT_HEADINGS_ROLLBACK_FILE = new URL("./migrations/rollback/0008_account_headings_down.sql", import.meta.url);
 const BUSINESS_TEMPLATES_ROLLBACK_FILE = new URL("./migrations/rollback/0009_business_templates_down.sql", import.meta.url);
+const MONEY_MOVEMENTS_ROLLBACK_FILE = new URL("./migrations/rollback/0010_money_movements_down.sql", import.meta.url);
 
 export type MigrationQueryResult<Row = Record<string, unknown>> = {
   rows: Row[];
@@ -86,6 +90,7 @@ export type MigrationSequence<T> = {
   rateLimit: T;
   accountHeadings: T;
   businessTemplates: T;
+  moneyMovements: T;
 };
 
 export function assertRequiredMigrations(
@@ -98,6 +103,7 @@ export function assertRequiredMigrations(
   rateLimit?: MigrationCheck,
   accountHeadings?: MigrationCheck,
   businessTemplates?: MigrationCheck,
+  moneyMovements?: MigrationCheck,
 ): void {
   if (
     initial.version !== MIGRATION_VERSION
@@ -137,6 +143,9 @@ export function assertRequiredMigrations(
   }
   if (businessTemplates && (!businessTemplates.applied || businessTemplates.version !== BUSINESS_TEMPLATES_MIGRATION_VERSION || businessTemplates.requiredTableCount !== 1)) {
     throw new Error("Required PostgreSQL business templates migration is not applied");
+  }
+  if (moneyMovements && (!moneyMovements.applied || moneyMovements.version !== MONEY_MOVEMENTS_MIGRATION_VERSION || moneyMovements.requiredTableCount !== MONEY_MOVEMENTS_REQUIRED_TABLES.length)) {
+    throw new Error("Required PostgreSQL money movements migration is not applied");
   }
 }
 
@@ -830,6 +839,84 @@ export async function checkBusinessTemplatesMigration(
   }
 }
 
+export async function applyMoneyMovementsMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, BUSINESS_TEMPLATES_MIGRATION_VERSION))) {
+      throw new Error("Business templates migration must be applied before money movements migration");
+    }
+    if (await migrationWasApplied(client, MONEY_MOVEMENTS_MIGRATION_VERSION)) {
+      return { version: MONEY_MOVEMENTS_MIGRATION_VERSION, applied: false };
+    }
+    if (await hasPartialSchema(client, [...MONEY_MOVEMENTS_REQUIRED_TABLES])) {
+      throw new Error("Database has money movements schema tables without a migration record");
+    }
+    const migrationSql = withoutTransactionMarkers(await readFile(MONEY_MOVEMENTS_MIGRATION_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, migrationSql);
+    await client.query("INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)", [MONEY_MOVEMENTS_MIGRATION_VERSION]);
+    await client.query("COMMIT");
+    return { version: MONEY_MOVEMENTS_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function rollbackMoneyMovementsMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, MONEY_MOVEMENTS_MIGRATION_VERSION))) {
+      return { version: MONEY_MOVEMENTS_MIGRATION_VERSION, applied: false };
+    }
+    const rollbackSql = withoutTransactionMarkers(await readFile(MONEY_MOVEMENTS_ROLLBACK_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, rollbackSql);
+    await client.query("COMMIT");
+    return { version: MONEY_MOVEMENTS_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function checkMoneyMovementsMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationCheck> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    const applied = await migrationWasApplied(client, MONEY_MOVEMENTS_MIGRATION_VERSION);
+    const tables = await client.query<{ table_name: string }>(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = ANY($1::text[])`,
+      [[...MONEY_MOVEMENTS_REQUIRED_TABLES]],
+    );
+    return {
+      version: MONEY_MOVEMENTS_MIGRATION_VERSION,
+      applied,
+      requiredTableCount: tables.rowCount ?? 0,
+      ledgerRecordPresent: applied,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
 export async function applyAllMigrations(
   config: MigrationConfig,
   clientFactory: MigrationClientFactory = connect,
@@ -843,7 +930,8 @@ export async function applyAllMigrations(
   const rateLimit = await applyRateLimitMigration(config, clientFactory);
   const accountHeadings = await applyAccountHeadingsMigration(config, clientFactory);
   const businessTemplates = await applyBusinessTemplatesMigration(config, clientFactory);
-  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates };
+  const moneyMovements = await applyMoneyMovementsMigration(config, clientFactory);
+  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates, moneyMovements };
 }
 
 export async function checkAllMigrations(
@@ -859,6 +947,7 @@ export async function checkAllMigrations(
   const rateLimit = await checkRateLimitMigration(config, clientFactory);
   const accountHeadings = await checkAccountHeadingsMigration(config, clientFactory);
   const businessTemplates = await checkBusinessTemplatesMigration(config, clientFactory);
-  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates);
-  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates };
+  const moneyMovements = await checkMoneyMovementsMigration(config, clientFactory);
+  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates, moneyMovements);
+  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates, moneyMovements };
 }

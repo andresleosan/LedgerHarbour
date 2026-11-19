@@ -121,6 +121,10 @@ describe("relational domain schema", () => {
       "projectMemberships",
       "accountHeadings",
       "businessTemplates",
+      "financialYears",
+      "moneyAccounts",
+      "moneyAccountOpenings",
+      "movements",
     ]);
     expect([
       users,
@@ -139,6 +143,10 @@ describe("relational domain schema", () => {
       projectMemberships,
       schema.accountHeadings,
       schema.businessTemplates,
+      schema.financialYears,
+      schema.moneyAccounts,
+      schema.moneyAccountOpenings,
+      schema.movements,
     ].map(getTableName)).toEqual([
       "users",
       "businesses",
@@ -156,6 +164,10 @@ describe("relational domain schema", () => {
       "project_memberships",
       "account_headings",
       "business_templates",
+      "financial_years",
+      "money_accounts",
+      "money_account_openings",
+      "movements",
     ]);
   });
 
@@ -170,6 +182,10 @@ describe("relational domain schema", () => {
       auditEvents,
       jobs,
       projects,
+      schema.financialYears,
+      schema.moneyAccounts,
+      schema.moneyAccountOpenings,
+      schema.movements,
     ]) {
       expect(getTableColumns(table).businessId.notNull).toBe(true);
     }
