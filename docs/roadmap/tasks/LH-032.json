@@ -1,0 +1,28 @@
+{
+  "id": "LH-032",
+  "titulo": "Leer la plantilla con memoria acotada",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Leer la plantilla real pide menos de 300 MB de memoria, medido.",
+    "Un archivo que supere el límite de memoria o de tiempo se rechaza sin tumbar el servidor.",
+    "El perfil que devuelve el lector no cambia: las pruebas existentes pasan sin tocarlas."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/workbook/**",
+    "tests/unit/workbook/**",
+    "tests/fixtures/workbook/**",
+    "package.json",
+    "pnpm-lock.yaml"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Medir primero. Opciones: leer el XML de las hojas directamente (la compuerta ya descomprime y recorre cada parte) o aislar la lectura en un worker con límite de memoria y de tiempo.",
+  "evidencia": [
+    "Creada el 2026-11-19 al cerrar LH-013: exceljs carga el libro entero, unas 20 veces el XML descomprimido."
+  ],
+  "actualizado": "2026-11-19"
+}

@@ -126,8 +126,8 @@ Decisions:
   or its analysis formula is missing on rows the business would use. Source:
   **Workbook** (each of these silently misstates the accounts).
 - **Placeholders** (headings that are only a number or a letter) are imported
-  inactive. They become usable when someone gives them a `displayName`, which is
-  a decision recorded in the audit trail. What account sits behind each one is
+  inactive. They become usable when someone names and activates them; both
+  steps are recorded in the audit trail. Renaming alone never activates. What account sits behind each one is
   the accountant's call (LH-028). Source: **Workbook**, **default**.
 - The five seeded expense categories of the current app are not headings and are
   not migrated. Invoices stop using the category field once LH-020 lands.

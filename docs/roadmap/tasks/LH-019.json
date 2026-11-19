@@ -1,7 +1,7 @@
 {
   "id": "LH-019",
   "titulo": "Una lectura fallida no deja la factura bloqueada",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "Tras un fallo de lectura se puede reintentar y, si vuelve a fallar, rellenar la factura a mano.",
@@ -18,10 +18,17 @@
     "tests/unit/documents/**",
     "src/i18n/messages/**"
   ],
-  "hecho": "",
-  "falta": "Comprobar al tomarla: en el servidor de desarrollo en modo memoria, subir un duplicado devolvió 500 en vez de 409 una vez cargada la ruta de lectura (sospecha sin confirmar: instanceof entre dos copias del módulo de documentos).",
+  "hecho": "Una lectura fallida se puede repetir (hasta 3 intentos) y, agotados, rellenar a mano; el mismo archivo puede volver a subirse si su lectura falló; hay una lista de documentos con estado y acciones, enlazada en el menú, en inglés y español. Arreglado el 500 en vez de 409 al subir un duplicado en el servidor de desarrollo.",
+  "falta": "",
   "bloqueo": "",
-  "siguiente": "Prueba que reproduce el callejón sin salida: lectura fallida, reintento rechazado y resubida rechazada.",
-  "evidencia": [],
+  "siguiente": "",
+  "evidencia": [
+    "Commit eb5dd2d.",
+    "failed-reading-recovery.test.ts: 7 de 8 fallaban antes (reintento 409, sin lista, sin vía manual) y 8 pasan después; document-recovery-repositories 10 (memoria y PGlite); duplicate-across-module-copies 2 (falla con el arreglo quitado).",
+    "e2e documents-list.spec.ts pasada a 390 px y 1280 px con la puerta de consola, copia en español, 403 entre negocios y 409 real del duplicado.",
+    "No comprobado en navegador: los botones «Leer de nuevo» y «Rellenar a mano», porque el entorno de pruebas no puede provocar una lectura fallida; cubierto llamando a las rutas con un proveedor que falla.",
+    "Decisión: sin migración; la resubida reutiliza la fila del documento fallido. El trabajo manual queda en «completed». Fuente: opción más simple.",
+    "Verificación de lote 2: lint 0, tsc 0, vitest --no-file-parallelism 793 pasadas y 7 omitidas (87 archivos), build 0; e2e documentos, facturas y navegación 13 pasadas, critical-path pasada en la repetición (la primera vez agotó 15 s creando el negocio con el servidor en frío). Tras ea1fcfd: tests/unit/workbook y template-service 65 pasadas, lint 0, tsc 0."
+  ],
   "actualizado": "2026-11-19"
 }

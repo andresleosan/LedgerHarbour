@@ -1,7 +1,7 @@
 {
   "id": "LH-014",
   "titulo": "Plan de cuentas por negocio, importado de la plantilla",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "Cada negocio tiene rótulos con código estable, etiqueta exacta, grupo (ingresos, coste de ventas, gastos, activo, pasivo, patrimonio), orden y activo o inactivo.",
@@ -23,10 +23,18 @@
     "tests/integration/**",
     "src/app/api/businesses/[businessId]/categories/**"
   ],
-  "hecho": "",
+  "hecho": "Rótulos por negocio (tabla account_headings, migración 0008) con id estable, valor exacto, tipo, grupo, orden, nombre visible, activo y motivo de bloqueo. Subida de la plantilla (tabla business_templates, migración 0009): la lee, importa los rótulos por posición y conserva lo ya codificado. API: GET/POST /template, GET /headings, PATCH /headings/{id}. Memoria y postgres.",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Decidir en el spec si los rótulos sustituyen a las categorías actuales o las amplían.",
-  "evidencia": [],
+  "siguiente": "",
+  "evidencia": [
+    "Commits f6f3d43, 254c884 y 4e2928f.",
+    "Pruebas: heading-service 19, template-service 13, template-route 8, heading-repository 10 y template-repository 6 (PGlite), permisos de rótulos 11 y de plantilla 9, migraciones 6; todas pasadas.",
+    "Migraciones 0008 y 0009 aditivas, con vuelta atrás probada en PGlite. No aplicadas en ninguna base real (LH-029). native-schema.test.ts omitida: necesita TEST_DATABASE_URL.",
+    "Decisión: renombrar no activa un rótulo; los numéricos o de una letra entran inactivos. Fuente: spec de LH-012, alineado.",
+    "Decisión: el permiso se comprueba antes de leer el archivo. Fuente: leer es caro.",
+    "Sin pantalla: el dueño aún no puede usarlo desde la app. Trasladado a LH-031.",
+    "Verificación de lote 2: lint 0, tsc 0, vitest --no-file-parallelism 793 pasadas y 7 omitidas (87 archivos), build 0; e2e documentos, facturas y navegación 13 pasadas, critical-path pasada en la repetición (la primera vez agotó 15 s creando el negocio con el servidor en frío). Tras ea1fcfd: tests/unit/workbook y template-service 65 pasadas, lint 0, tsc 0."
+  ],
   "actualizado": "2026-11-19"
 }

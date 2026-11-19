@@ -1,0 +1,29 @@
+{
+  "id": "LH-031",
+  "titulo": "Pantalla de ajustes: plantilla del contable y plan de cuentas",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "En Ajustes, el dueño sube la plantilla del contable y ve qué hojas y cuántos rótulos se leyeron.",
+    "Los defectos de la plantilla que falsean el resultado se muestran en palabras llanas, en inglés y español.",
+    "La lista de rótulos sale agrupada por sección; se puede renombrar y activar o desactivar; los bloqueados dicen por qué.",
+    "Comprobado a 390 px y 1280 px sin errores de consola."
+  ],
+  "depende": [
+    "LH-014"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/app/(app)/business/[businessId]/settings/**",
+    "tests/e2e/settings/**",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Leer las páginas de Ajustes > Categorías y Monedas y las rutas /api/businesses/{id}/template y /headings.",
+  "evidencia": [
+    "Creada el 2026-11-19 al cerrar LH-014: su criterio se cumple por API, pero sin pantalla el dueño no puede usarlo."
+  ],
+  "actualizado": "2026-11-19"
+}

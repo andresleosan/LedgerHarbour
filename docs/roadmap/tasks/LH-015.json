@@ -23,7 +23,7 @@
   "hecho": "",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Modelo y pruebas del servicio de movimientos antes de tocar la base de datos.",
+  "siguiente": "Leer «Money accounts», «Financial year» y «Movements» del spec de LH-012. Las hojas de la plantilla del negocio están en business_templates.profile.sheets (template-service.getTemplate).",
   "evidencia": [],
   "actualizado": "2026-11-19"
 }
