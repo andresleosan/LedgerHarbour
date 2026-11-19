@@ -18,6 +18,8 @@ const RATE_LIMIT_MIGRATION_VERSION = "0007_rate_limit_windows";
 const RATE_LIMIT_MIGRATION_FILE = new URL("./migrations/0007_rate_limit_windows.sql", import.meta.url);
 const ACCOUNT_HEADINGS_MIGRATION_VERSION = "0008_account_headings";
 const ACCOUNT_HEADINGS_MIGRATION_FILE = new URL("./migrations/0008_account_headings.sql", import.meta.url);
+const BUSINESS_TEMPLATES_MIGRATION_VERSION = "0009_business_templates";
+const BUSINESS_TEMPLATES_MIGRATION_FILE = new URL("./migrations/0009_business_templates.sql", import.meta.url);
 const REQUIRED_TABLES = [
   "users",
   "businesses",
@@ -39,6 +41,7 @@ const PROJECTS_ROLLBACK_FILE = new URL("./migrations/rollback/0005_projects_down
 const BUSINESS_REQUEST_AUDIT_ROLLBACK_FILE = new URL("./migrations/rollback/0006_business_request_audit_down.sql", import.meta.url);
 const RATE_LIMIT_ROLLBACK_FILE = new URL("./migrations/rollback/0007_rate_limit_windows_down.sql", import.meta.url);
 const ACCOUNT_HEADINGS_ROLLBACK_FILE = new URL("./migrations/rollback/0008_account_headings_down.sql", import.meta.url);
+const BUSINESS_TEMPLATES_ROLLBACK_FILE = new URL("./migrations/rollback/0009_business_templates_down.sql", import.meta.url);
 
 export type MigrationQueryResult<Row = Record<string, unknown>> = {
   rows: Row[];
@@ -82,6 +85,7 @@ export type MigrationSequence<T> = {
   businessRequestAudit: T;
   rateLimit: T;
   accountHeadings: T;
+  businessTemplates: T;
 };
 
 export function assertRequiredMigrations(
@@ -93,6 +97,7 @@ export function assertRequiredMigrations(
   businessRequestAudit?: MigrationCheck,
   rateLimit?: MigrationCheck,
   accountHeadings?: MigrationCheck,
+  businessTemplates?: MigrationCheck,
 ): void {
   if (
     initial.version !== MIGRATION_VERSION
@@ -129,6 +134,9 @@ export function assertRequiredMigrations(
   }
   if (accountHeadings && (!accountHeadings.applied || accountHeadings.version !== ACCOUNT_HEADINGS_MIGRATION_VERSION || accountHeadings.requiredTableCount !== 1)) {
     throw new Error("Required PostgreSQL account headings migration is not applied");
+  }
+  if (businessTemplates && (!businessTemplates.applied || businessTemplates.version !== BUSINESS_TEMPLATES_MIGRATION_VERSION || businessTemplates.requiredTableCount !== 1)) {
+    throw new Error("Required PostgreSQL business templates migration is not applied");
   }
 }
 
@@ -745,6 +753,83 @@ export async function checkAccountHeadingsMigration(
   }
 }
 
+export async function applyBusinessTemplatesMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, ACCOUNT_HEADINGS_MIGRATION_VERSION))) {
+      throw new Error("Account headings migration must be applied before business templates migration");
+    }
+    if (await migrationWasApplied(client, BUSINESS_TEMPLATES_MIGRATION_VERSION)) {
+      return { version: BUSINESS_TEMPLATES_MIGRATION_VERSION, applied: false };
+    }
+    if (await hasPartialSchema(client, ["business_templates"])) {
+      throw new Error("Database has business templates schema tables without a migration record");
+    }
+    const migrationSql = withoutTransactionMarkers(await readFile(BUSINESS_TEMPLATES_MIGRATION_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, migrationSql);
+    await client.query("INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)", [BUSINESS_TEMPLATES_MIGRATION_VERSION]);
+    await client.query("COMMIT");
+    return { version: BUSINESS_TEMPLATES_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function rollbackBusinessTemplatesMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, BUSINESS_TEMPLATES_MIGRATION_VERSION))) {
+      return { version: BUSINESS_TEMPLATES_MIGRATION_VERSION, applied: false };
+    }
+    const rollbackSql = withoutTransactionMarkers(await readFile(BUSINESS_TEMPLATES_ROLLBACK_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, rollbackSql);
+    await client.query("COMMIT");
+    return { version: BUSINESS_TEMPLATES_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function checkBusinessTemplatesMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationCheck> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    const applied = await migrationWasApplied(client, BUSINESS_TEMPLATES_MIGRATION_VERSION);
+    const tables = await client.query<{ table_name: string }>(
+      `SELECT table_name
+       FROM information_schema.tables
+       WHERE table_schema = 'public' AND table_name = 'business_templates'`,
+    );
+    return {
+      version: BUSINESS_TEMPLATES_MIGRATION_VERSION,
+      applied,
+      requiredTableCount: tables.rowCount ?? 0,
+      ledgerRecordPresent: applied,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
 export async function applyAllMigrations(
   config: MigrationConfig,
   clientFactory: MigrationClientFactory = connect,
@@ -757,7 +842,8 @@ export async function applyAllMigrations(
   const businessRequestAudit = await applyBusinessRequestAuditMigration(config, clientFactory);
   const rateLimit = await applyRateLimitMigration(config, clientFactory);
   const accountHeadings = await applyAccountHeadingsMigration(config, clientFactory);
-  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings };
+  const businessTemplates = await applyBusinessTemplatesMigration(config, clientFactory);
+  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates };
 }
 
 export async function checkAllMigrations(
@@ -772,6 +858,7 @@ export async function checkAllMigrations(
   const businessRequestAudit = await checkBusinessRequestAuditMigration(config, clientFactory);
   const rateLimit = await checkRateLimitMigration(config, clientFactory);
   const accountHeadings = await checkAccountHeadingsMigration(config, clientFactory);
-  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings);
-  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings };
+  const businessTemplates = await checkBusinessTemplatesMigration(config, clientFactory);
+  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates);
+  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates };
 }

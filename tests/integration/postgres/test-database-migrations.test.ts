@@ -4,6 +4,7 @@ import { PGlite } from "@electric-sql/pglite";
 import { createTestDatabase } from "../../../src/db/test-database";
 import {
   applyAccountHeadingsMigration,
+  applyBusinessTemplatesMigration,
   applyBusinessLifecycleMigration,
   applyAllMigrations,
   checkInitialMigration,
@@ -14,8 +15,10 @@ import {
   applyPlatformControlPlaneMigration,
   checkMembershipLifecycleMigration,
   checkAccountHeadingsMigration,
+  checkBusinessTemplatesMigration,
   checkProjectsMigration,
   rollbackAccountHeadingsMigration,
+  rollbackBusinessTemplatesMigration,
   rollbackMembershipLifecycleMigration,
   rollbackProjectsMigration,
   type MigrationClientFactory,
@@ -161,6 +164,7 @@ describe("PGlite test database migrations", () => {
         "0006_business_request_audit",
         "0007_rate_limit_windows",
         "0008_account_headings",
+        "0009_business_templates",
       ]);
       await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({
         projects: { applied: true, requiredTableCount: 2, ledgerRecordPresent: true },
@@ -223,6 +227,60 @@ describe("PGlite test database migrations", () => {
 
       await expect(applyAccountHeadingsMigration(config, clientFactory)).resolves.toEqual({ version: "0008_account_headings", applied: true });
       expect(await schemaObjects()).toEqual(withHeadings);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+  it("applies, rolls back exactly, and reapplies business templates 0009", async () => {
+    const client = new PGlite();
+    const clientFactory: MigrationClientFactory = async () => ({
+      query: async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+        if (!values && /^(BEGIN|COMMIT|ROLLBACK)\b/i.test(text.trim())) {
+          await client.exec(text);
+          return { rows: [] as Row[], rowCount: 0 };
+        }
+        const result = await client.query<Row>(text, values ? [...values] : undefined);
+        return { rows: result.rows, rowCount: result.rows.length };
+      },
+      exec: (text: string) => client.exec(text),
+      end: async () => undefined,
+    });
+    const schemaObjects = async () => {
+      const relations = await client.query<{ name: string }>(`
+        SELECT relname AS name FROM pg_class WHERE relnamespace = 'public'::regnamespace
+        UNION
+        SELECT conname AS name FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND contype <> 'n'
+        ORDER BY name
+      `);
+      return relations.rows.map((row) => row.name);
+    };
+    const ledger = async () => (await client.query<{ version: string }>("SELECT version FROM ledgerharbour_schema_migrations ORDER BY version")).rows.map((row) => row.version);
+    try {
+      const config = { databaseUrl: "pglite://lh014b", allowStagingMigration: true as const };
+      await applyAllMigrations(config, clientFactory);
+      const withTemplates = await schemaObjects();
+      await expect(checkBusinessTemplatesMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 1, ledgerRecordPresent: true });
+
+      await expect(rollbackBusinessTemplatesMigration(config, clientFactory)).resolves.toEqual({ version: "0009_business_templates", applied: true });
+      const withoutTemplates = await schemaObjects();
+      expect(withTemplates.filter((name) => !withoutTemplates.includes(name))).toEqual([
+        "business_templates",
+        "business_templates_business_id_fkey",
+        "business_templates_business_id_unique",
+        "business_templates_business_unique",
+        "business_templates_checksum_check",
+        "business_templates_file_name_check",
+        "business_templates_pkey",
+        "business_templates_size_check",
+        "business_templates_uploader_business_fk",
+      ]);
+      expect(withoutTemplates.every((name) => withTemplates.includes(name))).toBe(true);
+      expect(await ledger()).not.toContain("0009_business_templates");
+      expect(await ledger()).toContain("0008_account_headings");
+      await expect(checkBusinessTemplatesMigration(config, clientFactory)).resolves.toMatchObject({ applied: false, requiredTableCount: 0, ledgerRecordPresent: false });
+
+      await expect(applyBusinessTemplatesMigration(config, clientFactory)).resolves.toEqual({ version: "0009_business_templates", applied: true });
+      expect(await schemaObjects()).toEqual(withTemplates);
     } finally {
       await client.close();
     }

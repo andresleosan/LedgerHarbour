@@ -169,7 +169,7 @@ function mapBoundaryError(error: unknown): HeadingError {
   return new HeadingError(HEADING_ERROR_CODES.HEADING_REPOSITORY_CONFLICT);
 }
 
-async function requireHeadingCapability(businessId: BusinessId, actorId: UserId, repository: OnboardingRepository, capability: Capability): Promise<void> {
+export async function requireHeadingCapability(businessId: BusinessId, actorId: UserId, repository: OnboardingRepository, capability: Capability): Promise<void> {
   try {
     await requireBusinessOperational(repository, businessId);
     const membership = await createTenantContext(repository).getMembership(actorId, businessId);
@@ -192,7 +192,7 @@ function isPlaceholder(input: TemplateHeadingInput): boolean {
   return input.valueType === "number" || /^\d{0,3}[a-z]?$/i.test(input.templateValue.trim());
 }
 
-function validateImport(headings: unknown): TemplateHeadingInput[] {
+export function validateHeadingImport(headings: unknown): TemplateHeadingInput[] {
   if (!Array.isArray(headings) || headings.length === 0) throw new HeadingError(HEADING_ERROR_CODES.INVALID_HEADING_IMPORT);
   const positions = new Set<number>();
   for (const heading of headings as TemplateHeadingInput[]) {
@@ -233,49 +233,58 @@ export async function listHeadings(businessId: BusinessId, actor: OnboardingActo
   }
 }
 
+/**
+ * Applies the template import rules (upsert by position, missing positions deactivated).
+ * Callers run it inside a heading repository transaction and write their own audit event.
+ */
+export async function applyHeadingImport(headings: HeadingRepository, businessId: BusinessId, incoming: TemplateHeadingInput[], now: string): Promise<{ inserted: number; updated: number; missing: number }> {
+  const stored = new Map((await headings.listByBusinessId(businessId)).map((heading) => [heading.position, heading]));
+  let inserted = 0;
+  let updated = 0;
+  let missing = 0;
+  for (const item of incoming) {
+    const existing = stored.get(item.position);
+    stored.delete(item.position);
+    const fields = { templateValue: item.templateValue, valueType: item.valueType, group: item.group, sortOrder: item.order, blockedReason: item.blockedReason, updatedAt: now };
+    if (!existing) {
+      await headings.create({
+        ...fields,
+        id: randomUUID(),
+        businessId,
+        position: item.position,
+        displayName: defaultDisplayName(item.templateValue, item.position),
+        isActive: item.blockedReason === null && !isPlaceholder(item),
+        createdAt: now,
+      });
+      inserted += 1;
+      continue;
+    }
+    const customised = existing.displayName !== defaultDisplayName(existing.templateValue, existing.position);
+    await headings.update({
+      ...existing,
+      ...fields,
+      displayName: customised ? existing.displayName : defaultDisplayName(item.templateValue, item.position),
+      isActive: item.blockedReason === null && existing.isActive,
+    }, businessId);
+    updated += 1;
+  }
+  for (const absent of stored.values()) {
+    await headings.update({ ...absent, isActive: false, blockedReason: "missing_from_template", updatedAt: now }, businessId);
+    missing += 1;
+  }
+  return { inserted, updated, missing };
+}
+
 export async function importHeadings(businessId: BusinessId, input: TemplateHeadingInput[], actor: OnboardingActor, dependencies: HeadingDependencies = {}): Promise<HeadingImportResult> {
   const { tenancy, headings } = resolveDependencies(dependencies);
   const actorId = await resolveOnboardingActor(tenancy, actor);
   validateBusinessId(businessId);
-  const incoming = validateImport(input);
+  const incoming = validateHeadingImport(input);
   await requireHeadingCapability(businessId, actorId, tenancy, "edit_finance");
   const now = new Date().toISOString();
   try {
     return await headings.transaction(async () => {
-      const stored = new Map((await headings.listByBusinessId(businessId)).map((heading) => [heading.position, heading]));
-      let inserted = 0;
-      let updated = 0;
-      let missing = 0;
-      for (const item of incoming) {
-        const existing = stored.get(item.position);
-        stored.delete(item.position);
-        const fields = { templateValue: item.templateValue, valueType: item.valueType, group: item.group, sortOrder: item.order, blockedReason: item.blockedReason, updatedAt: now };
-        if (!existing) {
-          await headings.create({
-            ...fields,
-            id: randomUUID(),
-            businessId,
-            position: item.position,
-            displayName: defaultDisplayName(item.templateValue, item.position),
-            isActive: item.blockedReason === null && !isPlaceholder(item),
-            createdAt: now,
-          });
-          inserted += 1;
-          continue;
-        }
-        const customised = existing.displayName !== defaultDisplayName(existing.templateValue, existing.position);
-        await headings.update({
-          ...existing,
-          ...fields,
-          displayName: customised ? existing.displayName : defaultDisplayName(item.templateValue, item.position),
-          isActive: item.blockedReason === null && existing.isActive,
-        }, businessId);
-        updated += 1;
-      }
-      for (const absent of stored.values()) {
-        await headings.update({ ...absent, isActive: false, blockedReason: "missing_from_template", updatedAt: now }, businessId);
-        missing += 1;
-      }
+      const { inserted, updated, missing } = await applyHeadingImport(headings, businessId, incoming, now);
       await tenancy.transaction((transaction) => transaction.appendAuditEvent({ businessId, actorId, type: "account_heading_imported", entityId: businessId, metadata: { inserted, updated, missing } }));
       return { inserted, updated, missing, headings: await headings.listByBusinessId(businessId) };
     });

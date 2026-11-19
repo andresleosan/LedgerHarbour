@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   applyAllMigrations,
   checkAllMigrations,
-  applyAccountHeadingsMigration,
-  checkAccountHeadingsMigration,
-  rollbackAccountHeadingsMigration,
+  applyBusinessTemplatesMigration,
+  checkBusinessTemplatesMigration,
+  rollbackBusinessTemplatesMigration,
   type MigrationConfig,
 } from "../../../src/db/migration-runner";
 
@@ -66,6 +66,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       "0006_business_request_audit",
       "0007_rate_limit_windows",
       "0008_account_headings",
+      "0009_business_templates",
     ]);
     expect(Object.values(applied).every((migration) => migration.applied)).toBe(true);
     expect(checked).toMatchObject({
@@ -77,6 +78,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       businessRequestAudit: { applied: true, ledgerRecordPresent: true },
       rateLimit: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
       accountHeadings: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
+      businessTemplates: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
     });
   });
 
@@ -93,6 +95,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
     expect(tables.rows.map((row) => row.table_name)).toEqual([
       "account_headings",
       "audit_events",
+      "business_templates",
       "businesses",
       "categories",
       "currencies",
@@ -178,19 +181,19 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
   }, 30_000);
 
   it("rolls back and reapplies the latest migration with ledger parity", async () => {
-    await expect(rollbackAccountHeadingsMigration(config)).resolves.toEqual({
-      version: "0008_account_headings",
+    await expect(rollbackBusinessTemplatesMigration(config)).resolves.toEqual({
+      version: "0009_business_templates",
       applied: true,
     });
-    await expect(checkAccountHeadingsMigration(config)).resolves.toMatchObject({
+    await expect(checkBusinessTemplatesMigration(config)).resolves.toMatchObject({
       applied: false,
       ledgerRecordPresent: false,
     });
-    await expect(applyAccountHeadingsMigration(config)).resolves.toEqual({
-      version: "0008_account_headings",
+    await expect(applyBusinessTemplatesMigration(config)).resolves.toEqual({
+      version: "0009_business_templates",
       applied: true,
     });
-    await expect(checkAccountHeadingsMigration(config)).resolves.toMatchObject({
+    await expect(checkBusinessTemplatesMigration(config)).resolves.toMatchObject({
       applied: true,
       ledgerRecordPresent: true,
     });

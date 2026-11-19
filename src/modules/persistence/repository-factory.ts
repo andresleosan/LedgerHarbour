@@ -5,6 +5,8 @@ import { resolveDefaultCurrencyRepository } from "../accounting/currency-service
 import { createPostgresCurrencyRepository } from "../accounting/postgres-currency-repository";
 import { resolveDefaultHeadingRepository, type HeadingRepository } from "../accounting/heading-service";
 import { createPostgresHeadingRepository } from "../accounting/postgres-heading-repository";
+import { resolveDefaultTemplateRepository, type TemplateRepository } from "../accounting/template-service";
+import { createPostgresTemplateRepository } from "../accounting/postgres-template-repository";
 import { resolveDefaultDocumentRepository, resolveDefaultInvoiceRepository } from "../invoices/invoice-service";
 import { createPostgresInvoiceRepository } from "../invoices/postgres-invoice-repository";
 import { resolveDefaultJobRepository } from "../jobs/job-service";
@@ -35,6 +37,7 @@ export type PersistenceContext = {
   jobRepository: JobRepository;
   currencyRepository: CurrencyRepository;
   headingRepository: HeadingRepository;
+  templateRepository: TemplateRepository;
   storage: StorageAdapter;
   database?: Database;
   transaction?: <T>(operation: (tenancyRepository: OnboardingRepository) => Promise<T>) => Promise<T>;
@@ -87,6 +90,7 @@ export function createPersistenceContext(input: PersistenceInput = {}): Persiste
       jobRepository: resolveDefaultJobRepository(),
       currencyRepository: resolveDefaultCurrencyRepository(),
       headingRepository: resolveDefaultHeadingRepository(),
+      templateRepository: resolveDefaultTemplateRepository(),
       storage,
       close: async () => {},
     };
@@ -117,6 +121,7 @@ function postgresContext(database: Database, pool: Pool | undefined, storage: St
     jobRepository: createPostgresJobRepository(database),
     currencyRepository: createPostgresCurrencyRepository(database),
     headingRepository: createPostgresHeadingRepository(database),
+    templateRepository: createPostgresTemplateRepository(database),
     storage,
     database,
     transaction: async (operation) => {

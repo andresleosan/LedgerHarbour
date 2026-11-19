@@ -18,6 +18,7 @@ describe("PostgreSQL initial migration", () => {
       expect(tables.rows.map((row) => row.table_name)).toEqual([
         "account_headings",
         "audit_events",
+        "business_templates",
         "businesses",
         "categories",
         "currencies",

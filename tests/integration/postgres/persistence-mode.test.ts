@@ -21,6 +21,7 @@ import { resolveDefaultDocumentRepository, resolveDefaultInvoiceRepository } fro
 import { resolveDefaultCurrencyRepository, setCurrency } from "../../../src/modules/accounting/currency-service";
 import { resolveDefaultJobRepository } from "../../../src/modules/jobs/job-service";
 import { resolveDefaultHeadingRepository } from "../../../src/modules/accounting/heading-service";
+import { resolveDefaultTemplateRepository } from "../../../src/modules/accounting/template-service";
 import { resolveDefaultStorage } from "../../../src/modules/invoices/invoice-service";
 import { listUserBusinesses } from "../../../src/modules/tenancy/portfolio-service";
 import {
@@ -67,6 +68,7 @@ describe("persistence mode factory", () => {
     expect(context.jobRepository).toBe(resolveDefaultJobRepository());
     expect(context.currencyRepository).toBe(resolveDefaultCurrencyRepository());
     expect(context.headingRepository).toBe(resolveDefaultHeadingRepository());
+    expect(context.templateRepository).toBe(resolveDefaultTemplateRepository());
     expect(context.storage).toBe(resolveDefaultStorage());
     expect(context.database).toBeUndefined();
   });
@@ -85,6 +87,8 @@ describe("persistence mode factory", () => {
       expect(context.jobRepository).not.toBe(resolveDefaultJobRepository());
       expect(context.currencyRepository).not.toBe(resolveDefaultCurrencyRepository());
       expect(context.headingRepository).not.toBe(resolveDefaultHeadingRepository());
+      expect(context.templateRepository).not.toBe(resolveDefaultTemplateRepository());
+      await expect(context.templateRepository.findByBusinessId("no-business" as never)).resolves.toBeNull();
       await expect(context.headingRepository.listByBusinessId("no-business" as never)).resolves.toEqual([]);
       expect(context.storage).toBe(resolveDefaultStorage());
 

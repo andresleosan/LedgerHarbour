@@ -11,8 +11,9 @@ try {
     businessRequestAudit,
     rateLimit,
     accountHeadings,
+    businessTemplates,
   } = await checkAllMigrations(config);
-  console.log(`Verified: ${initial.version} + ${platform.version} + ${lifecycle.version} + ${membershipLifecycle.version} + ${projects.version} + ${businessRequestAudit.version} + ${rateLimit.version} + ${accountHeadings.version} (${initial.requiredTableCount} initial tables, ${platform.requiredTableCount} platform tables, ${lifecycle.requiredTableCount} lifecycle columns, ${membershipLifecycle.requiredTableCount} membership lifecycle columns, ${projects.requiredTableCount} project tables, ${rateLimit.requiredTableCount} rate-limit tables, ${accountHeadings.requiredTableCount} account heading tables, ledger records verified)`);
+  console.log(`Verified: ${initial.version} + ${platform.version} + ${lifecycle.version} + ${membershipLifecycle.version} + ${projects.version} + ${businessRequestAudit.version} + ${rateLimit.version} + ${accountHeadings.version} + ${businessTemplates.version} (${initial.requiredTableCount} initial tables, ${platform.requiredTableCount} platform tables, ${lifecycle.requiredTableCount} lifecycle columns, ${membershipLifecycle.requiredTableCount} membership lifecycle columns, ${projects.requiredTableCount} project tables, ${rateLimit.requiredTableCount} rate-limit tables, ${accountHeadings.requiredTableCount} account heading tables, ${businessTemplates.requiredTableCount} business template tables, ledger records verified)`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Migration check failed");
   process.exitCode = 1;

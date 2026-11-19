@@ -66,6 +66,11 @@ export async function createTestDatabase(): Promise<{
       "utf8",
     );
     await applyMigration(client, accountHeadingsMigration);
+    const businessTemplatesMigration = await readFile(
+      new URL("./migrations/0009_business_templates.sql", import.meta.url),
+      "utf8",
+    );
+    await applyMigration(client, businessTemplatesMigration);
   } catch (error) {
     await client.close();
     throw error;
