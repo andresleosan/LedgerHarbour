@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { readTemplate, readTemplateWithin } from "../../../src/modules/workbook/read-template";
 import type { TemplateProfile } from "../../../src/modules/workbook/template-profile";
-import { buildSyntheticTemplate } from "../../fixtures/workbook/synthetic-template";
+import { buildSyntheticTemplate, type SyntheticTemplateOptions } from "../../fixtures/workbook/synthetic-template";
 import { unzip, zip } from "../../fixtures/workbook/zip";
 
 // The reader parses the SpreadsheetML parts itself: text as an XML parser decodes it,
@@ -20,8 +20,8 @@ const P = (index: number) => 7 + index;
 const heading = (profile: TemplateProfile, position: number) => profile.headings.find((h) => h.position === position)!;
 
 /** The synthetic template with some entries' XML patched, re-zipped. */
-async function patched(edits: Record<string, (xml: string) => string>): Promise<Buffer> {
-  const entries = unzip(await buildSyntheticTemplate());
+async function patched(edits: Record<string, (xml: string) => string>, options?: SyntheticTemplateOptions): Promise<Buffer> {
+  const entries = unzip(await buildSyntheticTemplate(options));
   for (const [name, edit] of Object.entries(edits)) {
     const entry = entries.find((e) => e.name === name)!;
     const before = entry.data.toString("utf8");
@@ -92,6 +92,28 @@ describe("readTemplate limits on time and memory", () => {
   it("refuses a reading that passes its deadline as too large", async () => {
     await expect(readTemplateWithin(await buildSyntheticTemplate(), 0)).rejects.toMatchObject({ name: "TemplateReadError", code: "TOO_LARGE" });
   });
+
+  // Excel's own limit on a formula's length is 8,192 characters.
+  const formulaOf = (length: number) => `${"A1+".repeat((length - 2) / 3)}A1`;
+  const analysisMaster = /(<f t="shared" ref="H7:[A-Z]+\d+" si="\d+">)IF\(H\$5=\$E7,\$G7,0\)(<\/f>)/;
+
+  it("refuses a shared master or a plain formula longer than Excel allows, quickly", async () => {
+    const start = performance.now();
+    await refused(await patched({ [SHEET]: (xml) => xml.replace(analysisMaster, `$1${formulaOf(8_195)}$2`) }), "TOO_LARGE");
+    await refused(await patched({ [SHEET]: (xml) => xml.replace("<f>SUM(H7:W7)-G7</f>", `<f>${formulaOf(8_195)}</f>`) }), "TOO_LARGE");
+    // Generous for a loaded machine; the regression rebuilds megabytes of text per clone.
+    expect(performance.now() - start).toBeLessThan(10_000);
+  });
+
+  it("bounds the work on a master at the limit with thousands of clones", async () => {
+    // 16 analysis columns × 300 rows: about 4,800 clones of an 8,192-character master.
+    const bytes = await patched({ [SHEET]: (xml) => xml.replace(analysisMaster, `$1${formulaOf(8_192)}$2`) }, { dataRows: 300 });
+    const start = performance.now();
+    const error = await readTemplate(bytes).catch((e: unknown) => e);
+    // Thousands of references per clone exceed the reference budget: refused, well inside the deadline.
+    expect(error).toMatchObject({ name: "TemplateReadError", code: "TOO_LARGE" });
+    expect(performance.now() - start).toBeLessThan(15_000);
+  }, 30_000);
 
   it("reads a large template within a small heap", async () => {
     // 5 account sheets of 2,000 rows, read in a process whose heap is capped at 96 MB; the

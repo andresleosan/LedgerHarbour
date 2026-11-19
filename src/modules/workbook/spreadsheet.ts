@@ -57,6 +57,8 @@ export interface SheetScan {
 
 const MAX_COLUMNS = 16_384;
 const MAX_ROWS = 1_048_576;
+/** Excel's own limit on a formula's length, in characters. */
+const MAX_FORMULA_LENGTH = 8_192;
 const WORKSHEET_PART = /xl\/worksheets\/sheet(\d+)[.]xml/;
 const CELL_ADDRESS = /^([A-Z]{1,3})([1-9]\d*)$/;
 const RANGE = /^\$?([A-Z]{1,3})\$?([1-9]\d*)(?::\$?([A-Z]{1,3})\$?([1-9]\d*))?$/;
@@ -249,6 +251,10 @@ export function readSheet(book: Book, sheet: SheetInfo, onCell: (cell: SheetCell
     let created = true;
     let formula = false;
     if (c.formula || c.share) {
+      // Longer than Excel allows: only a crafted file, and each clone would copy it.
+      if ((c.formula?.length ?? 0) > MAX_FORMULA_LENGTH) throw new TemplateReadError("TOO_LARGE");
+      // The work on a formula (and its clones' moved text) grows with its length: look at the clock each time.
+      check();
       formula = true;
       value = "";
       text = c.formula ?? null;
