@@ -88,7 +88,7 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .language-switcher { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid #9bb7b0; border-radius: 999px; background: #fff; transition: background-color .18s ease, border-color .18s ease; }
          .language-switcher a { border-radius: 999px; padding: 6px 8px; color: #315b60; font-size: .76rem; font-weight: 800; text-decoration: none; }
          .language-switcher a:hover, .language-switcher a[aria-current="page"] { background: #d9eeea; color: #075b57; }
-          .language-switcher a:focus-visible, .app-shell button:focus-visible, .app-shell a:focus-visible, .app-shell input:focus-visible, .app-shell textarea:focus-visible { outline: 3px solid var(--lh-coral-focus); outline-offset: 3px; }
+          .language-switcher a:focus-visible, .app-shell button:focus-visible, .app-shell a:focus-visible, .app-shell input:focus-visible, .app-shell textarea:focus-visible, .app-shell summary:focus-visible { outline: 3px solid var(--lh-coral-focus); outline-offset: 3px; }
           .app-shell .invoice-hero a:focus-visible, .app-shell .review-preview a:focus-visible { outline-color: #fff; }
          .operational-page { min-width: 0; }
          .page-shell { width: min(100%, 980px); margin: 0 auto; }
@@ -168,6 +168,15 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .settings-create { grid-template-columns: minmax(0, 1fr) auto; }
          .currency-create { grid-template-columns: 2fr 1fr 1fr 1fr auto; }
          .settings-item small { display: block; margin-top: 4px; color: var(--lh-muted); }
+         .workbook-shell .page-card + .page-card { margin-top: 18px; }
+         .workbook-shell h2 { margin: 0 0 10px; color: var(--lh-navy); font-size: 1.15rem; }
+         .workbook-list { display: grid; gap: 6px; margin: 0; padding-left: 20px; overflow-wrap: anywhere; }
+         .workbook-group { margin-top: 14px; border-top: 1px solid var(--lh-border); }
+         .workbook-group summary { min-height: 44px; padding: 10px 0; color: var(--lh-navy); font-weight: 800; cursor: pointer; }
+         .workbook-group .settings-items { margin-top: 8px; }
+         .workbook-group .settings-item > div:first-child { flex: 1 1 auto; }
+         .workbook-rename { display: grid; gap: 9px; margin-top: 10px; }
+         .workbook-rename .page-actions { margin-top: 0; }
          .member-info { min-width: 0; }
          .transfer-panel { margin-top: 22px; padding: 18px; border: 1px solid #e1b9a8; border-radius: 12px; background: #fff6ef; }
          .transfer-panel h2 { margin: 0; font-size: 1.15rem; }
