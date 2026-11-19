@@ -63,6 +63,10 @@ export interface SyntheticTemplateOptions {
   readTwicePosition?: number;
   /** Heading position whose consolidated total the trial balance does not read. */
   notReadPosition?: number;
+  /** Data rows on every account sheet, instead of the defaults (for size tests). */
+  dataRows?: number;
+  /** More account sheets like the cash one, named "Account 1", "Account 2"… (for size tests). */
+  extraAccountSheets?: number;
 }
 
 const blockLabels: Record<Exclude<HeadingGroup, "cost_of_sales">, string> = {
@@ -90,13 +94,17 @@ export async function buildSyntheticTemplate(options: SyntheticTemplateOptions =
   const lastAnalysisColumn = firstAnalysisColumn + headings.length - 1;
   const col = columnLetter;
   const workbook = new ExcelJS.Workbook();
-  const lastDataRow = (sheet: SyntheticAccountSheet) => firstDataRow + SYNTHETIC_LAYOUT.dataRows[sheet] - 1;
+  const lastDataRow = (sheet: SyntheticAccountSheet) => firstDataRow + (options.dataRows ?? SYNTHETIC_LAYOUT.dataRows[sheet]) - 1;
   const totalsRow = (sheet: SyntheticAccountSheet) => lastDataRow(sheet) + 1;
   const consolidationRow = totalsRow("main") + SYNTHETIC_LAYOUT.consolidationRowOffset;
+  const accountSheets: Array<[SyntheticAccountSheet | "extra", string]> = [
+    ...(["main", "deposit", "cash"] as const).map((key): [SyntheticAccountSheet, string] => [key, SYNTHETIC_SHEETS[key]]),
+    ...Array.from({ length: options.extraAccountSheets ?? 0 }, (_, i): ["extra", string] => ["extra", `Account ${i + 1}`]),
+  ];
 
-  for (const key of ["main", "deposit", "cash"] as const) {
-    const ws = workbook.addWorksheet(SYNTHETIC_SHEETS[key]);
-    const last = lastDataRow(key);
+  for (const [key, name] of accountSheets) {
+    const ws = workbook.addWorksheet(name);
+    const last = lastDataRow(key === "extra" ? "cash" : key);
     const labels = ["Account", "Date", null, "Narrative", "Code", "Balance", "Amount"];
     labels.forEach((label, i) => {
       if (label) ws.getCell(headingRow, i + 1).value = label;
@@ -158,7 +166,7 @@ export async function buildSyntheticTemplate(options: SyntheticTemplateOptions =
       if (key === "main") ws.getCell(r, lastAnalysisColumn + 2).value = { formula: `SUM(${col(firstAnalysisColumn)}${r}:${col(lastAnalysisColumn)}${r})-${col(columns.amount)}${r}` };
     }
 
-    const totals = totalsRow(key);
+    const totals = last + 1;
     const closingRow = key === "main" && options.staleClosingBalanceRow ? options.staleClosingBalanceRow : last;
     ws.getCell(totals, columns.balance).value = { formula: `+${col(columns.balance)}${closingRow}` };
     for (let c = columns.amount; c <= lastAnalysisColumn; c++) {

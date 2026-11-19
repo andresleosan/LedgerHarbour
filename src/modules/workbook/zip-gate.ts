@@ -2,27 +2,28 @@ import { inflateRawSync } from "node:zlib";
 
 import { TemplateReadError } from "./template-profile";
 
-// Inspects an .xlsx archive before exceljs sees it, so nothing attacker-sized reaches
-// `workbook.xlsx.load`: real (inflated) sizes, and the ranges exceljs expands cell by
-// cell on load (merged cells, data validations, defined names).
+// Inspects an .xlsx archive before the reader parses any part of it: real (inflated)
+// sizes, and the ranges a workbook model would expand cell by cell (merged cells, data
+// validations, defined names). It then hands the reader its parts, one entry at a time,
+// inflated and decoded exactly as checked here.
 //
 // The gate fails closed: whenever it might read the archive or the XML differently
-// from JSZip and exceljs's XML parser, it refuses instead of guessing. Sizes and
+// from a zip library or an XML parser, it refuses instead of guessing. Sizes and
 // ranges over a cap → TOO_LARGE; anything it cannot read unambiguously → NOT_A_WORKBOOK.
 
 export const MAX_ACCOUNT_ROWS = 20_000;
 export const MAX_ACCOUNT_COLUMNS = 400;
 
 const MAX_ZIP_ENTRIES = 2_000;
-// ponytail: exceljs holds the whole workbook in memory, roughly 20x the inflated XML, so these stay low;
-// raise them only together with a streaming reader or a memory-limited worker.
+// The reader holds one entry's text at a time plus compact structures, so memory follows
+// the entry cap, not the workbook; the caps also bound the time spent inflating.
 const MAX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
 const MAX_ENTRY_BYTES = 32 * 1024 * 1024;
 /** Any single range: no larger than the biggest account sheet allowed. */
 const MAX_RANGE_CELLS = MAX_ACCOUNT_ROWS * MAX_ACCOUNT_COLUMNS;
-/** Cells exceljs creates for merged ranges and defined names, per workbook. */
+/** Cells a workbook model creates for merged ranges and defined names, per workbook. */
 const MAX_CREATED_CELLS = 100_000;
-/** Entries exceljs creates for data validations, per workbook. */
+/** Entries a workbook model creates for data validations, per workbook. */
 const MAX_VALIDATION_CELLS = 2_000_000;
 const SHEET_COLUMNS = 16_384;
 const SHEET_ROWS = 1_048_576;
@@ -41,7 +42,14 @@ const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const notAWorkbook = () => new TemplateReadError("NOT_A_WORKBOOK");
 const tooLarge = () => new TemplateReadError("TOO_LARGE");
 
-export function inspectWorkbookZip(bytes: Uint8Array) {
+/** A checked archive's parts, read on demand so only one entry's text is held at a time. */
+export interface WorkbookParts {
+  has(name: string): boolean;
+  /** The entry's text, inflated and decoded as the gate checked it; undefined when absent. Names have no leading "/". */
+  read(name: string): string | undefined;
+}
+
+export function inspectWorkbookZip(bytes: Uint8Array): WorkbookParts {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   // JSZip takes the last end-of-central-directory signature in the file: require it to be
   // the only one in the tail and to end exactly at the end of the file.
@@ -72,7 +80,7 @@ export function inspectWorkbookZip(bytes: Uint8Array) {
     // ASCII names only, so every decoder agrees on them; no Unicode path field, which renames the entry in JSZip.
     if (nameBytes.some((b) => b < 0x20 || b > 0x7e) || hasExtraField(view, p + 46 + nameLength, extraLength, 0x7075)) throw notAWorkbook();
     const name = Buffer.from(nameBytes).toString("latin1");
-    // exceljs strips one leading "/"; JSZip keeps the last of two entries with the same name.
+    // Readers strip one leading "/"; JSZip keeps the last of two entries with the same name.
     const normalized = name.replace(/^\//, "");
     if (names.has(normalized)) throw notAWorkbook();
     names.add(normalized);
@@ -82,6 +90,7 @@ export function inspectWorkbookZip(bytes: Uint8Array) {
 
   // Second gate: the real sizes, one entry at a time, and the ranges inside the XML.
   const budget = { total: 0, created: 0, validations: 0 };
+  const parts = new Map<string, { method: number; data: Uint8Array }>();
   for (const entry of entries) {
     if (entry.local + 30 > start || view.getUint32(entry.local, true) !== 0x04034b50) throw notAWorkbook();
     const localNameLength = view.getUint16(entry.local + 26, true);
@@ -90,11 +99,22 @@ export function inspectWorkbookZip(bytes: Uint8Array) {
     if (!Buffer.from(bytes.subarray(nameStart, nameStart + localNameLength)).equals(entry.nameBytes)) throw notAWorkbook();
     const dataStart = nameStart + localNameLength + view.getUint16(entry.local + 28, true);
     if (dataStart + entry.compressedSize > start) throw notAWorkbook();
-    const data = inflate(bytes.subarray(dataStart, dataStart + entry.compressedSize), entry.method, Math.min(MAX_ENTRY_BYTES, MAX_UNCOMPRESSED_BYTES - budget.total));
+    const compressed = bytes.subarray(dataStart, dataStart + entry.compressedSize);
+    const data = inflate(compressed, entry.method, Math.min(MAX_ENTRY_BYTES, MAX_UNCOMPRESSED_BYTES - budget.total));
     budget.total += data.length;
-    // exceljs picks entries by case-sensitive, unanchored name patterns ("…sheet1.xml"); this is a superset.
-    if (entry.name.toLowerCase().includes(".xml")) scanXml(decodeXml(data), budget);
+    // Any entry whose name mentions ".xml" is scanned: a superset of the parts a reader parses.
+    if (entry.name.toLowerCase().includes(".xml")) {
+      scanXml(decodeXml(data), budget);
+      parts.set(entry.name.replace(/^\//, ""), { method: entry.method, data: compressed });
+    }
   }
+  return {
+    has: (name) => parts.has(name),
+    read(name) {
+      const part = parts.get(name);
+      return part && decodeXml(inflate(part.data, part.method, MAX_ENTRY_BYTES));
+    },
+  };
 }
 
 function hasExtraField(view: DataView, offset: number, length: number, id: number): boolean {
@@ -119,9 +139,9 @@ function inflate(data: Uint8Array, method: number, limit: number): Buffer {
 }
 
 /**
- * JSZip hands exceljs every entry decoded as UTF-8, whatever the XML declares. Accept only
- * text that is valid UTF-8, has no NUL, no UTF-16/32 byte order mark and declares UTF-8 (or
- * nothing), so the gate and the parser read the same characters.
+ * Every entry is read as UTF-8, whatever the XML declares. Accept only text that is valid
+ * UTF-8, has no NUL, no UTF-16/32 byte order mark and declares UTF-8 (or nothing), so the
+ * gate and any parser read the same characters.
  */
 function decodeXml(data: Buffer): string {
   if ((data[0] === 0xfe && data[1] === 0xff) || (data[0] === 0xff && data[1] === 0xfe) || (data[0] === 0 && data[1] === 0)) throw notAWorkbook();
@@ -151,7 +171,7 @@ function scanXml(xml: string, budget: { created: number; validations: number }) 
       budget.created += area(value ?? "", true);
       if (budget.created > MAX_CREATED_CELLS) throw tooLarge();
     } else if (element === "datavalidation") {
-      // A whole column ("E:E") is legitimate and exceljs does not expand it; "E1:E9" it does.
+      // A whole column ("E:E") is legitimate and a workbook model does not expand it; "E1:E9" it does.
       for (const ref of (value ?? "").trim().split(/\s+/).filter(Boolean)) {
         budget.validations += area(ref, false);
         if (budget.validations > MAX_VALIDATION_CELLS) throw tooLarge();
@@ -165,42 +185,44 @@ function scanXml(xml: string, budget: { created: number; validations: number }) 
   }
 }
 
-/** Tokenizes a start tag's attributes from just after its name; throws if it is not plainly well formed. */
-function parseTag(xml: string, from: number) {
+/**
+ * Tokenizes a start tag's attributes from just after its name; throws if it is not plainly well formed.
+ * Attribute values are returned raw, or as `decode` returns them.
+ */
+export function parseTag(xml: string, from: number, decode?: (raw: string) => string) {
   const attributes = new Map<string, string>();
   let i = from;
-  const space = () => {
-    const before = i;
-    while (i < xml.length && " \t\r\n".includes(xml[i])) i++;
-    return i > before;
-  };
   for (;;) {
-    const spaced = space();
+    const before = i;
+    i = skipSpace(xml, i);
     if (xml.startsWith("/>", i)) return { attributes, end: i + 2, selfClosing: true };
     if (xml[i] === ">") return { attributes, end: i + 1, selfClosing: false };
     ATTRIBUTE_NAME.lastIndex = i;
     const name = ATTRIBUTE_NAME.exec(xml)?.[0];
-    if (!spaced || !name) throw notAWorkbook();
-    i += name.length;
-    space();
+    if (i === before || !name) throw notAWorkbook();
+    i = skipSpace(xml, i + name.length);
     if (xml[i] !== "=") throw notAWorkbook();
-    i++;
-    space();
+    i = skipSpace(xml, i + 1);
     const quote = xml[i];
     if (quote !== '"' && quote !== "'") throw notAWorkbook();
     const close = xml.indexOf(quote, i + 1);
     if (close < 0) throw notAWorkbook();
     const value = xml.slice(i + 1, close);
     if (value.includes("<") || attributes.has(name)) throw notAWorkbook();
-    attributes.set(name, value);
+    attributes.set(name, decode ? decode(value) : value);
     i = close + 1;
   }
+}
+
+function skipSpace(xml: string, i: number): number {
+  for (let c = xml.charCodeAt(i); c === 32 || c === 9 || c === 13 || c === 10; c = xml.charCodeAt(i)) i++;
+  return i;
 }
 
 /**
  * A defined name's range is its text content. Require plain text straight up to the
  * closing tag, so the text the parser joins together is exactly what is measured.
- * Bounding box of every cell it mentions: covers whatever exceljs makes of it.
+ * Bounding box of every cell it mentions: covers whatever a workbook model makes of it.
  */
 function definedNameCells(xml: string, from: number): number {
   const close = xml.indexOf("<", from);
