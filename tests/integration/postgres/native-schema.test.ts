@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   applyAllMigrations,
   checkAllMigrations,
-  applyInvoiceCodingsMigration,
-  checkInvoiceCodingsMigration,
-  rollbackInvoiceCodingsMigration,
+  applyInvoicePaymentsMigration,
+  checkInvoicePaymentsMigration,
+  rollbackInvoicePaymentsMigration,
   type MigrationConfig,
 } from "../../../src/db/migration-runner";
 
@@ -69,6 +69,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       "0009_business_templates",
       "0010_money_movements",
       "0011_invoice_codings",
+      "0012_invoice_payments",
     ]);
     expect(Object.values(applied).every((migration) => migration.applied)).toBe(true);
     expect(checked).toMatchObject({
@@ -83,6 +84,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       businessTemplates: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
       moneyMovements: { applied: true, requiredTableCount: 4, ledgerRecordPresent: true },
       invoiceCodings: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
+      invoicePayments: { applied: true, requiredTableCount: 6, ledgerRecordPresent: true },
     });
   });
 
@@ -190,19 +192,19 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
   }, 30_000);
 
   it("rolls back and reapplies the latest migration with ledger parity", async () => {
-    await expect(rollbackInvoiceCodingsMigration(config)).resolves.toEqual({
-      version: "0011_invoice_codings",
+    await expect(rollbackInvoicePaymentsMigration(config)).resolves.toEqual({
+      version: "0012_invoice_payments",
       applied: true,
     });
-    await expect(checkInvoiceCodingsMigration(config)).resolves.toMatchObject({
+    await expect(checkInvoicePaymentsMigration(config)).resolves.toMatchObject({
       applied: false,
       ledgerRecordPresent: false,
     });
-    await expect(applyInvoiceCodingsMigration(config)).resolves.toEqual({
-      version: "0011_invoice_codings",
+    await expect(applyInvoicePaymentsMigration(config)).resolves.toEqual({
+      version: "0012_invoice_payments",
       applied: true,
     });
-    await expect(checkInvoiceCodingsMigration(config)).resolves.toMatchObject({
+    await expect(checkInvoicePaymentsMigration(config)).resolves.toMatchObject({
       applied: true,
       ledgerRecordPresent: true,
     });

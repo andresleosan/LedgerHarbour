@@ -94,7 +94,7 @@ test("verifies the local MVP critical path and cross-tenant access block", async
     const response = await fetch(`/api/invoices/${id}/review`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "approve" }),
+      body: JSON.stringify({ action: "approve", payment: { status: "unpaid" } }),
     });
     return { status: response.status, body: await response.json() };
   }, invoiceId);

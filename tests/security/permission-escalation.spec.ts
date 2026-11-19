@@ -147,6 +147,6 @@ describe("Task 11 permission escalation matrix", () => {
     await invoices.create(invoice);
     const dependencies = { tenancyRepository: repository, documentRepository: documents, invoices };
     await resolveInvoiceCodingRepository(invoices).replace(business.id, invoice.id, [{ headingId: "permission-heading", amount: "12.00" }], invoice.updatedAt);
-    await expect(approveInvoice(invoice.id, user("administrator"), dependencies)).resolves.toMatchObject({ reviewState: "approved" });
+    await expect(approveInvoice(invoice.id, user("administrator"), dependencies, { status: "unpaid" })).resolves.toMatchObject({ reviewState: "approved" });
   });
 });

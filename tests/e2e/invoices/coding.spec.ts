@@ -89,7 +89,10 @@ test("owner codes invoices from the chart of accounts, gets the supplier's last 
   expect(JSON.parse(uncoded.body).error.code).toBe("CODING_REQUIRED");
   page.on("dialog", (dialog) => void dialog.accept());
   await stubNextApproval(page, 409, "CODING_REQUIRED");
-  const approve = page.getByRole("button", { name: "Approve invoice" });
+  // Approving asks how the invoice was paid first; "Not paid yet" creates no movement.
+  await page.getByRole("button", { name: "Approve invoice" }).click();
+  await page.getByLabel("Not paid yet").check();
+  const approve = page.getByRole("button", { name: "Approve", exact: true });
   await approve.click();
   await expect(page.locator(".review-coding").getByRole("alert")).toContainText("Choose a code and save it before approving.");
   await expect(approve).toBeEnabled();

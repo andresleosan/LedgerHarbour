@@ -16,7 +16,7 @@ export interface InvoiceCodingRepository {
   replace(businessId: BusinessId, invoiceId: InvoiceId, lines: readonly InvoiceCodingLine[], now: string): Promise<InvoiceCodingLine[]>;
   /**
    * Heading of the most recently updated other invoice of the business whose supplier
-   * matches `supplier` (see `supplierKey`) and that is coded to exactly one line.
+   * matches `supplier` (see `supplierKey`), that is not voided and that is coded to exactly one line.
    */
   findSupplierHeadingId(businessId: BusinessId, supplier: string, excludeInvoiceId: InvoiceId): Promise<string | null>;
 }
@@ -68,7 +68,7 @@ class MemoryInvoiceCodingRepository implements InvoiceCodingRepository {
 
   async findSupplierHeadingId(businessId: BusinessId, supplier: string, excludeInvoiceId: InvoiceId): Promise<string | null> {
     const candidates = (await this.invoices.listByBusinessId(businessId))
-      .filter((invoice) => invoice.id !== excludeInvoiceId && supplierKey(invoice.supplier) === supplier)
+      .filter((invoice) => invoice.id !== excludeInvoiceId && !invoice.voidedAt && supplierKey(invoice.supplier) === supplier)
       .filter((invoice) => this.codings.get(invoice.id)?.businessId === businessId && this.codings.get(invoice.id)!.lines.length === 1)
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt) || right.id.localeCompare(left.id));
     return candidates[0] ? this.codings.get(candidates[0].id)!.lines[0].headingId : null;

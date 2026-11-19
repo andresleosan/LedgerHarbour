@@ -257,7 +257,7 @@ describe("PostgreSQL finance repositories", () => {
         invoices: context.invoiceRepository,
         codings: context.invoiceCodingRepository,
         transaction,
-      })).rejects.toThrow("cross-repository rollback sentinel");
+      }, { status: "unpaid" })).rejects.toThrow("cross-repository rollback sentinel");
 
       await expect(context.invoiceRepository.findById(invoice.id)).resolves.toMatchObject({ reviewState: "needs_review" });
       await expect(context.documentRepository.getStatus(document.id)).resolves.toBe("needs_review");
@@ -282,7 +282,7 @@ describe("PostgreSQL finance repositories", () => {
         invoices: context.invoiceRepository,
         codings: context.invoiceCodingRepository,
         transaction: context.transaction,
-      })).resolves.toMatchObject({ reviewState: "approved" });
+      }, { status: "unpaid" })).resolves.toMatchObject({ reviewState: "approved" });
 
       await expect(context.invoiceRepository.findById(invoice.id)).resolves.toMatchObject({ reviewState: "approved" });
       await expect(context.documentRepository.getStatus(document.id)).resolves.toBe("approved");

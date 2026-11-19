@@ -25,6 +25,9 @@ import {
   applyInvoiceCodingsMigration,
   checkInvoiceCodingsMigration,
   rollbackInvoiceCodingsMigration,
+  applyInvoicePaymentsMigration,
+  checkInvoicePaymentsMigration,
+  rollbackInvoicePaymentsMigration,
   rollbackMembershipLifecycleMigration,
   rollbackProjectsMigration,
   type MigrationClientFactory,
@@ -173,6 +176,7 @@ describe("PGlite test database migrations", () => {
         "0009_business_templates",
         "0010_money_movements",
         "0011_invoice_codings",
+        "0012_invoice_payments",
       ]);
       await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({
         projects: { applied: true, requiredTableCount: 2, ledgerRecordPresent: true },
@@ -209,7 +213,9 @@ describe("PGlite test database migrations", () => {
     try {
       const config = { databaseUrl: "pglite://lh014", allowStagingMigration: true as const };
       await applyAllMigrations(config, clientFactory);
-      // 0010 movements and 0011 invoice codings reference account_headings, so the later migrations are rolled back first.
+      // 0010 movements and 0011 invoice codings reference account_headings, and 0012 invoice payments
+      // references money_accounts, so the later migrations are rolled back first.
+      await rollbackInvoicePaymentsMigration(config, clientFactory);
       await rollbackInvoiceCodingsMigration(config, clientFactory);
       await rollbackMoneyMovementsMigration(config, clientFactory);
       const withHeadings = await schemaObjects();
@@ -324,9 +330,11 @@ describe("PGlite test database migrations", () => {
     try {
       const config = { databaseUrl: "pglite://lh015", allowStagingMigration: true as const };
       await applyAllMigrations(config, clientFactory);
+      await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({ moneyMovements: { version: "0010_money_movements", applied: true } });
+      // 0012 invoice payments references money_accounts, so it is rolled back first.
+      await rollbackInvoicePaymentsMigration(config, clientFactory);
       const withMoney = await schemaObjects();
       await expect(checkMoneyMovementsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 4, ledgerRecordPresent: true });
-      await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({ moneyMovements: { version: "0010_money_movements", applied: true } });
 
       await expect(rollbackMoneyMovementsMigration(config, clientFactory)).resolves.toEqual({ version: "0010_money_movements", applied: true });
       const withoutMoney = await schemaObjects();
@@ -410,9 +418,11 @@ describe("PGlite test database migrations", () => {
     try {
       const config = { databaseUrl: "pglite://lh020", allowStagingMigration: true as const };
       await applyAllMigrations(config, clientFactory);
+      await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({ invoiceCodings: { version: "0011_invoice_codings", applied: true } });
+      // 0012 needs 0011 and references money_accounts, which this test rolls back too.
+      await rollbackInvoicePaymentsMigration(config, clientFactory);
       const withCodings = await schemaObjects();
       await expect(checkInvoiceCodingsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 1, ledgerRecordPresent: true });
-      await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({ invoiceCodings: { version: "0011_invoice_codings", applied: true } });
 
       await expect(rollbackInvoiceCodingsMigration(config, clientFactory)).resolves.toEqual({ version: "0011_invoice_codings", applied: true });
       const withoutCodings = await schemaObjects();
@@ -440,6 +450,71 @@ describe("PGlite test database migrations", () => {
       await expect(applyInvoiceCodingsMigration(config, clientFactory)).resolves.toEqual({ version: "0011_invoice_codings", applied: true });
       await expect(applyInvoiceCodingsMigration(config, clientFactory)).resolves.toEqual({ version: "0011_invoice_codings", applied: false });
       expect(await schemaObjects()).toEqual(withCodings);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+  it("applies, rolls back exactly, and reapplies invoice payments 0012", async () => {
+    const client = new PGlite();
+    const clientFactory: MigrationClientFactory = async () => ({
+      query: async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+        if (!values && /^(BEGIN|COMMIT|ROLLBACK)\b/i.test(text.trim())) {
+          await client.exec(text);
+          return { rows: [] as Row[], rowCount: 0 };
+        }
+        const result = await client.query<Row>(text, values ? [...values] : undefined);
+        return { rows: result.rows, rowCount: result.rows.length };
+      },
+      exec: (text: string) => client.exec(text),
+      end: async () => undefined,
+    });
+    const schemaObjects = async () => {
+      const relations = await client.query<{ name: string }>(`
+        SELECT relname AS name FROM pg_class WHERE relnamespace = 'public'::regnamespace
+        UNION
+        SELECT conname AS name FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND contype <> 'n'
+        UNION
+        SELECT 'invoices.' || column_name AS name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'invoices'
+        ORDER BY name
+      `);
+      return relations.rows.map((row) => row.name);
+    };
+    const ledger = async () => (await client.query<{ version: string }>("SELECT version FROM ledgerharbour_schema_migrations ORDER BY version")).rows.map((row) => row.version);
+    try {
+      const config = { databaseUrl: "pglite://lh021", allowStagingMigration: true as const };
+      await applyAllMigrations(config, clientFactory);
+      const withPayments = await schemaObjects();
+      await expect(checkInvoicePaymentsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 6, ledgerRecordPresent: true });
+      await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({ invoicePayments: { version: "0012_invoice_payments", applied: true } });
+
+      await expect(rollbackInvoicePaymentsMigration(config, clientFactory)).resolves.toEqual({ version: "0012_invoice_payments", applied: true });
+      const withoutPayments = await schemaObjects();
+      expect(withPayments.filter((name) => !withoutPayments.includes(name))).toEqual([
+        "invoices.amount_debited",
+        "invoices.kind",
+        "invoices.paid_account_id",
+        "invoices.paid_on",
+        "invoices.payment_status",
+        "invoices.voided_at",
+        "invoices_amount_debited_check",
+        "invoices_kind_check",
+        "invoices_paid_account_fk",
+        "invoices_payment_details_check",
+        "invoices_payment_status_check",
+      ]);
+      expect(withoutPayments.every((name) => withPayments.includes(name))).toBe(true);
+      expect(await ledger()).not.toContain("0012_invoice_payments");
+      expect(await ledger()).toContain("0011_invoice_codings");
+      await expect(checkInvoicePaymentsMigration(config, clientFactory)).resolves.toMatchObject({ applied: false, requiredTableCount: 0, ledgerRecordPresent: false });
+      await expect(checkAllMigrations(config, clientFactory)).rejects.toThrow("invoice payments migration");
+
+      await expect(rollbackInvoiceCodingsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true });
+      await expect(applyInvoicePaymentsMigration(config, clientFactory)).rejects.toThrow("Invoice codings migration must be applied before invoice payments migration");
+      await expect(applyInvoiceCodingsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true });
+
+      await expect(applyInvoicePaymentsMigration(config, clientFactory)).resolves.toEqual({ version: "0012_invoice_payments", applied: true });
+      await expect(applyInvoicePaymentsMigration(config, clientFactory)).resolves.toEqual({ version: "0012_invoice_payments", applied: false });
+      expect(await schemaObjects()).toEqual(withPayments);
     } finally {
       await client.close();
     }

@@ -81,6 +81,11 @@ export async function createTestDatabase(): Promise<{
       "utf8",
     );
     await applyMigration(client, invoiceCodingsMigration);
+    const invoicePaymentsMigration = await readFile(
+      new URL("./migrations/0012_invoice_payments.sql", import.meta.url),
+      "utf8",
+    );
+    await applyMigration(client, invoicePaymentsMigration);
   } catch (error) {
     await client.close();
     throw error;

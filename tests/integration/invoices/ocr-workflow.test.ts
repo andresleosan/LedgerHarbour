@@ -354,7 +354,7 @@ describe("OCR workflow boundaries", () => {
     const invoice = (await invoices.listByBusinessId(ownerBusiness.id))[0];
     await correctLowConfidence(invoice);
 
-    const approved = await approveInvoice(invoice.id, user("member"), dependencies);
+    const approved = await approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" });
 
     expect(approved.reviewState).toBe("approved");
     await expect(documentRepository.getStatus(documentId)).resolves.toBe("approved");
@@ -372,7 +372,7 @@ describe("OCR workflow boundaries", () => {
     await worker.processOcrJob(job.id);
     const invoice = (await invoices.listByBusinessId(ownerBusiness.id))[0];
     await correctLowConfidence(invoice);
-    await approveInvoice(invoice.id, user("member"), dependencies);
+    await approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" });
     const before = await getInvoice(invoice.id, user("member"), dependencies);
 
     await expect(updateInvoice(invoice.id, user("member"), { notes: "tampered" }, dependencies)).rejects.toMatchObject({
@@ -403,7 +403,7 @@ describe("OCR workflow boundaries", () => {
     try {
       const staleUpdate = updateInvoice(invoice.id, user("member"), { notes: "stale overwrite" }, dependencies);
       await new Promise((resolve) => setTimeout(resolve, 0));
-      await approveInvoice(invoice.id, user("member"), dependencies);
+      await approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" });
       releaseStaleRead();
       await expect(staleUpdate).rejects.toMatchObject({ code: "INVOICE_REPOSITORY_CONFLICT" });
     } finally {
@@ -436,7 +436,7 @@ describe("OCR workflow boundaries", () => {
     };
 
     try {
-      const approval = approveInvoice(invoice.id, user("member"), dependencies);
+      const approval = approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" });
       await approvalReadStarted;
       await updateInvoice(invoice.id, user("member"), { total: null }, dependencies);
       releaseApprovalRead();
@@ -469,7 +469,7 @@ describe("OCR workflow boundaries", () => {
     };
 
     try {
-      await expect(approveInvoice(invoice.id, user("member"), dependencies)).rejects.toMatchObject({
+      await expect(approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" })).rejects.toMatchObject({
         code: "INVOICE_REPOSITORY_CONFLICT",
       });
     } finally {
@@ -491,7 +491,7 @@ describe("OCR workflow boundaries", () => {
     tenancy.appendAuditEvent = async () => { throw new Error("audit failure"); };
 
     try {
-      await expect(approveInvoice(invoice.id, user("member"), dependencies)).rejects.toThrow("audit failure");
+      await expect(approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" })).rejects.toThrow("audit failure");
     } finally {
       tenancy.appendAuditEvent = originalAppend;
     }
@@ -508,7 +508,7 @@ describe("OCR workflow boundaries", () => {
     const invoice = (await invoices.listByBusinessId(ownerBusiness.id))[0];
     await correctLowConfidence(invoice);
 
-    await expect(approveInvoice(invoice.id, user("member"), dependencies)).resolves.toMatchObject({ reviewState: "approved" });
+    await expect(approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" })).resolves.toMatchObject({ reviewState: "approved" });
     expect(documentRepository).toBeDefined();
     expect(tenancy.auditEvents).toContainEqual(expect.objectContaining({ entityId: invoice.id, type: "invoice_approved" }));
   });
@@ -663,7 +663,7 @@ describe("OCR workflow boundaries", () => {
     await expect(uncodedApproval.json()).resolves.toMatchObject({ error: { code: "CODING_REQUIRED" } });
     await resolveInvoiceCodingRepository(defaultInvoices).replace(routeState.businessId as typeof ownerBusiness.id, invoiceId, [{ headingId: "heading-purchases", amount: "120.00" }], new Date().toISOString());
 
-    const approvePositive = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ action: "approve" }) }), {
+    const approvePositive = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ action: "approve", payment: { status: "unpaid" } }) }), {
       params: Promise.resolve({ invoiceId }),
     });
     expect(approvePositive.status).toBe(200);

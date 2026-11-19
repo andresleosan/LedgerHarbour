@@ -92,7 +92,7 @@ describe("invoice review boundaries", () => {
     const dependencies = { tenancyRepository: tenancy, documentRepository: documents, invoices, headings };
 
     await expect(updateInvoiceDraft({ invoiceId: invoice.id, fields: { notes: "Checked" }, coding: [{ headingId: "heading-rent", amount: "120.00" }] }, user("reviewer"), dependencies)).resolves.toMatchObject({ notes: "Checked" });
-    await expect(approveInvoice(invoice.id, user("reviewer"), dependencies)).resolves.toMatchObject({ reviewState: "approved" });
+    await expect(approveInvoice(invoice.id, user("reviewer"), dependencies, { status: "unpaid" })).resolves.toMatchObject({ reviewState: "approved" });
     await expect(updateInvoiceDraft({ invoiceId: invoice.id, fields: { notes: "Tampered" } }, user("reviewer"), dependencies)).rejects.toMatchObject({ code: "INVALID_INVOICE_STATE" });
     await expect(updateInvoiceDraft({ invoiceId: invoice.id, coding: [] }, user("reviewer"), dependencies)).rejects.toMatchObject({ code: "INVALID_INVOICE_STATE" });
     expect((await invoices.findById(invoice.id))?.notes).toBe("Checked");
@@ -158,7 +158,7 @@ describe("invoice review boundaries", () => {
     } as never;
     await resolveInvoiceCodingRepository(invoices).replace(business.id, invoice.id, [{ headingId: "heading-rent", amount: "120.00" }], invoice.updatedAt);
 
-    await expect(approveInvoice(invoice.id, user("reviewer"), { tenancyRepository: tenancy, documentRepository: portableDocuments, invoices }))
+    await expect(approveInvoice(invoice.id, user("reviewer"), { tenancyRepository: tenancy, documentRepository: portableDocuments, invoices }, { status: "unpaid" }))
       .resolves.toMatchObject({ reviewState: "approved" });
   });
 

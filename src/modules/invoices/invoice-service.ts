@@ -23,7 +23,10 @@ import type { StorageAdapter } from "../documents/storage-adapter";
 import { createStorageAdapter } from "../documents/storage-factory";
 import { resolveDefaultHeadingRepository, type HeadingRepository } from "../accounting/heading-service";
 import { formatPence, parsePounds, sumPence } from "../accounting/money";
+import { MONEY_ERROR_CODES, MoneyError, resolveDefaultMoneyRepository, type MoneyErrorCode, type MoneyRepository } from "../accounting/money-repository";
+import { replaceInvoiceMovements, type MovementWriteContext } from "../accounting/money-service";
 import { resolveInvoiceCodingRepository, supplierKey, type InvoiceCodingLine, type InvoiceCodingRepository } from "./invoice-coding-repository";
+import { invoiceNarrative, shareDebit } from "./payment-shares";
 
 export const INVOICE_ERROR_CODES = {
   INVOICE_NOT_FOUND: "INVOICE_NOT_FOUND",
@@ -41,6 +44,13 @@ export const INVOICE_ERROR_CODES = {
   CODING_DUPLICATE_HEADING: "CODING_DUPLICATE_HEADING",
   HEADING_NOT_FOUND: "HEADING_NOT_FOUND",
   HEADING_NOT_USABLE: "HEADING_NOT_USABLE",
+  PAYMENT_REQUIRED: "PAYMENT_REQUIRED",
+  INVALID_PAYMENT: "INVALID_PAYMENT",
+  INVOICE_VOIDED: "INVOICE_VOIDED",
+  MOVEMENT_OUTSIDE_OPEN_YEAR: "MOVEMENT_OUTSIDE_OPEN_YEAR",
+  MONEY_ACCOUNT_NOT_FOUND: "MONEY_ACCOUNT_NOT_FOUND",
+  MONEY_ACCOUNT_INACTIVE: "MONEY_ACCOUNT_INACTIVE",
+  FINANCIAL_YEAR_CLOSED: "FINANCIAL_YEAR_CLOSED",
 } as const;
 
 export type InvoiceErrorCode = (typeof INVOICE_ERROR_CODES)[keyof typeof INVOICE_ERROR_CODES];
@@ -61,7 +71,32 @@ const publicMessages: Record<InvoiceErrorCode, string> = {
   CODING_DUPLICATE_HEADING: "Each code can be used only once on an invoice.",
   HEADING_NOT_FOUND: "Code not found.",
   HEADING_NOT_USABLE: "This code is inactive or blocked.",
+  PAYMENT_REQUIRED: "Say how the invoice was paid before approving it.",
+  INVALID_PAYMENT: "The payment details are not valid.",
+  INVOICE_VOIDED: "This invoice was voided and cannot be changed.",
+  MOVEMENT_OUTSIDE_OPEN_YEAR: "That date is outside the open financial year.",
+  MONEY_ACCOUNT_NOT_FOUND: "That account was not found.",
+  MONEY_ACCOUNT_INACTIVE: "That account is no longer in use.",
+  FINANCIAL_YEAR_CLOSED: "That financial year is closed, so its movements cannot change.",
 };
+
+const conflictCodes = new Set<InvoiceErrorCode>([
+  INVOICE_ERROR_CODES.INVALID_STATE,
+  INVOICE_ERROR_CODES.REPOSITORY_CONFLICT,
+  INVOICE_ERROR_CODES.CODING_REQUIRED,
+  INVOICE_ERROR_CODES.PAYMENT_REQUIRED,
+  INVOICE_ERROR_CODES.INVOICE_VOIDED,
+  INVOICE_ERROR_CODES.MOVEMENT_OUTSIDE_OPEN_YEAR,
+  INVOICE_ERROR_CODES.MONEY_ACCOUNT_INACTIVE,
+  INVOICE_ERROR_CODES.FINANCIAL_YEAR_CLOSED,
+]);
+
+/** HTTP status of an invoice error, shared by the invoice routes. */
+export function invoiceErrorStatus(code: InvoiceErrorCode): number {
+  if (code === INVOICE_ERROR_CODES.INVOICE_NOT_FOUND || code === INVOICE_ERROR_CODES.DOCUMENT_NOT_FOUND) return 404;
+  if (code === INVOICE_ERROR_CODES.BUSINESS_ACCESS_DENIED || code === INVOICE_ERROR_CODES.INACTIVE_BUSINESS || code === INVOICE_ERROR_CODES.INSUFFICIENT_CAPABILITY) return 403;
+  return conflictCodes.has(code) ? 409 : 400;
+}
 
 export class InvoiceError extends Error {
   readonly name = "InvoiceError";
@@ -71,12 +106,29 @@ export class InvoiceError extends Error {
   }
 }
 
+export const INVOICE_KINDS = ["invoice", "credit_note"] as const;
+export type InvoiceKind = (typeof INVOICE_KINDS)[number];
+export const PAYMENT_STATUSES = ["paid", "unpaid", "paid_privately"] as const;
+export type PaymentStatus = (typeof PAYMENT_STATUSES)[number];
+/** How an approved invoice was paid. `amountDebited` is the pounds the bank took ("120.00"). */
+export type InvoicePayment =
+  | { status: "paid"; accountId: string; paidOn: string; amountDebited: string }
+  | { status: "unpaid" }
+  | { status: "paid_privately" };
+
 export interface Invoice extends InvoiceDraft {
   id: InvoiceId;
   businessId: BusinessId;
   documentId: DocumentId;
   createdAt: string;
   updatedAt: string;
+  /** Absent means the stored default: an invoice, not paid yet answered, not voided. */
+  kind?: InvoiceKind;
+  paymentStatus?: PaymentStatus | null;
+  paidAccountId?: string | null;
+  paidOn?: string | null;
+  amountDebited?: string | null;
+  voidedAt?: string | null;
 }
 
 export interface InvoiceRepository {
@@ -211,6 +263,7 @@ export interface InvoiceDependencies {
   transaction?: <T>(operation: (tenancyRepository: OnboardingRepository) => Promise<T>) => Promise<T>;
   codings?: InvoiceCodingRepository;
   headings?: HeadingRepository;
+  money?: MoneyRepository;
 }
 
 function dependencies(input: InvoiceDependencies = {}) {
@@ -222,6 +275,7 @@ function dependencies(input: InvoiceDependencies = {}) {
     transaction: input.transaction,
     codings: input.codings ?? resolveInvoiceCodingRepository(invoices),
     headings: input.headings ?? resolveDefaultHeadingRepository(),
+    money: input.money ?? resolveDefaultMoneyRepository(),
   };
 }
 
@@ -363,7 +417,7 @@ export async function getInvoice(invoiceId: InvoiceId, actor: OnboardingActor, i
 export async function updateInvoice(
   invoiceId: InvoiceId,
   actor: OnboardingActor,
-  patch: Partial<Omit<InvoiceDraft, "confidenceData" | "reviewState">>,
+  patch: Partial<Omit<InvoiceDraft, "confidenceData" | "reviewState">> & { kind?: InvoiceKind },
   input: InvoiceDependencies = {},
   coding?: InvoiceCodingInput,
 ): Promise<Invoice> {
@@ -371,9 +425,11 @@ export async function updateInvoice(
   const actorId = await resolveOnboardingActor(resolved.tenancyRepository, actor);
   const current = await getInvoice(invoiceId, actorId, input);
   if (current.reviewState === "approved") throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_STATE);
-  const fields = { ...current, ...patch };
+  const { kind, ...fieldPatch } = patch;
+  if (kind !== undefined && !INVOICE_KINDS.includes(kind)) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_INVOICE);
+  const fields = { ...current, ...fieldPatch };
   const confidenceData = { ...current.confidenceData };
-  for (const field of Object.keys(patch) as (keyof typeof confidenceData)[]) confidenceData[field] = 1;
+  for (const field of Object.keys(fieldPatch) as (keyof typeof confidenceData)[]) confidenceData[field] = 1;
   const result: OcrResult = { fields: {
     supplier: fields.supplier,
     invoiceNumber: fields.invoiceNumber,
@@ -392,7 +448,7 @@ export async function updateInvoice(
   } catch {
     throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_INVOICE);
   }
-  const updated = { ...current, ...draft, updatedAt: new Date().toISOString() };
+  const updated = { ...current, ...draft, ...(kind === undefined ? {} : { kind }), updatedAt: new Date().toISOString() };
   await requireInvoiceDocument(current, resolved.documentRepository);
   const lines = await codingForSave(current, updated, coding, resolved);
   if (lines === null) return resolved.invoices.updateIfUnchanged(updated, current.reviewState, current.updatedAt);
@@ -424,7 +480,132 @@ export async function getInvoiceWithCoding(invoiceId: InvoiceId, actor: Onboardi
   return { invoice, coding, suggestedHeadingId };
 }
 
-export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActor, input: InvoiceDependencies = {}): Promise<Invoice> {
+const ISO_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+function isCalendarDate(value: unknown): value is string {
+  const match = typeof value === "string" ? ISO_DATE.exec(value) : null;
+  if (!match) return false;
+  const [year, month, day] = match.slice(1).map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day;
+}
+
+/** Checks a payment answer from a request; amounts come back normalised to pence ("120" → "120.00"). */
+export function normalizePayment(input: unknown): InvoicePayment {
+  if (input === undefined || input === null) throw new InvoiceError(INVOICE_ERROR_CODES.PAYMENT_REQUIRED);
+  const payment = input as Record<string, unknown>;
+  if (typeof input !== "object" || !PAYMENT_STATUSES.includes(payment.status as PaymentStatus)) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_PAYMENT);
+  if (payment.status !== "paid") return { status: payment.status as "unpaid" | "paid_privately" };
+  const pence = typeof payment.amountDebited === "string" ? penceOf(payment.amountDebited) : null;
+  if (typeof payment.accountId !== "string" || !payment.accountId || !isCalendarDate(payment.paidOn) || pence === null || !Number.isSafeInteger(pence) || pence <= 0) {
+    throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_PAYMENT);
+  }
+  return { status: "paid", accountId: payment.accountId, paidOn: payment.paidOn, amountDebited: formatPence(pence) };
+}
+
+/** The invoice's stored payment columns for an answer. */
+export function paymentFields(payment: InvoicePayment): Pick<Invoice, "paymentStatus" | "paidAccountId" | "paidOn" | "amountDebited"> {
+  return payment.status === "paid"
+    ? { paymentStatus: "paid", paidAccountId: payment.accountId, paidOn: payment.paidOn, amountDebited: payment.amountDebited }
+    : { paymentStatus: payment.status, paidAccountId: null, paidOn: null, amountDebited: null };
+}
+
+const movementErrors = new Map<MoneyErrorCode, InvoiceErrorCode>([
+  [MONEY_ERROR_CODES.MOVEMENT_OUTSIDE_OPEN_YEAR, INVOICE_ERROR_CODES.MOVEMENT_OUTSIDE_OPEN_YEAR],
+  [MONEY_ERROR_CODES.MONEY_ACCOUNT_NOT_FOUND, INVOICE_ERROR_CODES.MONEY_ACCOUNT_NOT_FOUND],
+  [MONEY_ERROR_CODES.MONEY_ACCOUNT_INACTIVE, INVOICE_ERROR_CODES.MONEY_ACCOUNT_INACTIVE],
+  [MONEY_ERROR_CODES.FINANCIAL_YEAR_CLOSED, INVOICE_ERROR_CODES.FINANCIAL_YEAR_CLOSED],
+  [MONEY_ERROR_CODES.HEADING_NOT_FOUND, INVOICE_ERROR_CODES.HEADING_NOT_FOUND],
+  [MONEY_ERROR_CODES.HEADING_NOT_USABLE, INVOICE_ERROR_CODES.HEADING_NOT_USABLE],
+  [MONEY_ERROR_CODES.INVALID_AMOUNT, INVOICE_ERROR_CODES.INVALID_PAYMENT],
+  [MONEY_ERROR_CODES.INVALID_MOVEMENT, INVOICE_ERROR_CODES.INVALID_PAYMENT],
+]);
+
+/** Runs a movement write and turns the money module's refusals into the invoice's own typed codes. */
+export async function asInvoiceError<T>(operation: () => Promise<T>): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    if (error instanceof MoneyError) throw new InvoiceError(movementErrors.get(error.code) ?? INVOICE_ERROR_CODES.REPOSITORY_CONFLICT);
+    throw error;
+  }
+}
+
+/**
+ * Runs `operation` inside a money transaction and rethrows its own error: the PostgreSQL money
+ * repository would otherwise turn any non-money error into a money conflict. Taken before the
+ * invoice and tenancy locks, the same order as the money service, so the memory locks never cross.
+ */
+export async function inMoneyTransaction<T>(money: MoneyRepository, operation: () => Promise<T>): Promise<T> {
+  const failure: { error?: unknown; failed?: true } = {};
+  try {
+    return await money.transaction(async () => {
+      try {
+        return await operation();
+      } catch (error) {
+        failure.error = error;
+        failure.failed = true;
+        throw error;
+      }
+    });
+  } catch (error) {
+    throw failure.failed ? failure.error : error;
+  }
+}
+
+/** The tenancy repository of an open transaction, whose nested transactions run inline (the memory lock is not reentrant). */
+function inlineTenancy(tenancy: OnboardingRepository): OnboardingRepository {
+  return new Proxy(tenancy, {
+    get(target, property) {
+      if (property === "transaction") return <T>(operation: (repository: OnboardingRepository) => Promise<T>) => operation(target);
+      const value = Reflect.get(target, property, target) as unknown;
+      return typeof value === "function" ? value.bind(target) : value;
+    },
+  });
+}
+
+export type InvoiceTransactionDependencies = ReturnType<typeof dependencies>;
+
+/**
+ * Writes the invoice's movements for a payment inside the caller's transaction: one per coding line
+ * when paid (negative for an invoice, positive for a credit note), none otherwise.
+ */
+export async function writeInvoiceMovements(
+  resolved: InvoiceTransactionDependencies,
+  transactionTenancy: OnboardingRepository,
+  actorId: UserId,
+  invoice: Invoice,
+  payment: InvoicePayment,
+): Promise<void> {
+  const context: MovementWriteContext = { businessId: invoice.businessId, actorId, tenancy: inlineTenancy(transactionTenancy), money: resolved.money, headings: resolved.headings };
+  if (payment.status !== "paid") {
+    await asInvoiceError(() => replaceInvoiceMovements(context, invoice.id, []));
+    return;
+  }
+  const lines = await resolved.codings.list(invoice.businessId, invoice.id);
+  const sign = (invoice.kind ?? "invoice") === "credit_note" ? 1 : -1;
+  const shares = shareDebit(lines.map((line) => parsePounds(line.amount)), parsePounds(payment.amountDebited));
+  const narrative = invoiceNarrative(invoice.supplier, invoice.invoiceNumber);
+  const rows = lines.flatMap((line, index) => shares[index] === 0 ? [] : [{
+    accountId: payment.accountId,
+    date: payment.paidOn,
+    narrative,
+    headingId: line.headingId,
+    amount: formatPence(sign * shares[index]),
+  }]);
+  await asInvoiceError(() => replaceInvoiceMovements(context, invoice.id, rows));
+}
+
+/** Payment audit metadata: ids only, never amounts or names. */
+export function paymentAudit(payment: InvoicePayment): Record<string, unknown> {
+  return payment.status === "paid" ? { paymentStatus: payment.status, moneyAccountId: payment.accountId } : { paymentStatus: payment.status };
+}
+
+/**
+ * Approves a coded invoice and records how it was paid. A payment from a business account creates
+ * the invoice's movements in the same transaction; any refusal leaves nothing written.
+ */
+export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActor, input: InvoiceDependencies = {}, payment?: unknown): Promise<Invoice> {
   const resolved = dependencies(input);
   const actorId = await resolveOnboardingActor(resolved.tenancyRepository, actor);
   const current = await getInvoice(invoiceId, actorId, input);
@@ -437,6 +618,7 @@ export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActo
   if (current.reviewState === "approved") throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_STATE);
   if (!validForApproval(current)) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_FOR_APPROVAL);
   await requireApprovableCoding(current, resolved.codings);
+  const answer = normalizePayment(payment);
 
   const approveInTransaction: ApprovalTransaction = async (transactionTenancy) => {
       const latest = await resolved.invoices.findById(invoiceId);
@@ -445,8 +627,10 @@ export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActo
       const document = await resolved.documentRepository.findById(current.documentId);
       if (!document || document.businessId !== current.businessId) throw new InvoiceError(INVOICE_ERROR_CODES.DOCUMENT_NOT_FOUND);
       const previousDocumentStatus = await resolved.documentRepository.getStatus(current.documentId);
-      const approved = { ...current, reviewState: "approved" as const, updatedAt: new Date().toISOString() };
+      const approved: Invoice = { ...current, reviewState: "approved", kind: current.kind ?? "invoice", ...paymentFields(answer), voidedAt: current.voidedAt ?? null, updatedAt: new Date().toISOString() };
       try {
+        // Movements first: their typed refusal (wrong account, closed year…) wins over the invoice's own keys.
+        if (answer.status === "paid") await writeInvoiceMovements(resolved, transactionTenancy, actorId, approved, answer);
         const saved = await resolved.invoices.updateIfUnchanged(approved, current.reviewState, current.updatedAt);
       if (!await setDocumentState(resolved.documentRepository, saved.documentId, "approved")) {
         throw new InvoiceError(INVOICE_ERROR_CODES.DOCUMENT_NOT_FOUND);
@@ -456,6 +640,7 @@ export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActo
         actorId,
         type: "invoice_approved",
         entityId: saved.id,
+        metadata: paymentAudit(answer),
       });
       return saved;
     } catch (error) {
@@ -464,9 +649,11 @@ export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActo
     }
   };
 
-  if (resolved.transaction) return resolved.transaction(approveInTransaction);
-  return resolved.invoices.transaction(async () => {
-    return resolved.tenancyRepository.transaction((transaction) => approveInTransaction(transaction));
+  return inMoneyTransaction(resolved.money, () => {
+    if (resolved.transaction) return resolved.transaction(approveInTransaction);
+    return resolved.invoices.transaction(async () => {
+      return resolved.tenancyRepository.transaction((transaction) => approveInTransaction(transaction));
+    });
   });
 }
 

@@ -115,7 +115,7 @@ describe("PostgreSQL invoice codings", () => {
       await save({ fields: { total: "75.25" } });
       await expect(getInvoiceCoding(invoiceId, a.owner, dependencies)).resolves.toEqual([{ headingId: a.rent.id, amount: "75.25" }]);
 
-      await expect(approveInvoice(invoiceId, a.owner, dependencies)).resolves.toMatchObject({ reviewState: "approved" });
+      await expect(approveInvoice(invoiceId, a.owner, dependencies, { status: "unpaid" })).resolves.toMatchObject({ reviewState: "approved" });
       await expect(save({ coding: [] })).rejects.toMatchObject({ code: "INVALID_INVOICE_STATE" });
       await expect(getInvoiceCoding(invoiceId, a.owner, dependencies)).resolves.toEqual([{ headingId: a.rent.id, amount: "75.25" }]);
     } finally {

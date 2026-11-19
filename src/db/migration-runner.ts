@@ -25,6 +25,9 @@ const MONEY_MOVEMENTS_MIGRATION_FILE = new URL("./migrations/0010_money_movement
 const MONEY_MOVEMENTS_REQUIRED_TABLES = ["financial_years", "money_accounts", "money_account_openings", "movements"] as const;
 const INVOICE_CODINGS_MIGRATION_VERSION = "0011_invoice_codings";
 const INVOICE_CODINGS_MIGRATION_FILE = new URL("./migrations/0011_invoice_codings.sql", import.meta.url);
+const INVOICE_PAYMENTS_MIGRATION_VERSION = "0012_invoice_payments";
+const INVOICE_PAYMENTS_MIGRATION_FILE = new URL("./migrations/0012_invoice_payments.sql", import.meta.url);
+const INVOICE_PAYMENTS_REQUIRED_COLUMNS = ["kind", "payment_status", "paid_account_id", "paid_on", "amount_debited", "voided_at"] as const;
 const REQUIRED_TABLES = [
   "users",
   "businesses",
@@ -49,6 +52,7 @@ const ACCOUNT_HEADINGS_ROLLBACK_FILE = new URL("./migrations/rollback/0008_accou
 const BUSINESS_TEMPLATES_ROLLBACK_FILE = new URL("./migrations/rollback/0009_business_templates_down.sql", import.meta.url);
 const MONEY_MOVEMENTS_ROLLBACK_FILE = new URL("./migrations/rollback/0010_money_movements_down.sql", import.meta.url);
 const INVOICE_CODINGS_ROLLBACK_FILE = new URL("./migrations/rollback/0011_invoice_codings_down.sql", import.meta.url);
+const INVOICE_PAYMENTS_ROLLBACK_FILE = new URL("./migrations/rollback/0012_invoice_payments_down.sql", import.meta.url);
 
 export type MigrationQueryResult<Row = Record<string, unknown>> = {
   rows: Row[];
@@ -95,6 +99,7 @@ export type MigrationSequence<T> = {
   businessTemplates: T;
   moneyMovements: T;
   invoiceCodings: T;
+  invoicePayments: T;
 };
 
 export function assertRequiredMigrations(
@@ -109,6 +114,7 @@ export function assertRequiredMigrations(
   businessTemplates?: MigrationCheck,
   moneyMovements?: MigrationCheck,
   invoiceCodings?: MigrationCheck,
+  invoicePayments?: MigrationCheck,
 ): void {
   if (
     initial.version !== MIGRATION_VERSION
@@ -154,6 +160,9 @@ export function assertRequiredMigrations(
   }
   if (invoiceCodings && (!invoiceCodings.applied || invoiceCodings.version !== INVOICE_CODINGS_MIGRATION_VERSION || invoiceCodings.requiredTableCount !== 1)) {
     throw new Error("Required PostgreSQL invoice codings migration is not applied");
+  }
+  if (invoicePayments && (!invoicePayments.applied || invoicePayments.version !== INVOICE_PAYMENTS_MIGRATION_VERSION || invoicePayments.requiredTableCount !== INVOICE_PAYMENTS_REQUIRED_COLUMNS.length)) {
+    throw new Error("Required PostgreSQL invoice payments migration is not applied");
   }
 }
 
@@ -1002,6 +1011,86 @@ export async function checkInvoiceCodingsMigration(
   }
 }
 
+async function invoicePaymentColumnCount(client: MigrationClient): Promise<number> {
+  const columns = await client.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = 'invoices' AND column_name = ANY($1::text[])`,
+    [INVOICE_PAYMENTS_REQUIRED_COLUMNS],
+  );
+  return columns.rowCount ?? 0;
+}
+
+export async function applyInvoicePaymentsMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, INVOICE_CODINGS_MIGRATION_VERSION))) {
+      throw new Error("Invoice codings migration must be applied before invoice payments migration");
+    }
+    if (await migrationWasApplied(client, INVOICE_PAYMENTS_MIGRATION_VERSION)) {
+      return { version: INVOICE_PAYMENTS_MIGRATION_VERSION, applied: false };
+    }
+    if ((await invoicePaymentColumnCount(client)) > 0) {
+      throw new Error("Database has invoice payments columns without a migration record");
+    }
+    const migrationSql = withoutTransactionMarkers(await readFile(INVOICE_PAYMENTS_MIGRATION_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, migrationSql);
+    await client.query("INSERT INTO ledgerharbour_schema_migrations (version) VALUES ($1)", [INVOICE_PAYMENTS_MIGRATION_VERSION]);
+    await client.query("COMMIT");
+    return { version: INVOICE_PAYMENTS_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function rollbackInvoicePaymentsMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationResult> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    if (!(await migrationWasApplied(client, INVOICE_PAYMENTS_MIGRATION_VERSION))) {
+      return { version: INVOICE_PAYMENTS_MIGRATION_VERSION, applied: false };
+    }
+    const rollbackSql = withoutTransactionMarkers(await readFile(INVOICE_PAYMENTS_ROLLBACK_FILE, "utf8"));
+    await client.query("BEGIN");
+    await executeMigration(client, rollbackSql);
+    await client.query("COMMIT");
+    return { version: INVOICE_PAYMENTS_MIGRATION_VERSION, applied: true };
+  } catch (error) {
+    await client.query("ROLLBACK").catch(() => undefined);
+    throw error;
+  } finally {
+    await client.end();
+  }
+}
+
+export async function checkInvoicePaymentsMigration(
+  config: MigrationConfig,
+  clientFactory: MigrationClientFactory = connect,
+): Promise<MigrationCheck> {
+  const client = await clientFactory(config);
+  try {
+    await ensureMigrationTable(client);
+    const applied = await migrationWasApplied(client, INVOICE_PAYMENTS_MIGRATION_VERSION);
+    return {
+      version: INVOICE_PAYMENTS_MIGRATION_VERSION,
+      applied,
+      requiredTableCount: await invoicePaymentColumnCount(client),
+      ledgerRecordPresent: applied,
+    };
+  } finally {
+    await client.end();
+  }
+}
+
 export async function applyAllMigrations(
   config: MigrationConfig,
   clientFactory: MigrationClientFactory = connect,
@@ -1017,7 +1106,8 @@ export async function applyAllMigrations(
   const businessTemplates = await applyBusinessTemplatesMigration(config, clientFactory);
   const moneyMovements = await applyMoneyMovementsMigration(config, clientFactory);
   const invoiceCodings = await applyInvoiceCodingsMigration(config, clientFactory);
-  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates, moneyMovements, invoiceCodings };
+  const invoicePayments = await applyInvoicePaymentsMigration(config, clientFactory);
+  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates, moneyMovements, invoiceCodings, invoicePayments };
 }
 
 export async function checkAllMigrations(
@@ -1035,6 +1125,7 @@ export async function checkAllMigrations(
   const businessTemplates = await checkBusinessTemplatesMigration(config, clientFactory);
   const moneyMovements = await checkMoneyMovementsMigration(config, clientFactory);
   const invoiceCodings = await checkInvoiceCodingsMigration(config, clientFactory);
-  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates, moneyMovements, invoiceCodings);
-  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates, moneyMovements, invoiceCodings };
+  const invoicePayments = await checkInvoicePaymentsMigration(config, clientFactory);
+  assertRequiredMigrations(initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates, moneyMovements, invoiceCodings, invoicePayments);
+  return { initial, platform, lifecycle, membershipLifecycle, projects, businessRequestAudit, rateLimit, accountHeadings, businessTemplates, moneyMovements, invoiceCodings, invoicePayments };
 }

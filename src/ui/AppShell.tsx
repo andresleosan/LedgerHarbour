@@ -159,6 +159,11 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .review-coding .tertiary-button { justify-self: start; }
          .coding-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) auto; gap: 8px; align-items: end; }
          .coding-hint { margin: 0; color: var(--lh-muted); font-size: .88rem; }
+         .review-choice { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+         .review-choice legend { padding: 0; font-weight: 750; }
+         .review-choice > label { display: flex; align-items: center; gap: 10px; min-height: 44px; overflow-wrap: anywhere; }
+         .review-choice input[type="radio"] { flex: none; width: 20px; height: 20px; margin: 0; }
+         .review-banner { margin: 0 0 14px; padding: 12px 14px; border: 1px solid #e3b7a8; border-radius: 10px; background: #f4dbd2; color: #793e35; font-weight: 750; }
          @media (max-width: 650px) { .coding-line { grid-template-columns: minmax(0, 1fr); } }
          .low-confidence { border-color: #c77c52; background: #fff7ed; }
          .confidence { color: #8d4d2d; font-size: .78rem; }

@@ -6,11 +6,12 @@ import {
   approveInvoice,
   getInvoice,
   InvoiceError,
-  INVOICE_ERROR_CODES,
+  invoiceErrorStatus,
   updateInvoice,
 } from "../../../../modules/invoices/invoice-service";
 import type { InvoiceId } from "../../../../modules/invoices/ocr-provider";
 import { getPersistenceContext } from "../../../../modules/persistence/repository-factory";
+import { paymentSchema } from "../../../../modules/invoices/review-validation";
 
 type RouteContext = { params: Promise<{ invoiceId: string }> };
 
@@ -26,14 +27,11 @@ const fieldSchema = z.object({
   expenseCategoryReference: z.string().nullable().optional(),
   notes: z.string().nullable().optional(),
 });
-const patchSchema = fieldSchema.extend({ action: z.literal("approve").optional() }).strict();
+const patchSchema = fieldSchema.extend({ action: z.literal("approve").optional(), payment: paymentSchema.optional() }).strict();
 
 function errorResponse(error: unknown): NextResponse {
   if (error instanceof InvoiceError) {
-    const status = error.code === INVOICE_ERROR_CODES.INVOICE_NOT_FOUND || error.code === INVOICE_ERROR_CODES.DOCUMENT_NOT_FOUND ? 404 :
-      error.code === INVOICE_ERROR_CODES.BUSINESS_ACCESS_DENIED || error.code === INVOICE_ERROR_CODES.INACTIVE_BUSINESS || error.code === INVOICE_ERROR_CODES.INSUFFICIENT_CAPABILITY ? 403 :
-      error.code === INVOICE_ERROR_CODES.INVALID_STATE || error.code === INVOICE_ERROR_CODES.REPOSITORY_CONFLICT || error.code === INVOICE_ERROR_CODES.CODING_REQUIRED ? 409 : 400;
-    return NextResponse.json({ error: { code: error.code, message: error.message } }, { status });
+    return NextResponse.json({ error: { code: error.code, message: error.message } }, { status: invoiceErrorStatus(error.code) });
   }
   return NextResponse.json({ error: { code: "INVOICE_REQUEST_FAILED", message: "The invoice request could not be completed." } }, { status: 500 });
 }
@@ -80,10 +78,12 @@ export async function PATCH(request: Request, context: RouteContext) {
       transaction: persistence.transaction,
       codings: persistence.invoiceCodingRepository,
       headings: persistence.headingRepository,
+      money: persistence.moneyRepository,
     };
-    if (parsed.data.action === "approve") return NextResponse.json(await approveInvoice(invoiceId as InvoiceId, actor, dependencies));
+    if (parsed.data.action === "approve") return NextResponse.json(await approveInvoice(invoiceId as InvoiceId, actor, dependencies, parsed.data.payment));
     const fields = { ...parsed.data };
     delete fields.action;
+    delete fields.payment;
     return NextResponse.json(await updateInvoice(invoiceId as InvoiceId, actor, fields, dependencies));
   } catch (error) {
     return errorResponse(error);

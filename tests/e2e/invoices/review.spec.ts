@@ -143,8 +143,9 @@ test.describe("invoice review workspace", () => {
     await expect(page.locator(".page-error")).toHaveCount(0);
     await expect(page.getByLabel(/supplier/i)).toHaveValue("Corrected Supplier");
 
-    page.on("dialog", (dialog) => void dialog.accept());
     await page.getByRole("button", { name: "Approve invoice" }).click();
+    await page.getByLabel("Not paid yet").check();
+    await page.getByRole("button", { name: "Approve", exact: true }).click();
     await expect(page.getByRole("status")).toContainText("Invoice approved.");
     await expect(page.locator(".page-error")).toHaveCount(0);
     await expect(page.getByLabel(/notes/i)).toBeDisabled();

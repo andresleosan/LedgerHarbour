@@ -149,7 +149,7 @@ describe("invoice coding rules", () => {
 
     await expect(approveInvoice(untotalled.id, owner, dependencies)).rejects.toMatchObject({ code: "INVOICE_INVALID_FOR_APPROVAL" });
     await invoices.update({ ...(await invoices.findById(untotalled.id))!, total: "120.00" });
-    await expect(approveInvoice(untotalled.id, owner, dependencies)).resolves.toMatchObject({ reviewState: "approved" });
+    await expect(approveInvoice(untotalled.id, owner, dependencies, { status: "unpaid" })).resolves.toMatchObject({ reviewState: "approved" });
   });
 
   it("moves a single line with a new total and rejects a new total that a split no longer adds up to", async () => {
@@ -174,7 +174,7 @@ describe("invoice coding rules", () => {
     await expect(approveInvoice(untotalled.id, owner, dependencies)).rejects.toMatchObject({ code: "CODING_REQUIRED" });
 
     await save({ coding: [{ headingId: "rent", amount: "120.00" }] });
-    await expect(approveInvoice(invoice.id, owner, dependencies)).resolves.toMatchObject({ reviewState: "approved" });
+    await expect(approveInvoice(invoice.id, owner, dependencies, { status: "unpaid" })).resolves.toMatchObject({ reviewState: "approved" });
     await expect(save({ coding: [{ headingId: "sales", amount: "120.00" }] })).rejects.toMatchObject({ code: "INVALID_INVOICE_STATE" });
     await expect(codings.list(businessId, invoice.id)).resolves.toEqual([{ headingId: "rent", amount: "120.00" }]);
   });
@@ -252,7 +252,10 @@ describe("invoice coding routes", () => {
     await expect(getInvoiceCoding(invoice.id, identity)).resolves.toEqual([{ headingId: rent.id, amount: "120.00" }]);
     expect(resolveInvoiceCodingRepository(resolveDefaultInvoiceRepository())).toBe(resolveInvoiceCodingRepository(resolveDefaultInvoiceRepository()));
 
-    const approved = await patch({ action: "approve" });
+    const unanswered = await patch({ action: "approve" });
+    expect(unanswered.status).toBe(409);
+    await expect(unanswered.json()).resolves.toMatchObject({ error: { code: "PAYMENT_REQUIRED" } });
+    const approved = await patch({ action: "approve", payment: { status: "unpaid" } });
     expect(approved.status).toBe(200);
   });
 

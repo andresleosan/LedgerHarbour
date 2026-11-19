@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { and, asc, desc, eq, ne, sql } from "drizzle-orm";
+import { and, asc, desc, eq, isNull, ne, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/client";
 import { databaseForOperation, transactionWithDatabase } from "../../db/transaction-scope";
@@ -71,6 +71,7 @@ export function createPostgresInvoiceCodingRepository(database: Database): Invoi
           .where(and(
             eq(invoices.businessId, businessId),
             ne(invoices.id, excludeInvoiceId),
+            isNull(invoices.voidedAt),
             sql`lower(btrim(${invoices.supplier}, ${TRIMMED})) = ${supplier}`,
           ))
           .groupBy(invoices.id, invoices.updatedAt)

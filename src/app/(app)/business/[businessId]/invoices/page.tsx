@@ -8,13 +8,13 @@ import { getPersistenceContext } from "@/modules/persistence/repository-factory"
 import { BusinessLifecycleError, LIFECYCLE_ERROR_CODES } from "@/modules/tenancy/business-lifecycle-service";
 import { AUTHORIZATION_ERROR_CODES, AuthorizationError } from "@/modules/permissions/authorize";
 
-type Filter = "all" | "needs_review" | "approved" | "failed";
+type Filter = "all" | "needs_review" | "approved" | "unpaid" | "failed";
 
 export default async function InvoicesPage({ params, searchParams }: { params: Promise<{ businessId: string }>; searchParams?: Promise<{ status?: string; locale?: string }> }) {
   const { businessId } = await params;
   const query = await searchParams;
   const locale: SupportedLocale = query?.locale === "es" ? "es" : "en";
-  const filter: Filter = query?.status === "needs_review" || query?.status === "approved" || query?.status === "failed" ? query.status : "all";
+  const filter: Filter = query?.status === "needs_review" || query?.status === "approved" || query?.status === "unpaid" || query?.status === "failed" ? query.status : "all";
   const preservedQuery = new URLSearchParams({ locale });
   if (query?.status) preservedQuery.set("status", query.status);
   const copy = messages[locale].invoices;
@@ -37,8 +37,12 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
       }
     }
   }
-  const visible = filter === "all" ? invoices : invoices.filter((invoice) => filter === invoice.reviewState || (filter === "failed" && invoice.documentStatus === "failed"));
-  const filters: Array<[Filter, string]> = [["all", copy.allInvoices], ["needs_review", copy.needsReview], ["approved", copy.approvedFilter], ["failed", copy.failed]];
+  const unpaid = (invoice: InvoiceListItem) => invoice.reviewState === "approved" && !invoice.voidedAt && invoice.paymentStatus === "unpaid";
+  const visible = filter === "all" ? invoices : invoices.filter((invoice) => filter === invoice.reviewState || (filter === "failed" && invoice.documentStatus === "failed") || (filter === "unpaid" && unpaid(invoice)));
+  const filters: Array<[Filter, string]> = [["all", copy.allInvoices], ["needs_review", copy.needsReview], ["approved", copy.approvedFilter], ["unpaid", copy.unpaidFilter], ["failed", copy.failed]];
+  // How an approved invoice was paid, or that it was voided; nothing for older approvals without an answer.
+  const paymentLabel = (invoice: InvoiceListItem) => invoice.reviewState !== "approved" ? null : invoice.voidedAt ? copy.stateVoided
+    : invoice.paymentStatus === "paid" ? copy.statePaid : invoice.paymentStatus === "unpaid" ? copy.stateUnpaid : invoice.paymentStatus === "paid_privately" ? copy.statePaidPrivately : null;
   const statusLabel = (invoice: InvoiceListItem) => invoice.documentStatus === "failed" ? copy.failed : invoice.reviewState === "needs_review" ? copy.needsReview : invoice.reviewState === "approved" ? copy.approvedFilter : invoice.reviewState;
 
   return (
@@ -50,7 +54,7 @@ export default async function InvoicesPage({ params, searchParams }: { params: P
           <nav className="invoice-settings" aria-label={messages[locale].categories.eyebrow}><Link href={`/business/${businessId}/settings/categories?${preservedQuery.toString()}`}>{messages[locale].categories.title}</Link><Link href={`/business/${businessId}/settings/currencies?${preservedQuery.toString()}`}>{messages[locale].currencies.title}</Link><Link href={`/business/${businessId}/settings/workbook?${preservedQuery.toString()}`}>{messages[locale].workbookSettings.title}</Link><Link href={`/business/${businessId}/settings/accounts?${preservedQuery.toString()}`}>{messages[locale].moneySettings.title}</Link></nav>
         </section>
         <div className="invoice-filters" role="group" aria-label={copy.listTitle}>{filters.map(([value, label]) => <form key={value} method="get"><input type="hidden" name="locale" value={locale} /><button className="filter-button" type="submit" name="status" value={value} aria-pressed={filter === value}>{label}</button></form>)}</div>
-        {listError ? <section className="page-card page-empty" role="alert"><strong>{copy.loadError}</strong></section> : visible.length === 0 ? <section className="page-card page-empty" aria-live="polite"><strong>{copy.empty}</strong><span>{filter === "all" ? copy.allInvoices : filters.find(([value]) => value === filter)?.[1]}</span></section> : <section className="invoice-list" aria-label={copy.listTitle}>{visible.map((invoice) => <article className="invoice-row" key={invoice.id}><div><strong>{invoice.supplier ?? invoice.invoiceNumber ?? invoice.id}</strong><p>{statusLabel(invoice)}</p></div><Link className="tertiary-button" href={`/business/${businessId}/invoices/${invoice.id}?${preservedQuery.toString()}`}>{copy.openReview}</Link></article>)}</section>}
+        {listError ? <section className="page-card page-empty" role="alert"><strong>{copy.loadError}</strong></section> : visible.length === 0 ? <section className="page-card page-empty" aria-live="polite"><strong>{copy.empty}</strong><span>{filter === "all" ? copy.allInvoices : filters.find(([value]) => value === filter)?.[1]}</span></section> : <section className="invoice-list" aria-label={copy.listTitle}>{visible.map((invoice) => <article className="invoice-row" key={invoice.id}><div><strong>{invoice.supplier ?? invoice.invoiceNumber ?? invoice.id}</strong><p>{statusLabel(invoice)}{paymentLabel(invoice) && <> <span className="status-badge status-badge-neutral">{paymentLabel(invoice)}</span></>}</p></div><Link className="tertiary-button" href={`/business/${businessId}/invoices/${invoice.id}?${preservedQuery.toString()}`}>{copy.openReview}</Link></article>)}</section>}
       </div>
     </main>
   );

@@ -1,4 +1,4 @@
-import { createInvoiceRepository, getInvoice, getInvoiceWithCoding, approveInvoice as approveTask8Invoice, updateInvoice, InvoiceError, INVOICE_ERROR_CODES, resolveDefaultDocumentRepository, type Invoice, type InvoiceCodingInput, type InvoiceCodingLine, type InvoiceDependencies, type InvoiceRepository } from "./invoice-service";
+import { createInvoiceRepository, getInvoice, getInvoiceWithCoding, approveInvoice as approveTask8Invoice, updateInvoice, InvoiceError, INVOICE_ERROR_CODES, resolveDefaultDocumentRepository, type Invoice, type InvoiceCodingInput, type InvoiceCodingLine, type InvoiceDependencies, type InvoiceKind, type InvoiceRepository, type PaymentStatus } from "./invoice-service";
 import type { InvoiceId } from "./ocr-provider";
 import type { Document } from "../documents/document-service";
 import type { BusinessId } from "../tenancy/types";
@@ -8,7 +8,7 @@ import { AuthorizationError, requireCapability } from "../permissions/authorize"
 import { createTenantContext } from "../tenancy/tenant-context";
 
 export type InvoiceReviewDependencies = InvoiceDependencies;
-export type DraftFieldPatch = Partial<Pick<Invoice, "supplier" | "invoiceNumber" | "invoiceDate" | "dueDate" | "subtotal" | "taxAmount" | "total" | "currencyReference" | "expenseCategoryReference" | "notes">>;
+export type DraftFieldPatch = Partial<Pick<Invoice, "supplier" | "invoiceNumber" | "invoiceDate" | "dueDate" | "subtotal" | "taxAmount" | "total" | "currencyReference" | "expenseCategoryReference" | "notes">> & { kind?: InvoiceKind };
 
 export interface UpdateInvoiceDraftInput {
   invoiceId: InvoiceId;
@@ -22,6 +22,9 @@ export interface InvoiceReview {
   invoice: Invoice;
   coding: InvoiceCodingLine[];
   suggestedHeadingId: string | null;
+  kind: InvoiceKind;
+  payment: { status: PaymentStatus | null; accountId: string | null; paidOn: string | null; amountDebited: string | null };
+  voidedAt: string | null;
   document: Omit<Document, "privateObjectKey">;
   documentDownloadUrl: string;
 }
@@ -58,8 +61,8 @@ export async function updateInvoiceDraft(input: UpdateInvoiceDraftInput, actor: 
   return updateInvoice(input.invoiceId, actor, fieldsFrom(input), dependencies, input.coding);
 }
 
-export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActor, dependencies: InvoiceReviewDependencies = {}): Promise<Invoice> {
-  return approveTask8Invoice(invoiceId, actor, dependencies);
+export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActor, dependencies: InvoiceReviewDependencies = {}, payment?: unknown): Promise<Invoice> {
+  return approveTask8Invoice(invoiceId, actor, dependencies, payment);
 }
 
 export async function getInvoiceReview(invoiceId: InvoiceId, actor: OnboardingActor, dependencies: InvoiceReviewDependencies = {}): Promise<InvoiceReview> {
@@ -70,7 +73,8 @@ export async function getInvoiceReview(invoiceId: InvoiceId, actor: OnboardingAc
   }
   const safeDocument = { ...document };
   Reflect.deleteProperty(safeDocument, "privateObjectKey");
-  return { invoice, coding, suggestedHeadingId, document: safeDocument, documentDownloadUrl: `/api/documents/${document.id}/download` };
+  const payment = { status: invoice.paymentStatus ?? null, accountId: invoice.paidAccountId ?? null, paidOn: invoice.paidOn ?? null, amountDebited: invoice.amountDebited ?? null };
+  return { invoice, coding, suggestedHeadingId, kind: invoice.kind ?? "invoice", payment, voidedAt: invoice.voidedAt ?? null, document: safeDocument, documentDownloadUrl: `/api/documents/${document.id}/download` };
 }
 
 export async function listInvoices(businessId: BusinessId, actor: OnboardingActor, dependencies: InvoiceReviewDependencies = {}): Promise<InvoiceListItem[]> {
