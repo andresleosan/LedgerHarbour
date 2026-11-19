@@ -16,6 +16,7 @@ export { documents, DocumentStatus, documentStatusEnum } from "./documents";
 export { invoices, InvoiceReviewState, invoiceReviewStateEnum } from "./invoices";
 export { categories } from "./categories";
 export { currencies } from "./currencies";
+export { accountHeadings } from "./account-headings";
 export { auditEvents, AuditActorType, auditActorTypeEnum } from "./audit-events";
 export { jobs, JobStatus, jobStatusEnum } from "./jobs";
 export { PlatformRole, platformMembers, platformRoleEnum } from "./platform-members";
@@ -23,6 +24,7 @@ export { platformAuditEvents } from "./platform-audit-events";
 export { projects } from "./projects";
 export { projectMemberships } from "./project-memberships";
 
+import { accountHeadings } from "./account-headings";
 import { auditEvents } from "./audit-events";
 import { businesses } from "./businesses";
 import { categories } from "./categories";
@@ -53,4 +55,5 @@ export const schema = {
   platformAuditEvents,
   projects,
   projectMemberships,
+  accountHeadings,
 };

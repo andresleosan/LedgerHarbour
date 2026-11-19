@@ -119,6 +119,7 @@ describe("relational domain schema", () => {
       "platformAuditEvents",
       "projects",
       "projectMemberships",
+      "accountHeadings",
     ]);
     expect([
       users,
@@ -135,6 +136,7 @@ describe("relational domain schema", () => {
       schema.platformAuditEvents,
       projects,
       projectMemberships,
+      schema.accountHeadings,
     ].map(getTableName)).toEqual([
       "users",
       "businesses",
@@ -150,6 +152,7 @@ describe("relational domain schema", () => {
       "platform_audit_events",
       "projects",
       "project_memberships",
+      "account_headings",
     ]);
   });
 

@@ -3,6 +3,7 @@ import { PGlite } from "@electric-sql/pglite";
 
 import { createTestDatabase } from "../../../src/db/test-database";
 import {
+  applyAccountHeadingsMigration,
   applyBusinessLifecycleMigration,
   applyAllMigrations,
   checkInitialMigration,
@@ -12,7 +13,9 @@ import {
   applyProjectsMigration,
   applyPlatformControlPlaneMigration,
   checkMembershipLifecycleMigration,
+  checkAccountHeadingsMigration,
   checkProjectsMigration,
+  rollbackAccountHeadingsMigration,
   rollbackMembershipLifecycleMigration,
   rollbackProjectsMigration,
   type MigrationClientFactory,
@@ -157,10 +160,69 @@ describe("PGlite test database migrations", () => {
         "0005_projects",
         "0006_business_request_audit",
         "0007_rate_limit_windows",
+        "0008_account_headings",
       ]);
       await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({
         projects: { applied: true, requiredTableCount: 2, ledgerRecordPresent: true },
       });
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("applies, rolls back exactly, and reapplies account headings 0008", async () => {
+    const client = new PGlite();
+    const clientFactory: MigrationClientFactory = async () => ({
+      query: async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+        if (!values && /^(BEGIN|COMMIT|ROLLBACK)\b/i.test(text.trim())) {
+          await client.exec(text);
+          return { rows: [] as Row[], rowCount: 0 };
+        }
+        const result = await client.query<Row>(text, values ? [...values] : undefined);
+        return { rows: result.rows, rowCount: result.rows.length };
+      },
+      exec: (text: string) => client.exec(text),
+      end: async () => undefined,
+    });
+    const schemaObjects = async () => {
+      const relations = await client.query<{ name: string }>(`
+        SELECT relname AS name FROM pg_class WHERE relnamespace = 'public'::regnamespace
+        UNION
+        SELECT conname AS name FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND contype <> 'n'
+        ORDER BY name
+      `);
+      return relations.rows.map((row) => row.name);
+    };
+    const ledger = async () => (await client.query<{ version: string }>("SELECT version FROM ledgerharbour_schema_migrations ORDER BY version")).rows.map((row) => row.version);
+    try {
+      const config = { databaseUrl: "pglite://lh014", allowStagingMigration: true as const };
+      await applyAllMigrations(config, clientFactory);
+      const withHeadings = await schemaObjects();
+      await expect(checkAccountHeadingsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 1, ledgerRecordPresent: true });
+
+      await expect(rollbackAccountHeadingsMigration(config, clientFactory)).resolves.toEqual({ version: "0008_account_headings", applied: true });
+      const withoutHeadings = await schemaObjects();
+      expect(withHeadings.filter((name) => !withoutHeadings.includes(name))).toEqual([
+        "account_headings",
+        "account_headings_blocked_inactive_check",
+        "account_headings_blocked_reason_check",
+        "account_headings_business_id_fkey",
+        "account_headings_business_id_unique",
+        "account_headings_business_position_unique",
+        "account_headings_business_sort_order_idx",
+        "account_headings_display_name_check",
+        "account_headings_heading_group_check",
+        "account_headings_pkey",
+        "account_headings_position_check",
+        "account_headings_value_type_check",
+      ]);
+      expect(withoutHeadings.every((name) => withHeadings.includes(name))).toBe(true);
+      expect(await ledger()).not.toContain("0008_account_headings");
+      expect(await ledger()).toContain("0007_rate_limit_windows");
+      await expect(checkAccountHeadingsMigration(config, clientFactory)).resolves.toMatchObject({ applied: false, requiredTableCount: 0, ledgerRecordPresent: false });
+
+      await expect(applyAccountHeadingsMigration(config, clientFactory)).resolves.toEqual({ version: "0008_account_headings", applied: true });
+      expect(await schemaObjects()).toEqual(withHeadings);
     } finally {
       await client.close();
     }

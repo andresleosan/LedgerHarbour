@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   applyAllMigrations,
   checkAllMigrations,
-  applyRateLimitMigration,
-  checkRateLimitMigration,
-  rollbackRateLimitMigration,
+  applyAccountHeadingsMigration,
+  checkAccountHeadingsMigration,
+  rollbackAccountHeadingsMigration,
   type MigrationConfig,
 } from "../../../src/db/migration-runner";
 
@@ -65,6 +65,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       "0005_projects",
       "0006_business_request_audit",
       "0007_rate_limit_windows",
+      "0008_account_headings",
     ]);
     expect(Object.values(applied).every((migration) => migration.applied)).toBe(true);
     expect(checked).toMatchObject({
@@ -75,6 +76,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       projects: { applied: true, requiredTableCount: 2, ledgerRecordPresent: true },
       businessRequestAudit: { applied: true, ledgerRecordPresent: true },
       rateLimit: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
+      accountHeadings: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
     });
   });
 
@@ -89,6 +91,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       ORDER BY table_name
     `);
     expect(tables.rows.map((row) => row.table_name)).toEqual([
+      "account_headings",
       "audit_events",
       "businesses",
       "categories",
@@ -175,19 +178,19 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
   }, 30_000);
 
   it("rolls back and reapplies the latest migration with ledger parity", async () => {
-    await expect(rollbackRateLimitMigration(config)).resolves.toEqual({
-      version: "0007_rate_limit_windows",
+    await expect(rollbackAccountHeadingsMigration(config)).resolves.toEqual({
+      version: "0008_account_headings",
       applied: true,
     });
-    await expect(checkRateLimitMigration(config)).resolves.toMatchObject({
+    await expect(checkAccountHeadingsMigration(config)).resolves.toMatchObject({
       applied: false,
       ledgerRecordPresent: false,
     });
-    await expect(applyRateLimitMigration(config)).resolves.toEqual({
-      version: "0007_rate_limit_windows",
+    await expect(applyAccountHeadingsMigration(config)).resolves.toEqual({
+      version: "0008_account_headings",
       applied: true,
     });
-    await expect(checkRateLimitMigration(config)).resolves.toMatchObject({
+    await expect(checkAccountHeadingsMigration(config)).resolves.toMatchObject({
       applied: true,
       ledgerRecordPresent: true,
     });

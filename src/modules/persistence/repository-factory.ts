@@ -3,6 +3,8 @@ import { Pool } from "pg";
 import { createDbClient, type Database } from "../../db/client";
 import { resolveDefaultCurrencyRepository } from "../accounting/currency-service";
 import { createPostgresCurrencyRepository } from "../accounting/postgres-currency-repository";
+import { resolveDefaultHeadingRepository, type HeadingRepository } from "../accounting/heading-service";
+import { createPostgresHeadingRepository } from "../accounting/postgres-heading-repository";
 import { resolveDefaultDocumentRepository, resolveDefaultInvoiceRepository } from "../invoices/invoice-service";
 import { createPostgresInvoiceRepository } from "../invoices/postgres-invoice-repository";
 import { resolveDefaultJobRepository } from "../jobs/job-service";
@@ -32,6 +34,7 @@ export type PersistenceContext = {
   invoiceRepository: InvoiceRepository;
   jobRepository: JobRepository;
   currencyRepository: CurrencyRepository;
+  headingRepository: HeadingRepository;
   storage: StorageAdapter;
   database?: Database;
   transaction?: <T>(operation: (tenancyRepository: OnboardingRepository) => Promise<T>) => Promise<T>;
@@ -83,6 +86,7 @@ export function createPersistenceContext(input: PersistenceInput = {}): Persiste
       invoiceRepository: resolveDefaultInvoiceRepository(),
       jobRepository: resolveDefaultJobRepository(),
       currencyRepository: resolveDefaultCurrencyRepository(),
+      headingRepository: resolveDefaultHeadingRepository(),
       storage,
       close: async () => {},
     };
@@ -112,6 +116,7 @@ function postgresContext(database: Database, pool: Pool | undefined, storage: St
     invoiceRepository: createPostgresInvoiceRepository(database),
     jobRepository: createPostgresJobRepository(database),
     currencyRepository: createPostgresCurrencyRepository(database),
+    headingRepository: createPostgresHeadingRepository(database),
     storage,
     database,
     transaction: async (operation) => {

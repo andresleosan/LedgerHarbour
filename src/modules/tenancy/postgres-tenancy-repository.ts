@@ -140,6 +140,7 @@ function entityType(type: string): string {
   if (type.startsWith("membership_")) return "membership";
   if (type.startsWith("category_")) return "category";
   if (type.startsWith("invoice_")) return "invoice";
+  if (type.startsWith("account_heading_")) return "account_heading";
   return type;
 }
 
@@ -377,6 +378,7 @@ function createRepository(db: Database, transactionCount: { value: number }): On
           action: input.type,
           entityType: entityType(input.type),
           entityId: input.entityId,
+          metadata: input.metadata ?? {},
         }).returning();
         if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
         return {

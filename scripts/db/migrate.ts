@@ -10,6 +10,7 @@ try {
     projects,
     businessRequestAudit,
     rateLimit,
+    accountHeadings,
   } = await applyAllMigrations(config);
   console.log(`${initial.applied ? "Applied" : "Already applied"}: ${initial.version}`);
   console.log(`${platform.applied ? "Applied" : "Already applied"}: ${platform.version}`);
@@ -18,6 +19,7 @@ try {
   console.log(`${projects.applied ? "Applied" : "Already applied"}: ${projects.version}`);
   console.log(`${businessRequestAudit.applied ? "Applied" : "Already applied"}: ${businessRequestAudit.version}`);
   console.log(`${rateLimit.applied ? "Applied" : "Already applied"}: ${rateLimit.version}`);
+  console.log(`${accountHeadings.applied ? "Applied" : "Already applied"}: ${accountHeadings.version}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Migration failed");
   process.exitCode = 1;

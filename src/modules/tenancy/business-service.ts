@@ -90,6 +90,7 @@ export interface AuditEvent {
   actorId: UserId;
   type: string;
   entityId: string;
+  metadata?: Record<string, unknown>;
   createdAt: string;
 }
 
