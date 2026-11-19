@@ -182,6 +182,23 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .workbook-group .settings-item > div:first-child { flex: 1 1 auto; }
          .workbook-rename { display: grid; gap: 9px; margin-top: 10px; }
          .workbook-rename .page-actions { margin-top: 0; }
+         .money-shell .page-card + .page-card { margin-top: 18px; }
+         .money-shell h2, .money-shell h3 { margin: 0 0 10px; color: var(--lh-navy); font-size: 1.15rem; }
+         .money-shell h3 { margin-top: 22px; font-size: 1rem; }
+         .money-shell .settings-item > div:first-child { flex: 1 1 auto; }
+         .money-form { display: grid; gap: 12px; margin-top: 12px; }
+         .money-form .page-actions { margin-top: 0; }
+         .money-add { padding-top: 6px; border-top: 1px solid var(--lh-border); }
+         .money-dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 12px; }
+         .money-field, .money-kind { display: grid; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+         .money-field > label, .money-kind legend { padding: 0; font-weight: 750; }
+         .money-kind > div { display: flex; flex-wrap: wrap; gap: 0 18px; }
+         .money-kind label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+         .money-kind input { width: 20px; height: 20px; margin: 0; accent-color: var(--lh-teal); }
+         .money-hint { margin: 0; color: var(--lh-muted); font-size: .88rem; line-height: 1.5; }
+         .money-shell .page-card > .money-hint { margin: 12px 0; }
+         .money-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--lh-teal); font-weight: 800; }
+         .app-shell select:focus-visible { outline: 3px solid var(--lh-coral-focus); outline-offset: 3px; }
          .member-info { min-width: 0; }
          .transfer-panel { margin-top: 22px; padding: 18px; border: 1px solid #e1b9a8; border-radius: 12px; background: #fff6ef; }
          .transfer-panel h2 { margin: 0; font-size: 1.15rem; }
