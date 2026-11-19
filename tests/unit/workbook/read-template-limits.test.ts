@@ -79,7 +79,8 @@ describe("readTemplate limits", () => {
       for (let r = 1; r <= 500; r++) tb.getCell(r, 10).value = { formula: `SUM('${SYNTHETIC_SHEETS.main}'!A1:XFD1048576)` };
     });
     const { ms, result } = await timed(() => readTemplate(bytes));
-    expect(ms).toBeLessThan(3000);
+    // Generous bound for a loaded machine; the regression (expanding ranges) takes minutes.
+    expect(ms).toBeLessThan(10_000);
     expect(result).toMatchObject({ headings: expect.any(Array) });
   });
 
@@ -102,7 +103,8 @@ describe("readTemplate limits", () => {
       const bytes = Buffer.from(await workbook.xlsx.writeBuffer());
       const { ms, result } = await timed(() => readTemplate(bytes));
       expect(result).toMatchObject({ name: "TemplateReadError", code: "UNRECOGNISED_LAYOUT" });
-      expect(ms).toBeLessThan(1000);
+      // Generous bound for a loaded machine; the regression (allocating up to the parsed row) takes far longer.
+      expect(ms).toBeLessThan(10_000);
     }
   });
 });

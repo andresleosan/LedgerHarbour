@@ -10,6 +10,7 @@ import {
   type TemplateHeading,
   type TemplateProfile,
 } from "./template-profile";
+import { MAX_ACCOUNT_COLUMNS, MAX_ACCOUNT_ROWS, inspectWorkbookZip } from "./zip-gate";
 
 // Reads an accountant's accounts workbook into a profile. The layout is found by
 // structure (the analysis formula), never by sheet names or fixed addresses.
@@ -42,11 +43,7 @@ interface Dimensions {
   columns: number;
 }
 
-const MAX_UNCOMPRESSED_BYTES = 256 * 1024 * 1024;
-const MAX_ZIP_ENTRIES = 2_000;
 const MAX_SHEETS = 64;
-const MAX_ACCOUNT_ROWS = 20_000;
-const MAX_ACCOUNT_COLUMNS = 400;
 const MAX_FORMULAS = 2_000_000;
 const MAX_REFERENCES = 100_000;
 
@@ -62,7 +59,8 @@ const BLOCKS: Array<[RegExp, HeadingGroup]> = [
 
 export async function readTemplate(bytes: Uint8Array | Buffer): Promise<TemplateProfile> {
   if (bytes.byteLength > TEMPLATE_MAX_BYTES) throw new TemplateReadError("TOO_LARGE");
-  checkZipDirectory(bytes);
+  // The caller must still run this under a memory and time limit: exceljs builds its whole model in memory.
+  inspectWorkbookZip(bytes);
   const workbook = new ExcelJS.Workbook();
   try {
     await workbook.xlsx.load(Buffer.from(bytes) as unknown as ExcelJS.Buffer);
@@ -196,28 +194,6 @@ export async function readTemplate(bytes: Uint8Array | Buffer): Promise<Template
   });
 
   return { headings, sheets, defects };
-}
-
-// A first gate only: declared sizes can lie, so the caller must also run the parse under a memory and time limit.
-function checkZipDirectory(bytes: Uint8Array) {
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  let end = -1;
-  for (let i = bytes.byteLength - 22; i >= Math.max(0, bytes.byteLength - 22 - 0xffff) && end < 0; i--) {
-    if (view.getUint32(i, true) === 0x06054b50) end = i;
-  }
-  if (end < 0) throw new TemplateReadError("NOT_A_WORKBOOK");
-  const count = view.getUint16(end + 10, true);
-  const size = view.getUint32(end + 12, true);
-  const start = view.getUint32(end + 16, true);
-  if (count > MAX_ZIP_ENTRIES) throw new TemplateReadError("TOO_LARGE");
-  if (start + size > end) throw new TemplateReadError("NOT_A_WORKBOOK");
-  let total = 0;
-  for (let i = 0, p = start; i < count; i++) {
-    if (p + 46 > start + size || view.getUint32(p, true) !== 0x02014b50) throw new TemplateReadError("NOT_A_WORKBOOK");
-    total += view.getUint32(p + 24, true);
-    if (total > MAX_UNCOMPRESSED_BYTES) throw new TemplateReadError("TOO_LARGE");
-    p += 46 + view.getUint16(p + 28, true) + view.getUint16(p + 30, true) + view.getUint16(p + 32, true);
-  }
 }
 
 function scanSheet(ws: Worksheet, dimensions: Dimensions, budget: { formulas: number }) {
