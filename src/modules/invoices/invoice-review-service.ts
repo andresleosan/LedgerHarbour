@@ -1,4 +1,4 @@
-import { createInvoiceRepository, getInvoice, approveInvoice as approveTask8Invoice, updateInvoice, InvoiceError, INVOICE_ERROR_CODES, resolveDefaultDocumentRepository, type Invoice, type InvoiceDependencies, type InvoiceRepository } from "./invoice-service";
+import { createInvoiceRepository, getInvoice, getInvoiceWithCoding, approveInvoice as approveTask8Invoice, updateInvoice, InvoiceError, INVOICE_ERROR_CODES, resolveDefaultDocumentRepository, type Invoice, type InvoiceCodingInput, type InvoiceCodingLine, type InvoiceDependencies, type InvoiceRepository } from "./invoice-service";
 import type { InvoiceId } from "./ocr-provider";
 import type { Document } from "../documents/document-service";
 import type { BusinessId } from "../tenancy/types";
@@ -13,11 +13,15 @@ export type DraftFieldPatch = Partial<Pick<Invoice, "supplier" | "invoiceNumber"
 export interface UpdateInvoiceDraftInput {
   invoiceId: InvoiceId;
   fields?: DraftFieldPatch;
+  /** Replaces the coding lines together with the field changes; omitted keeps them. */
+  coding?: InvoiceCodingInput;
   [field: string]: unknown;
 }
 
 export interface InvoiceReview {
   invoice: Invoice;
+  coding: InvoiceCodingLine[];
+  suggestedHeadingId: string | null;
   document: Omit<Document, "privateObjectKey">;
   documentDownloadUrl: string;
 }
@@ -46,11 +50,12 @@ function fieldsFrom(input: UpdateInvoiceDraftInput): DraftFieldPatch {
   const fields = { ...input } as Record<string, unknown>;
   Reflect.deleteProperty(fields, "invoiceId");
   Reflect.deleteProperty(fields, "fields");
+  Reflect.deleteProperty(fields, "coding");
   return fields as DraftFieldPatch;
 }
 
 export async function updateInvoiceDraft(input: UpdateInvoiceDraftInput, actor: OnboardingActor, dependencies: InvoiceReviewDependencies = {}): Promise<Invoice> {
-  return updateInvoice(input.invoiceId, actor, fieldsFrom(input), dependencies);
+  return updateInvoice(input.invoiceId, actor, fieldsFrom(input), dependencies, input.coding);
 }
 
 export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActor, dependencies: InvoiceReviewDependencies = {}): Promise<Invoice> {
@@ -58,14 +63,14 @@ export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActo
 }
 
 export async function getInvoiceReview(invoiceId: InvoiceId, actor: OnboardingActor, dependencies: InvoiceReviewDependencies = {}): Promise<InvoiceReview> {
-  const invoice = await getInvoice(invoiceId, actor, dependencies);
+  const { invoice, coding, suggestedHeadingId } = await getInvoiceWithCoding(invoiceId, actor, dependencies);
   const document = await (dependencies.documentRepository ?? resolveDefaultDocumentRepository()).findById(invoice.documentId);
   if (!document) {
     throw new InvoiceError(INVOICE_ERROR_CODES.DOCUMENT_NOT_FOUND);
   }
   const safeDocument = { ...document };
   Reflect.deleteProperty(safeDocument, "privateObjectKey");
-  return { invoice, document: safeDocument, documentDownloadUrl: `/api/documents/${document.id}/download` };
+  return { invoice, coding, suggestedHeadingId, document: safeDocument, documentDownloadUrl: `/api/documents/${document.id}/download` };
 }
 
 export async function listInvoices(businessId: BusinessId, actor: OnboardingActor, dependencies: InvoiceReviewDependencies = {}): Promise<InvoiceListItem[]> {

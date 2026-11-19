@@ -18,6 +18,7 @@ import {
   resolveDefaultStorage,
   type InMemoryInvoiceRepository,
 } from "../../../src/modules/invoices/invoice-service";
+import { resolveInvoiceCodingRepository } from "../../../src/modules/invoices/invoice-coding-repository";
 import { createOcrWorker } from "../../../src/modules/jobs/ocr-worker";
 import { resetRateLimitersForTests } from "../../../src/modules/security/rate-limit";
 import {
@@ -108,6 +109,7 @@ describe("OCR workflow boundaries", () => {
   async function correctLowConfidence(invoice: Awaited<ReturnType<InMemoryInvoiceRepository["findById"]>>) {
     if (!invoice) throw new Error("invoice fixture missing");
     await invoices.update({ ...invoice, confidenceData: { ...invoice.confidenceData, supplier: 1, invoiceNumber: 1 } });
+    await resolveInvoiceCodingRepository(invoices).replace(invoice.businessId, invoice.id, [{ headingId: "heading-purchases", amount: invoice.total! }], invoice.updatedAt);
   }
 
   it("queues, processes, links the invoice to the document, and routes low confidence to review", async () => {
@@ -653,6 +655,13 @@ describe("OCR workflow boundaries", () => {
       params: Promise.resolve({ invoiceId }),
     });
     expect(restoreRequiredField.status).toBe(200);
+
+    const uncodedApproval = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ action: "approve" }) }), {
+      params: Promise.resolve({ invoiceId }),
+    });
+    expect(uncodedApproval.status).toBe(409);
+    await expect(uncodedApproval.json()).resolves.toMatchObject({ error: { code: "CODING_REQUIRED" } });
+    await resolveInvoiceCodingRepository(defaultInvoices).replace(routeState.businessId as typeof ownerBusiness.id, invoiceId, [{ headingId: "heading-purchases", amount: "120.00" }], new Date().toISOString());
 
     const approvePositive = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ action: "approve" }) }), {
       params: Promise.resolve({ invoiceId }),

@@ -24,6 +24,7 @@ describe("PostgreSQL initial migration", () => {
         "currencies",
         "documents",
         "financial_years",
+        "invoice_codings",
         "invoices",
         "jobs",
         "join_requests",

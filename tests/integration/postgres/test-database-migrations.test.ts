@@ -22,6 +22,9 @@ import {
   applyMoneyMovementsMigration,
   checkMoneyMovementsMigration,
   rollbackMoneyMovementsMigration,
+  applyInvoiceCodingsMigration,
+  checkInvoiceCodingsMigration,
+  rollbackInvoiceCodingsMigration,
   rollbackMembershipLifecycleMigration,
   rollbackProjectsMigration,
   type MigrationClientFactory,
@@ -169,6 +172,7 @@ describe("PGlite test database migrations", () => {
         "0008_account_headings",
         "0009_business_templates",
         "0010_money_movements",
+        "0011_invoice_codings",
       ]);
       await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({
         projects: { applied: true, requiredTableCount: 2, ledgerRecordPresent: true },
@@ -205,7 +209,8 @@ describe("PGlite test database migrations", () => {
     try {
       const config = { databaseUrl: "pglite://lh014", allowStagingMigration: true as const };
       await applyAllMigrations(config, clientFactory);
-      // 0010 movements reference account_headings, so the later migration is rolled back first.
+      // 0010 movements and 0011 invoice codings reference account_headings, so the later migrations are rolled back first.
+      await rollbackInvoiceCodingsMigration(config, clientFactory);
       await rollbackMoneyMovementsMigration(config, clientFactory);
       const withHeadings = await schemaObjects();
       await expect(checkAccountHeadingsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 1, ledgerRecordPresent: true });
@@ -373,6 +378,68 @@ describe("PGlite test database migrations", () => {
       await expect(applyMoneyMovementsMigration(config, clientFactory)).resolves.toEqual({ version: "0010_money_movements", applied: true });
       await expect(applyMoneyMovementsMigration(config, clientFactory)).resolves.toEqual({ version: "0010_money_movements", applied: false });
       expect(await schemaObjects()).toEqual(withMoney);
+    } finally {
+      await client.close();
+    }
+  }, 30_000);
+
+  it("applies, rolls back exactly, and reapplies invoice codings 0011", async () => {
+    const client = new PGlite();
+    const clientFactory: MigrationClientFactory = async () => ({
+      query: async <Row = Record<string, unknown>>(text: string, values?: readonly unknown[]) => {
+        if (!values && /^(BEGIN|COMMIT|ROLLBACK)\b/i.test(text.trim())) {
+          await client.exec(text);
+          return { rows: [] as Row[], rowCount: 0 };
+        }
+        const result = await client.query<Row>(text, values ? [...values] : undefined);
+        return { rows: result.rows, rowCount: result.rows.length };
+      },
+      exec: (text: string) => client.exec(text),
+      end: async () => undefined,
+    });
+    const schemaObjects = async () => {
+      const relations = await client.query<{ name: string }>(`
+        SELECT relname AS name FROM pg_class WHERE relnamespace = 'public'::regnamespace
+        UNION
+        SELECT conname AS name FROM pg_constraint WHERE connamespace = 'public'::regnamespace AND contype <> 'n'
+        ORDER BY name
+      `);
+      return relations.rows.map((row) => row.name);
+    };
+    const ledger = async () => (await client.query<{ version: string }>("SELECT version FROM ledgerharbour_schema_migrations ORDER BY version")).rows.map((row) => row.version);
+    try {
+      const config = { databaseUrl: "pglite://lh020", allowStagingMigration: true as const };
+      await applyAllMigrations(config, clientFactory);
+      const withCodings = await schemaObjects();
+      await expect(checkInvoiceCodingsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true, requiredTableCount: 1, ledgerRecordPresent: true });
+      await expect(checkAllMigrations(config, clientFactory)).resolves.toMatchObject({ invoiceCodings: { version: "0011_invoice_codings", applied: true } });
+
+      await expect(rollbackInvoiceCodingsMigration(config, clientFactory)).resolves.toEqual({ version: "0011_invoice_codings", applied: true });
+      const withoutCodings = await schemaObjects();
+      expect(withCodings.filter((name) => !withoutCodings.includes(name))).toEqual([
+        "invoice_codings",
+        "invoice_codings_amount_check",
+        "invoice_codings_business_id_fkey",
+        "invoice_codings_business_invoice_idx",
+        "invoice_codings_heading_fk",
+        "invoice_codings_invoice_fk",
+        "invoice_codings_invoice_heading_unique",
+        "invoice_codings_invoice_sort_unique",
+        "invoice_codings_pkey",
+      ]);
+      expect(withoutCodings.every((name) => withCodings.includes(name))).toBe(true);
+      expect(await ledger()).not.toContain("0011_invoice_codings");
+      expect(await ledger()).toContain("0010_money_movements");
+      await expect(checkInvoiceCodingsMigration(config, clientFactory)).resolves.toMatchObject({ applied: false, requiredTableCount: 0, ledgerRecordPresent: false });
+      await expect(checkAllMigrations(config, clientFactory)).rejects.toThrow("invoice codings migration");
+
+      await expect(rollbackMoneyMovementsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true });
+      await expect(applyInvoiceCodingsMigration(config, clientFactory)).rejects.toThrow("Money movements migration must be applied before invoice codings migration");
+      await expect(applyMoneyMovementsMigration(config, clientFactory)).resolves.toMatchObject({ applied: true });
+
+      await expect(applyInvoiceCodingsMigration(config, clientFactory)).resolves.toEqual({ version: "0011_invoice_codings", applied: true });
+      await expect(applyInvoiceCodingsMigration(config, clientFactory)).resolves.toEqual({ version: "0011_invoice_codings", applied: false });
+      expect(await schemaObjects()).toEqual(withCodings);
     } finally {
       await client.close();
     }

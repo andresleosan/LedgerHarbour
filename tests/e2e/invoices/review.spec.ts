@@ -1,3 +1,4 @@
+import { buildSyntheticTemplate } from "../../fixtures/workbook/synthetic-template";
 import { expect, test } from "../fixtures";
 import { createApprovedBusiness } from "../helpers/business";
 import { browserApiRequest } from "../helpers/browser-api";
@@ -113,6 +114,12 @@ test.describe("invoice review workspace", () => {
     await page.getByRole("button", { name: "Continue with email" }).click();
     await expect(page.getByRole("status")).toContainText("Signed in as");
     const businessId = await createApprovedBusiness(browser, page, `Review Books ${suffix}`);
+    // Approval needs a code from the business's chart of accounts, which comes from its template.
+    const template = await browserApiRequest(page, `/api/businesses/${businessId}/template`, {
+      method: "POST",
+      multipart: { file: { name: "accounts.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: await buildSyntheticTemplate() } },
+    });
+    expect(template.status).toBeLessThan(300);
 
     await page.goto(`/business/${businessId}/upload?locale=en`);
     await page.locator('input[type="file"][multiple]').setInputFiles({
@@ -130,6 +137,7 @@ test.describe("invoice review workspace", () => {
     await page.getByLabel(/supplier/i).fill("Corrected Supplier");
     await page.getByLabel(/invoice number/i).fill("REVIEW-001");
     await page.getByLabel(/notes/i).fill("Checked by finance");
+    await page.getByLabel("Code", { exact: true }).selectOption({ label: "Premises" });
     await page.getByRole("button", { name: "Save correction" }).click();
     await expect(page.getByRole("status")).toContainText("Correction saved.");
     await expect(page.locator(".page-error")).toHaveCount(0);

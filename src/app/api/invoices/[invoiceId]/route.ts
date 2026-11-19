@@ -32,7 +32,7 @@ function errorResponse(error: unknown): NextResponse {
   if (error instanceof InvoiceError) {
     const status = error.code === INVOICE_ERROR_CODES.INVOICE_NOT_FOUND || error.code === INVOICE_ERROR_CODES.DOCUMENT_NOT_FOUND ? 404 :
       error.code === INVOICE_ERROR_CODES.BUSINESS_ACCESS_DENIED || error.code === INVOICE_ERROR_CODES.INACTIVE_BUSINESS || error.code === INVOICE_ERROR_CODES.INSUFFICIENT_CAPABILITY ? 403 :
-      error.code === INVOICE_ERROR_CODES.INVALID_STATE || error.code === INVOICE_ERROR_CODES.REPOSITORY_CONFLICT ? 409 : 400;
+      error.code === INVOICE_ERROR_CODES.INVALID_STATE || error.code === INVOICE_ERROR_CODES.REPOSITORY_CONFLICT || error.code === INVOICE_ERROR_CODES.CODING_REQUIRED ? 409 : 400;
     return NextResponse.json({ error: { code: error.code, message: error.message } }, { status });
   }
   return NextResponse.json({ error: { code: "INVOICE_REQUEST_FAILED", message: "The invoice request could not be completed." } }, { status: 500 });
@@ -78,6 +78,8 @@ export async function PATCH(request: Request, context: RouteContext) {
       documentRepository: persistence.documentRepository,
       invoices: persistence.invoiceRepository,
       transaction: persistence.transaction,
+      codings: persistence.invoiceCodingRepository,
+      headings: persistence.headingRepository,
     };
     if (parsed.data.action === "approve") return NextResponse.json(await approveInvoice(invoiceId as InvoiceId, actor, dependencies));
     const fields = { ...parsed.data };

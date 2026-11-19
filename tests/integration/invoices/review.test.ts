@@ -14,6 +14,8 @@ import { getInvoiceReview, listInvoices, updateInvoiceDraft } from "../../../src
 import { MAX_REVIEW_PATCH_BYTES } from "../../../src/modules/invoices/review-validation";
 import type { DocumentId, InvoiceId } from "../../../src/modules/invoices/ocr-provider";
 import type { BusinessId, UserId } from "../../../src/modules/tenancy/types";
+import { resolveInvoiceCodingRepository } from "../../../src/modules/invoices/invoice-coding-repository";
+import { createHeadingRepository } from "../../../src/modules/accounting/heading-service";
 import { createApprovedBusiness } from "../../helpers/business-fixtures";
 
 const user = (value: string) => value as UserId;
@@ -84,12 +86,17 @@ describe("invoice review boundaries", () => {
   });
 
   it("updates a draft through Task 8 and preserves approved immutability", async () => {
-    const dependencies = { tenancyRepository: tenancy, documentRepository: documents, invoices };
+    const headings = createHeadingRepository();
+    const now = new Date().toISOString();
+    await headings.create({ id: "heading-rent", businessId: business.id, position: 1, templateValue: "Rent", valueType: "text", group: "expenses", sortOrder: 1, displayName: "Rent", isActive: true, blockedReason: null, createdAt: now, updatedAt: now });
+    const dependencies = { tenancyRepository: tenancy, documentRepository: documents, invoices, headings };
 
-    await expect(updateInvoiceDraft({ invoiceId: invoice.id, fields: { notes: "Checked" } }, user("reviewer"), dependencies)).resolves.toMatchObject({ notes: "Checked" });
+    await expect(updateInvoiceDraft({ invoiceId: invoice.id, fields: { notes: "Checked" }, coding: [{ headingId: "heading-rent", amount: "120.00" }] }, user("reviewer"), dependencies)).resolves.toMatchObject({ notes: "Checked" });
     await expect(approveInvoice(invoice.id, user("reviewer"), dependencies)).resolves.toMatchObject({ reviewState: "approved" });
     await expect(updateInvoiceDraft({ invoiceId: invoice.id, fields: { notes: "Tampered" } }, user("reviewer"), dependencies)).rejects.toMatchObject({ code: "INVALID_INVOICE_STATE" });
+    await expect(updateInvoiceDraft({ invoiceId: invoice.id, coding: [] }, user("reviewer"), dependencies)).rejects.toMatchObject({ code: "INVALID_INVOICE_STATE" });
     expect((await invoices.findById(invoice.id))?.notes).toBe("Checked");
+    await expect(getInvoiceReview(invoice.id, user("reviewer"), dependencies)).resolves.toMatchObject({ coding: [{ headingId: "heading-rent", amount: "120.00" }] });
   });
 
   it("resolves an AuthIdentity before listing invoices", async () => {
@@ -149,6 +156,7 @@ describe("invoice review boundaries", () => {
         return updated;
       },
     } as never;
+    await resolveInvoiceCodingRepository(invoices).replace(business.id, invoice.id, [{ headingId: "heading-rent", amount: "120.00" }], invoice.updatedAt);
 
     await expect(approveInvoice(invoice.id, user("reviewer"), { tenancyRepository: tenancy, documentRepository: portableDocuments, invoices }))
       .resolves.toMatchObject({ reviewState: "approved" });

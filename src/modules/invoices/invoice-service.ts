@@ -21,6 +21,9 @@ import type { Document, DocumentRepository } from "../documents/document-service
 import { createDocumentRepository } from "../documents/document-service";
 import type { StorageAdapter } from "../documents/storage-adapter";
 import { createStorageAdapter } from "../documents/storage-factory";
+import { resolveDefaultHeadingRepository, type HeadingRepository } from "../accounting/heading-service";
+import { formatPence, parsePounds, sumPence } from "../accounting/money";
+import { resolveInvoiceCodingRepository, supplierKey, type InvoiceCodingLine, type InvoiceCodingRepository } from "./invoice-coding-repository";
 
 export const INVOICE_ERROR_CODES = {
   INVOICE_NOT_FOUND: "INVOICE_NOT_FOUND",
@@ -32,6 +35,12 @@ export const INVOICE_ERROR_CODES = {
   INVALID_FOR_APPROVAL: "INVOICE_INVALID_FOR_APPROVAL",
   INVALID_STATE: "INVALID_INVOICE_STATE",
   REPOSITORY_CONFLICT: "INVOICE_REPOSITORY_CONFLICT",
+  INVALID_CODING: "INVALID_CODING",
+  CODING_REQUIRED: "CODING_REQUIRED",
+  CODING_TOTAL_MISMATCH: "CODING_TOTAL_MISMATCH",
+  CODING_DUPLICATE_HEADING: "CODING_DUPLICATE_HEADING",
+  HEADING_NOT_FOUND: "HEADING_NOT_FOUND",
+  HEADING_NOT_USABLE: "HEADING_NOT_USABLE",
 } as const;
 
 export type InvoiceErrorCode = (typeof INVOICE_ERROR_CODES)[keyof typeof INVOICE_ERROR_CODES];
@@ -46,6 +55,12 @@ const publicMessages: Record<InvoiceErrorCode, string> = {
   INVOICE_INVALID_FOR_APPROVAL: "The invoice draft is not valid for approval.",
   INVALID_INVOICE_STATE: "The invoice is not in a reviewable state.",
   INVOICE_REPOSITORY_CONFLICT: "The invoice changed elsewhere.",
+  INVALID_CODING: "The invoice coding is not valid.",
+  CODING_REQUIRED: "Choose a code that covers the invoice total before approving it.",
+  CODING_TOTAL_MISMATCH: "The coded amounts must add up to the invoice total.",
+  CODING_DUPLICATE_HEADING: "Each code can be used only once on an invoice.",
+  HEADING_NOT_FOUND: "Code not found.",
+  HEADING_NOT_USABLE: "This code is inactive or blocked.",
 };
 
 export class InvoiceError extends Error {
@@ -194,14 +209,19 @@ export interface InvoiceDependencies {
   documentRepository?: DocumentRepository;
   invoices?: InvoiceRepository;
   transaction?: <T>(operation: (tenancyRepository: OnboardingRepository) => Promise<T>) => Promise<T>;
+  codings?: InvoiceCodingRepository;
+  headings?: HeadingRepository;
 }
 
 function dependencies(input: InvoiceDependencies = {}) {
+  const invoices = input.invoices ?? resolveDefaultInvoiceRepository();
   return {
     tenancyRepository: input.tenancyRepository ?? defaultOnboardingRepository,
     documentRepository: input.documentRepository ?? resolveDefaultDocumentRepository(),
-    invoices: input.invoices ?? resolveDefaultInvoiceRepository(),
+    invoices,
     transaction: input.transaction,
+    codings: input.codings ?? resolveInvoiceCodingRepository(invoices),
+    headings: input.headings ?? resolveDefaultHeadingRepository(),
   };
 }
 
@@ -239,6 +259,71 @@ const minimumApprovalConfidence = 0.8;
 
 function validForApproval(invoice: Invoice): boolean {
   return requiredFields.every((field) => invoice[field] !== null && (invoice.confidenceData[field] ?? 0) >= minimumApprovalConfidence);
+}
+
+export type { InvoiceCodingLine } from "./invoice-coding-repository";
+export type InvoiceCodingInput = readonly { headingId: string; amount: string }[];
+export const MAX_CODING_LINES = 20;
+
+function penceOf(amount: string | null): number | null {
+  if (amount === null) return null;
+  try {
+    return parsePounds(amount);
+  } catch {
+    return Number.NaN;
+  }
+}
+
+/** True when the lines cover the invoice total exactly, in pence. */
+function codingCoversTotal(lines: readonly InvoiceCodingLine[], total: string | null): boolean {
+  const totalPence = penceOf(total);
+  return totalPence !== null && lines.length > 0 && sumPence(lines.map((line) => parsePounds(line.amount))) === totalPence;
+}
+
+function normalizeCoding(input: InvoiceCodingInput): InvoiceCodingLine[] {
+  if (!Array.isArray(input) || input.length > MAX_CODING_LINES) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_CODING);
+  const seen = new Set<string>();
+  return input.map((line) => {
+    if (typeof line?.headingId !== "string" || !line.headingId.trim()) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_CODING);
+    const pence = penceOf(typeof line.amount === "string" ? line.amount : "");
+    if (pence === null || !Number.isSafeInteger(pence) || pence <= 0) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_CODING);
+    if (seen.has(line.headingId)) throw new InvoiceError(INVOICE_ERROR_CODES.CODING_DUPLICATE_HEADING);
+    seen.add(line.headingId);
+    return { headingId: line.headingId, amount: formatPence(pence) };
+  });
+}
+
+async function requireUsableHeadings(headings: HeadingRepository, businessId: BusinessId, lines: readonly InvoiceCodingLine[]): Promise<void> {
+  for (const line of lines) {
+    const heading = await headings.findById(line.headingId, businessId);
+    if (!heading) throw new InvoiceError(INVOICE_ERROR_CODES.HEADING_NOT_FOUND);
+    if (!heading.isActive || heading.blockedReason !== null) throw new InvoiceError(INVOICE_ERROR_CODES.HEADING_NOT_USABLE);
+  }
+}
+
+/**
+ * The lines to store with a draft save, or null to keep the stored ones. A single stored line follows
+ * a new total; several stored lines must still add up to it.
+ */
+async function codingForSave(current: Invoice, updated: Invoice, coding: InvoiceCodingInput | undefined, resolved: ReturnType<typeof dependencies>): Promise<InvoiceCodingLine[] | null> {
+  if (coding !== undefined) {
+    const lines = normalizeCoding(coding);
+    await requireUsableHeadings(resolved.headings, current.businessId, lines);
+    if (updated.total !== null && lines.length > 0 && !codingCoversTotal(lines, updated.total)) throw new InvoiceError(INVOICE_ERROR_CODES.CODING_TOTAL_MISMATCH);
+    return lines;
+  }
+  if (updated.total === null || updated.total === current.total) return null;
+  const stored = await resolved.codings.list(current.businessId, current.id);
+  if (stored.length === 0 || codingCoversTotal(stored, updated.total)) return null;
+  const totalPence = penceOf(updated.total)!;
+  if (stored.length > 1 || !Number.isSafeInteger(totalPence) || totalPence <= 0) throw new InvoiceError(INVOICE_ERROR_CODES.CODING_TOTAL_MISMATCH);
+  return [{ headingId: stored[0].headingId, amount: formatPence(totalPence) }];
+}
+
+async function requireApprovableCoding(invoice: Invoice, codings: InvoiceCodingRepository): Promise<void> {
+  if (!codingCoversTotal(await codings.list(invoice.businessId, invoice.id), invoice.total)) {
+    throw new InvoiceError(INVOICE_ERROR_CODES.CODING_REQUIRED);
+  }
 }
 
 type ApprovalTransaction = (tenancyRepository: OnboardingRepository) => Promise<Invoice>;
@@ -280,6 +365,7 @@ export async function updateInvoice(
   actor: OnboardingActor,
   patch: Partial<Omit<InvoiceDraft, "confidenceData" | "reviewState">>,
   input: InvoiceDependencies = {},
+  coding?: InvoiceCodingInput,
 ): Promise<Invoice> {
   const resolved = dependencies(input);
   const actorId = await resolveOnboardingActor(resolved.tenancyRepository, actor);
@@ -308,7 +394,34 @@ export async function updateInvoice(
   }
   const updated = { ...current, ...draft, updatedAt: new Date().toISOString() };
   await requireInvoiceDocument(current, resolved.documentRepository);
-  return resolved.invoices.updateIfUnchanged(updated, current.reviewState, current.updatedAt);
+  const lines = await codingForSave(current, updated, coding, resolved);
+  if (lines === null) return resolved.invoices.updateIfUnchanged(updated, current.reviewState, current.updatedAt);
+  return resolved.invoices.transaction(() => resolved.codings.transaction(async () => {
+    const saved = await resolved.invoices.updateIfUnchanged(updated, current.reviewState, current.updatedAt);
+    await resolved.codings.replace(saved.businessId, saved.id, lines, saved.updatedAt);
+    return saved;
+  }));
+}
+
+/** The invoice's coding lines in order, for a member of its business. */
+export async function getInvoiceCoding(invoiceId: InvoiceId, actor: OnboardingActor, input: InvoiceDependencies = {}): Promise<InvoiceCodingLine[]> {
+  const invoice = await getInvoice(invoiceId, actor, input);
+  return dependencies(input).codings.list(invoice.businessId, invoice.id);
+}
+
+/**
+ * The invoice with its coding and the code last used alone with the same supplier in the same
+ * business, offered only while that heading is still active and unblocked.
+ */
+export async function getInvoiceWithCoding(invoiceId: InvoiceId, actor: OnboardingActor, input: InvoiceDependencies = {}): Promise<{ invoice: Invoice; coding: InvoiceCodingLine[]; suggestedHeadingId: string | null }> {
+  const resolved = dependencies(input);
+  const invoice = await getInvoice(invoiceId, actor, input);
+  const coding = await resolved.codings.list(invoice.businessId, invoice.id);
+  const key = supplierKey(invoice.supplier);
+  const headingId = key ? await resolved.codings.findSupplierHeadingId(invoice.businessId, key, invoice.id) : null;
+  const heading = headingId ? await resolved.headings.findById(headingId, invoice.businessId) : null;
+  const suggestedHeadingId = heading?.isActive && heading.blockedReason === null ? heading.id : null;
+  return { invoice, coding, suggestedHeadingId };
 }
 
 export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActor, input: InvoiceDependencies = {}): Promise<Invoice> {
@@ -323,6 +436,7 @@ export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActo
   }
   if (current.reviewState === "approved") throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_STATE);
   if (!validForApproval(current)) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_FOR_APPROVAL);
+  await requireApprovableCoding(current, resolved.codings);
 
   const approveInTransaction: ApprovalTransaction = async (transactionTenancy) => {
       const latest = await resolved.invoices.findById(invoiceId);

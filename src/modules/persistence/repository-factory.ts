@@ -11,6 +11,8 @@ import { resolveDefaultMoneyRepository, type MoneyRepository } from "../accounti
 import { createPostgresMoneyRepository } from "../accounting/postgres-money-repository";
 import { resolveDefaultDocumentRepository, resolveDefaultInvoiceRepository } from "../invoices/invoice-service";
 import { createPostgresInvoiceRepository } from "../invoices/postgres-invoice-repository";
+import { resolveInvoiceCodingRepository, type InvoiceCodingRepository } from "../invoices/invoice-coding-repository";
+import { createPostgresInvoiceCodingRepository } from "../invoices/postgres-invoice-coding-repository";
 import { resolveDefaultJobRepository } from "../jobs/job-service";
 import { createPostgresJobRepository } from "../jobs/postgres-job-repository";
 import { createPostgresDocumentRepository } from "../documents/postgres-document-repository";
@@ -36,6 +38,7 @@ export type PersistenceContext = {
   projectRepository: ProjectRepository;
   documentRepository: DocumentRepository;
   invoiceRepository: InvoiceRepository;
+  invoiceCodingRepository: InvoiceCodingRepository;
   jobRepository: JobRepository;
   currencyRepository: CurrencyRepository;
   headingRepository: HeadingRepository;
@@ -90,6 +93,7 @@ export function createPersistenceContext(input: PersistenceInput = {}): Persiste
       projectRepository: defaultProjectRepository,
       documentRepository: resolveDefaultDocumentRepository(),
       invoiceRepository: resolveDefaultInvoiceRepository(),
+      invoiceCodingRepository: resolveInvoiceCodingRepository(resolveDefaultInvoiceRepository()),
       jobRepository: resolveDefaultJobRepository(),
       currencyRepository: resolveDefaultCurrencyRepository(),
       headingRepository: resolveDefaultHeadingRepository(),
@@ -122,6 +126,7 @@ function postgresContext(database: Database, pool: Pool | undefined, storage: St
     projectRepository: createPostgresProjectRepository(database),
     documentRepository: createPostgresDocumentRepository(database),
     invoiceRepository: createPostgresInvoiceRepository(database),
+    invoiceCodingRepository: createPostgresInvoiceCodingRepository(database),
     jobRepository: createPostgresJobRepository(database),
     currencyRepository: createPostgresCurrencyRepository(database),
     headingRepository: createPostgresHeadingRepository(database),

@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   applyAllMigrations,
   checkAllMigrations,
-  applyMoneyMovementsMigration,
-  checkMoneyMovementsMigration,
-  rollbackMoneyMovementsMigration,
+  applyInvoiceCodingsMigration,
+  checkInvoiceCodingsMigration,
+  rollbackInvoiceCodingsMigration,
   type MigrationConfig,
 } from "../../../src/db/migration-runner";
 
@@ -68,6 +68,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       "0008_account_headings",
       "0009_business_templates",
       "0010_money_movements",
+      "0011_invoice_codings",
     ]);
     expect(Object.values(applied).every((migration) => migration.applied)).toBe(true);
     expect(checked).toMatchObject({
@@ -81,6 +82,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       accountHeadings: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
       businessTemplates: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
       moneyMovements: { applied: true, requiredTableCount: 4, ledgerRecordPresent: true },
+      invoiceCodings: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
     });
   });
 
@@ -103,6 +105,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       "currencies",
       "documents",
       "financial_years",
+      "invoice_codings",
       "invoices",
       "jobs",
       "join_requests",
@@ -187,19 +190,19 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
   }, 30_000);
 
   it("rolls back and reapplies the latest migration with ledger parity", async () => {
-    await expect(rollbackMoneyMovementsMigration(config)).resolves.toEqual({
-      version: "0010_money_movements",
+    await expect(rollbackInvoiceCodingsMigration(config)).resolves.toEqual({
+      version: "0011_invoice_codings",
       applied: true,
     });
-    await expect(checkMoneyMovementsMigration(config)).resolves.toMatchObject({
+    await expect(checkInvoiceCodingsMigration(config)).resolves.toMatchObject({
       applied: false,
       ledgerRecordPresent: false,
     });
-    await expect(applyMoneyMovementsMigration(config)).resolves.toEqual({
-      version: "0010_money_movements",
+    await expect(applyInvoiceCodingsMigration(config)).resolves.toEqual({
+      version: "0011_invoice_codings",
       applied: true,
     });
-    await expect(checkMoneyMovementsMigration(config)).resolves.toMatchObject({
+    await expect(checkInvoiceCodingsMigration(config)).resolves.toMatchObject({
       applied: true,
       ledgerRecordPresent: true,
     });

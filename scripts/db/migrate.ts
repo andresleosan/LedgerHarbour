@@ -13,6 +13,7 @@ try {
     accountHeadings,
     businessTemplates,
     moneyMovements,
+    invoiceCodings,
   } = await applyAllMigrations(config);
   console.log(`${initial.applied ? "Applied" : "Already applied"}: ${initial.version}`);
   console.log(`${platform.applied ? "Applied" : "Already applied"}: ${platform.version}`);
@@ -24,6 +25,7 @@ try {
   console.log(`${accountHeadings.applied ? "Applied" : "Already applied"}: ${accountHeadings.version}`);
   console.log(`${businessTemplates.applied ? "Applied" : "Already applied"}: ${businessTemplates.version}`);
   console.log(`${moneyMovements.applied ? "Applied" : "Already applied"}: ${moneyMovements.version}`);
+  console.log(`${invoiceCodings.applied ? "Applied" : "Already applied"}: ${invoiceCodings.version}`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Migration failed");
   process.exitCode = 1;

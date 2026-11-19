@@ -1,3 +1,4 @@
+import { buildSyntheticTemplate } from "../fixtures/workbook/synthetic-template";
 import { expect, test } from "./fixtures";
 import { createApprovedBusiness } from "./helpers/business";
 import { browserApiRequest } from "./helpers/browser-api";
@@ -69,14 +70,23 @@ test("verifies the local MVP critical path and cross-tenant access block", async
   await owner.getByLabel(/proveedor/i).fill("Corrected Supplier");
   await owner.getByLabel(/número de factura/i).fill("TASK-11-001");
   await owner.getByLabel(/notas/i).fill("Reviewed in Task 11");
-  const savedResponse = await owner.evaluate(async (id) => {
+  // Approval needs a code from the chart of accounts, which comes from the business's template.
+  const template = await browserApiRequest(owner, `/api/businesses/${businessId}/template`, {
+    method: "POST",
+    multipart: { file: { name: "accounts.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: await buildSyntheticTemplate() } },
+  });
+  expect(template.status).toBeLessThan(300);
+  const headings = JSON.parse((await browserApiRequest(owner, `/api/businesses/${businessId}/headings`)).body) as Array<{ id: string; isActive: boolean; blockedReason: string | null }>;
+  const headingId = headings.find((heading) => heading.isActive && heading.blockedReason === null)?.id;
+  expect(headingId).toBeTruthy();
+  const savedResponse = await owner.evaluate(async ({ id, headingId }) => {
     const response = await fetch(`/api/invoices/${id}/review`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ supplier: "Corrected Supplier", invoiceNumber: "TASK-11-001", notes: "Reviewed in Task 11" }),
+      body: JSON.stringify({ supplier: "Corrected Supplier", invoiceNumber: "TASK-11-001", notes: "Reviewed in Task 11", coding: [{ headingId, amount: "120.00" }] }),
     });
     return { status: response.status, body: await response.json() };
-  }, invoiceId);
+  }, { id: invoiceId, headingId });
   expect(savedResponse.status).toBe(200);
   expect(savedResponse.body).toMatchObject({ supplier: "Corrected Supplier", invoiceNumber: "TASK-11-001", notes: "Reviewed in Task 11" });
 
