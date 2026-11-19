@@ -86,31 +86,31 @@ describe("InMemoryRateLimiter", () => {
   });
 
   it("raises the harness limit under the development NODE_ENV that next dev compiles in", async () => {
+    resetRateLimitersForTests(); // only clears while NODE_ENV is "test"
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("RATE_LIMIT_MODE", "memory");
     vi.stubEnv("LEDGERHARBOUR_PLAYWRIGHT_HARNESS", "true");
-    resetRateLimitersForTests();
     const limiter = createAuthRateLimiter();
 
     for (let attempt = 0; attempt < 20; attempt += 1) {
       await expect(limiter.limit("auth:dev-browser")).resolves.toMatchObject({ success: true });
     }
 
-    resetRateLimitersForTests();
     vi.unstubAllEnvs();
+    resetRateLimitersForTests();
   });
 
   it("keeps the real limit in development without the harness flag", async () => {
+    resetRateLimitersForTests();
     vi.stubEnv("NODE_ENV", "development");
     vi.stubEnv("RATE_LIMIT_MODE", "memory");
     vi.stubEnv("LEDGERHARBOUR_PLAYWRIGHT_HARNESS", "");
-    resetRateLimitersForTests();
     const limiter = createAuthRateLimiter();
 
     for (let attempt = 0; attempt < 10; attempt += 1) await limiter.limit("auth:dev-plain");
     await expect(limiter.limit("auth:dev-plain")).resolves.toMatchObject({ success: false });
 
-    resetRateLimitersForTests();
     vi.unstubAllEnvs();
+    resetRateLimitersForTests();
   });
 });
