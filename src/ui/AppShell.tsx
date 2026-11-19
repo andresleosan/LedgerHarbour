@@ -38,6 +38,7 @@ export default function AppShell({ children, identity, businesses, locale, platf
         invoices: "Facturas / revisión",
         documents: "Documentos",
         movements: "Movimientos",
+        year: "Ejercicio",
         settings: "Configuración",
         signOut: "Cerrar sesión",
          workspace: "Espacio de trabajo",
@@ -49,6 +50,7 @@ export default function AppShell({ children, identity, businesses, locale, platf
         invoices: "Invoices / review",
         documents: "Documents",
         movements: "Movements",
+        year: "Year",
         settings: "Settings",
         signOut: "Sign out",
          workspace: "Workspace",
@@ -235,6 +237,14 @@ export default function AppShell({ children, identity, businesses, locale, platf
          @media (max-width: 900px) { .shell-header { grid-template-columns: 1fr auto; } .shell-nav { grid-column: 1 / -1; grid-row: 2; } }
          @media (max-width: 900px) { .currency-create { grid-template-columns: 1fr 1fr; } .currency-create input:first-of-type { grid-column: span 2; } }
           @media (max-width: 650px) { .shell-header, .shell-main { width: min(100% - 28px, 1240px); } .shell-header { gap: 12px; } .shell-brand-logo { width: 116px; height: 77px; } .shell-user span { display: none; } .shell-layout { grid-template-columns: 1fr; gap: 18px; } .business-switcher { position: static; order: 2; } .shell-content { order: 1; } .shell-nav { overflow-x: auto; flex-wrap: nowrap; } .shell-nav a, .shell-nav-disabled { white-space: nowrap; } .page-shell { width: 100%; } .invoice-hero { display: block; } .invoice-settings { margin-top: 18px; } .review-grid { grid-template-columns: 1fr; } .review-preview { min-height: auto; } .request-row, .settings-item { align-items: stretch; flex-direction: column; } .page-actions { width: 100%; } .page-actions button { flex: 1 1 100%; } .settings-create, .currency-create { grid-template-columns: 1fr; } .currency-create input:first-of-type { grid-column: auto; } .upload-drop { padding: 18px; } }
+         .year-actions a { display: inline-flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
+         .year-sheets { margin-top: 14px; }
+         .year-counts { margin-top: 14px; }
+         .movement-balance .year-subtotal { padding-top: 6px; border-top: 1px solid var(--lh-border); }
+         .year-subtotal dt { color: var(--lh-navy); font-weight: 800; }
+         .year-refresh { align-items: center; justify-content: space-between; }
+         .year-refresh p { margin: 0; }
+         @media (max-width: 650px) { .year-actions a { flex: 1 1 100%; } }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
       `}</style>
       <header className="shell-header">
@@ -246,6 +256,7 @@ export default function AppShell({ children, identity, businesses, locale, platf
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/invoices`)}>{copy.invoices}</a> : <span className="shell-nav-disabled">{copy.invoices}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/documents`)}>{copy.documents}</a> : <span className="shell-nav-disabled">{copy.documents}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/movements`)}>{copy.movements}</a> : <span className="shell-nav-disabled">{copy.movements}</span>}
+           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/year`)}>{copy.year}</a> : <span className="shell-nav-disabled">{copy.year}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/settings/members`)}>{copy.settings}</a> : <span className="shell-nav-disabled">{copy.settings}</span>}
         </nav>
           <div className="shell-user"><LanguageSwitcher locale={activeLocale} /><span><strong>{identity.displayName}</strong>{identity.email}</span><form action={signOutAction} onSubmit={async (event) => { event.preventDefault(); try { await signOutFirebaseUser(firebaseConfig); } finally { await signOutAction(); } }}><button className="sign-out" type="submit">{copy.signOut}</button></form></div>
