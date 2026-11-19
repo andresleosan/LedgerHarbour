@@ -10,6 +10,10 @@ export interface ZipEntry {
   method?: 0 | 8;
   /** Uncompressed size written in the headers; defaults to the real one. */
   declaredSize?: number;
+  /** Name written in the local header; defaults to `name`. */
+  localName?: string;
+  /** Extra field written in the central directory record. */
+  centralExtra?: Buffer;
 }
 
 export function unzip(bytes: Buffer): ZipEntry[] {
@@ -38,6 +42,8 @@ export function zip(entries: ZipEntry[]): Buffer {
   let offset = 0;
   for (const entry of entries) {
     const name = Buffer.from(entry.name, "utf8");
+    const localName = Buffer.from(entry.localName ?? entry.name, "utf8");
+    const extra = entry.centralExtra ?? Buffer.alloc(0);
     const method = entry.method ?? 0;
     const body = method === 8 ? deflateRawSync(entry.data) : entry.data;
     const size = entry.declaredSize ?? entry.data.length;
@@ -49,7 +55,7 @@ export function zip(entries: ZipEntry[]): Buffer {
     local.writeUInt32LE(crc, 14);
     local.writeUInt32LE(body.length, 18);
     local.writeUInt32LE(size, 22);
-    local.writeUInt16LE(name.length, 26);
+    local.writeUInt16LE(localName.length, 26);
     const central = Buffer.alloc(46);
     central.writeUInt32LE(0x02014b50, 0);
     central.writeUInt16LE(20, 4);
@@ -59,10 +65,11 @@ export function zip(entries: ZipEntry[]): Buffer {
     central.writeUInt32LE(body.length, 20);
     central.writeUInt32LE(size, 24);
     central.writeUInt16LE(name.length, 28);
+    central.writeUInt16LE(extra.length, 30);
     central.writeUInt32LE(offset, 42);
-    locals.push(local, name, body);
-    directory.push(central, name);
-    offset += 30 + name.length + body.length;
+    locals.push(local, localName, body);
+    directory.push(central, name, extra);
+    offset += 30 + localName.length + body.length;
   }
   const directoryBytes = Buffer.concat(directory);
   const end = Buffer.alloc(22);
