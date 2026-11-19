@@ -1,7 +1,7 @@
 {
   "id": "LH-021",
   "titulo": "De factura aprobada a movimiento pagado",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "Al aprobar se indica con qué cuenta se pagó, en qué fecha (por defecto la de la factura) y el importe cargado en libras.",
@@ -22,10 +22,18 @@
     "tests/unit/invoices/**",
     "src/i18n/messages/**"
   ],
-  "hecho": "",
+  "hecho": "Al aprobar una factura se indica cómo se pagó: desde una cuenta del negocio (cuenta, fecha e importe cargado en libras), sin pagar todavía o con dinero propio. El pago crea un movimiento por línea de código, negativo para factura y positivo para nota de abono, con concepto «proveedor + número». El pago se puede cambiar después y la factura se puede anular, sin duplicados. Lista de facturas sin pagar y pagadas en privado. Migración 0012.",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Leer «From an approved invoice to a movement» del spec de LH-012. Piezas ya hechas: getInvoiceCoding (facturas) y replaceInvoiceMovements / removeInvoiceMovements (money-service).",
-  "evidencia": [],
-  "actualizado": "2026-11-19"
+  "siguiente": "",
+  "evidencia": [
+    "Commit 527f16b.",
+    "payment-shares 11, payment.test 27, invoice-payment-repository (PGlite) 3, invoice-payment-permissions 4, migraciones 9; e2e payment.spec, review.spec, coding.spec y critical-path pasadas.",
+    "Reparto: si el importe cargado difiere del total, cada línea se escala en céntimos enteros y el resto va a la mayor; la suma es exacta.",
+    "Solo el reparto se probó en rojo primero; el resto se comprobó con dos mutaciones (signo forzado; no borrar el movimiento).",
+    "La prueba e2e destapó y corrigió un fallo real: un clic rápido en Factura / Nota de abono se perdía al cargar.",
+    "Migración 0012 probada en PGlite; sin aplicar en ninguna base real.",
+    "Verificación de lote 4 sobre 527f16b: lint 0, tsc 0, vitest --no-file-parallelism 1091 pasadas y 7 omitidas (107 archivos), build 0; e2e 16 pasadas en la pasada larga y las 3 restantes (movements, settings/accounts, settings/workbook) pasadas al repetirlas solas: en la larga fallaron con la máquina saturada y un «Page crashed» de Chromium. Servidor de pruebas en modo sondeo porque la máquina está sin vigilantes de archivos."
+  ],
+  "actualizado": "2026-11-20"
 }

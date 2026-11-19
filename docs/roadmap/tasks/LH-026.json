@@ -19,7 +19,7 @@
   "hecho": "",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Definir el formato del anexo en el spec de LH-012.",
+  "siguiente": "Piezas ya hechas: listUnpaidInvoices y listPrivatelyPaidInvoices (facturas) y los movimientos por rótulo del grupo de activos.",
   "evidencia": [],
-  "actualizado": "2026-11-19"
+  "actualizado": "2026-11-20"
 }

@@ -2,6 +2,9 @@
 
 Una línea por cierre, la más reciente arriba: fecha, tarea, qué cambió para quien usa la app y progreso antes → después.
 
+- 2026-11-20 · LH-022 · Pantalla «Movimientos»: ingresos, retiros, comisiones y traspasos sin factura, con saldos por cuenta · 14 de 23 → 15 de 23.
+- 2026-11-20 · LH-021 · Al aprobar una factura se dice cómo se pagó y eso crea su movimiento; se puede cambiar el pago o anular la factura · 13 de 23 → 14 de 23.
+- 2026-11-20 · LH-034 · En Ajustes se crean el ejercicio y las cuentas de banco y caja con su saldo inicial · 12 de 23 → 13 de 23.
 - 2026-11-19 · LH-024 · El servidor ya produce el libro del contable relleno con los movimientos del ejercicio y un informe de control; aún sin botón (LH-025) · 11 de 22 → 12 de 22.
 - 2026-11-19 · LH-020 · Al revisar una factura se elige el código de la lista, con sugerencia por proveedor y reparto entre varios; no se aprueba sin código · 10 de 22 → 11 de 22.
 - 2026-11-19 · LH-032 · Leer la plantilla del contable ya no pide 1 GB de memoria, sino unos 160 MB · 9 de 22 → 10 de 22.

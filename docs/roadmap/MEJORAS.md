@@ -17,3 +17,9 @@ Formato: `- [ID] qué mejorar · por qué · fecha`. Cuando no quede nada constr
 - [LH-024] La ruta del informe de control ejecuta la escritura completa y no tiene límite de peticiones · la descarga sí · 2026-11-19
 - [LH-024] Los atributos spans de las filas se conservan tal cual; una celda nueva puede quedar fuera · no ocurre con el libro real; Excel lo trata como pista opcional, sin confirmar · 2026-11-19
 - [LH-031] Reimportar la plantilla cuenta todos los rótulos como «actualizados» aunque no cambien · 2026-11-19
+- [LH-022] createMovement acepta un transferGroupId si se llama al servicio directamente · la ruta lo impide con su esquema estricto · 2026-11-20
+- [LH-022] Un traspaso sin concepto se guarda como «Transfer» también con la pantalla en español · 2026-11-20
+- [LH-022] Buscar las dos patas de un traspaso lee todos los movimientos del ejercicio · bien para un negocio pequeño; pediría una consulta propia · 2026-11-20
+- [LH-021] PATCH /api/invoices/{id} sin acción y sin campos solo cambia la fecha de actualización · anterior al lote · 2026-11-20
+- [LH-021] El texto approveConfirm quedó sin uso en los mensajes · 2026-11-20
+- [e2e] La suite de navegador tarda más de 12 minutos y pierde pruebas con la máquina saturada · solas pasan; conviene correrla por carpetas · 2026-11-20

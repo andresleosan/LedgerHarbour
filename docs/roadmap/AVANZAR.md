@@ -31,6 +31,8 @@ Las pruebas van de un archivo en uno: en paralelo, las de PostgreSQL en memoria 
 
 Las pruebas de navegador arrancan `next dev` en el puerto 3100 y no arrancan si `.next` contiene un build de producción: córrelas antes de `pnpm build`, o borra `.next` antes (es salida generada). Solo cabe una ejecución a la vez en la máquina: con subagentes, `flock /tmp/lh-e2e.lock corepack pnpm test:e2e <spec>`.
 
+Con la máquina cargada, la suite de navegador entera pierde pruebas por tiempo y por caídas de Chromium: córrela por carpetas y repite sola la que falle antes de culpar al cambio. Si `next dev` no arranca por falta de vigilantes de archivos (ENOSPC), el servidor de pruebas necesita `WATCHPACK_POLLING=true`.
+
 Línea de partida del 19-nov-2026, sobre `0311fc8` con Node 26.12.1: lint, tipos y build correctos; 73 archivos de prueba pasados y 2 omitidos; 602 pruebas pasadas y 7 omitidas. Las pruebas de navegador no se han corrido aún en esta copia.
 
 Una tabla o migración nueva obliga a actualizar las pruebas que fijan la lista de tablas y el orden de migraciones, el ejecutor de migraciones y el cargador de PGlite: búscalos por el nombre de la última migración.

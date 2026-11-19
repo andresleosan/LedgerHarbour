@@ -1,7 +1,7 @@
 {
   "id": "LH-022",
   "titulo": "Movimientos sin factura desde el móvil",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "Formulario para ingresos, retiros del dueño, comisiones y traspasos entre cuentas propias, con el código elegido de la lista.",
@@ -18,10 +18,18 @@
     "tests/e2e/transactions/**",
     "src/i18n/messages/**"
   ],
-  "hecho": "",
+  "hecho": "Pantalla «Movimientos»: ingresos, retiros del dueño, comisiones y traspasos entre cuentas propias, con el código elegido de la lista; lista del ejercicio con filtro por cuenta, saldos por cuenta, editar y borrar. Un traspaso crea sus dos patas con el mismo código y se edita o borra entero.",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Ruta de API con sus pruebas de permisos.",
-  "evidencia": [],
-  "actualizado": "2026-11-19"
+  "siguiente": "",
+  "evidencia": [
+    "Commit 00bf017.",
+    "transfer-service 20 (escritas antes del código), transfer-permissions 7; e2e movements.spec pasada a 390 px y 1280 px.",
+    "Invariante probado: los traspasos no cambian la suma por código ni el total de las cuentas.",
+    "Editar y borrar escriben eventos de auditoría (movement_* y transfer_*), solo con identificadores.",
+    "Decisión: sin ajuste ni migración para el código del traspaso; se elige en el formulario y se propone el del último traspaso. Fuente: opción más simple.",
+    "La prueba e2e destapó y corrigió un fallo real: el formulario de edición se abría en las dos filas del traspaso.",
+    "Verificación de lote 4 sobre 527f16b: lint 0, tsc 0, vitest --no-file-parallelism 1091 pasadas y 7 omitidas (107 archivos), build 0; e2e 16 pasadas en la pasada larga y las 3 restantes (movements, settings/accounts, settings/workbook) pasadas al repetirlas solas: en la larga fallaron con la máquina saturada y un «Page crashed» de Chromium. Servidor de pruebas en modo sondeo porque la máquina está sin vigilantes de archivos."
+  ],
+  "actualizado": "2026-11-20"
 }
