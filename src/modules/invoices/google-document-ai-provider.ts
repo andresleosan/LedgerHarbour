@@ -103,12 +103,13 @@ function normalizedDate(entity: GoogleDocumentAiEntity | null): string | null {
 
 function normalizedMoney(entity: GoogleDocumentAiEntity | null): string | null {
   const money = entity?.normalizedValue?.moneyValue;
-  if (!money || money.units === null || money.units === undefined || money.nanos === null || money.nanos === undefined) {
+  if (!money || ((money.units === null || money.units === undefined) && (money.nanos === null || money.nanos === undefined))) {
     return null;
   }
 
-  const units = String(money.units);
-  const nanos = String(money.nanos);
+  // Google omits zero-valued fields, so a missing units or nanos means 0.
+  const units = String(money.units ?? 0);
+  const nanos = String(money.nanos ?? 0);
   if (!/^\d+$/.test(units) || !/^\d+$/.test(nanos)) return null;
 
   const nanosNumber = Number(nanos);
@@ -119,11 +120,17 @@ function normalizedMoney(entity: GoogleDocumentAiEntity | null): string | null {
   return `${normalizedUnits}.${fraction}`;
 }
 
+function normalizedCurrency(entity: GoogleDocumentAiEntity | null): string | null {
+  const code = entity?.normalizedValue?.moneyValue?.currencyCode;
+  return typeof code === "string" && /^[A-Z]{3}$/.test(code) ? code : null;
+}
+
+// Prefer the provider's normalized value; printed mention text is the fallback the parser reads leniently.
 function valueForEntity(
   entity: GoogleDocumentAiEntity | null,
   normalized: (entity: GoogleDocumentAiEntity | null) => string | null,
 ): string | null {
-  return mentionText(entity) ?? normalized(entity);
+  return normalized(entity) ?? mentionText(entity);
 }
 
 function providerErrorIsRetryable(error: unknown): boolean {
@@ -151,7 +158,8 @@ function mapResponse(response: GoogleDocumentAiResponse): OcrResult {
   const subtotal = entity("subtotal");
   const taxAmount = entity("taxAmount");
   const total = entity("total");
-  const currencyReference = entity("currencyReference");
+  const currencyEntity = entity("currencyReference");
+  const currencyReference = [total, subtotal, taxAmount].find((money) => normalizedCurrency(money) !== null) ?? currencyEntity;
 
   return {
     fields: {
@@ -162,7 +170,7 @@ function mapResponse(response: GoogleDocumentAiResponse): OcrResult {
       subtotal: valueForEntity(subtotal, normalizedMoney),
       taxAmount: valueForEntity(taxAmount, normalizedMoney),
       total: valueForEntity(total, normalizedMoney),
-      currencyReference: mentionText(currencyReference),
+      currencyReference: normalizedCurrency(currencyReference) ?? mentionText(currencyReference),
       expenseCategoryReference: null,
       notes: null,
     },

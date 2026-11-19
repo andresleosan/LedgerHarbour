@@ -252,7 +252,7 @@ export async function createInvoiceFromOcr(
   const resolved = dependencies(input);
   let draft: InvoiceDraft;
   try {
-    draft = parseInvoice(result);
+    draft = parseInvoice(result, "ocr");
   } catch (error) {
     if (error instanceof Error && "code" in error && error.code === INVOICE_PARSER_ERROR_CODES.MALFORMED_OCR_OUTPUT) {
       throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_INVOICE);
