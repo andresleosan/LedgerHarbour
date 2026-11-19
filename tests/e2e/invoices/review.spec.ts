@@ -115,14 +115,13 @@ test.describe("invoice review workspace", () => {
     const businessId = await createApprovedBusiness(browser, page, `Review Books ${suffix}`);
 
     await page.goto(`/business/${businessId}/upload?locale=en`);
-    await page.locator('input[type="file"]').setInputFiles({
+    await page.locator('input[type="file"][multiple]').setInputFiles({
       name: "review-invoice.pdf",
       mimeType: "application/pdf",
       buffer: Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\nstartxref\n0\n%%EOF\n"),
     });
-    await page.getByRole("button", { name: "Upload document" }).click();
-    await expect(page.getByRole("status")).toContainText("uploaded");
-    await page.getByRole("button", { name: "Process with OCR" }).click();
+    await expect(page.getByRole("listitem").filter({ hasText: "review-invoice.pdf" }).getByRole("status")).toContainText("Ready for review");
+    await page.getByRole("link", { name: "Review invoices" }).click();
     await expect(page).toHaveURL(`/business/${businessId}/invoices?locale=en`);
     await page.getByRole("link", { name: "Open review" }).click();
     await expect(page.getByRole("heading", { name: "Extracted fields" })).toBeVisible();
