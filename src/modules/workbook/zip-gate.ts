@@ -10,8 +10,10 @@ export const MAX_ACCOUNT_ROWS = 20_000;
 export const MAX_ACCOUNT_COLUMNS = 400;
 
 const MAX_ZIP_ENTRIES = 2_000;
-const MAX_UNCOMPRESSED_BYTES = 256 * 1024 * 1024;
-const MAX_ENTRY_BYTES = 64 * 1024 * 1024;
+// ponytail: exceljs holds the whole workbook in memory, roughly 20x the inflated XML, so these stay low;
+// raise them only together with a streaming reader or a memory-limited worker.
+const MAX_UNCOMPRESSED_BYTES = 64 * 1024 * 1024;
+const MAX_ENTRY_BYTES = 32 * 1024 * 1024;
 /** Any single range: no larger than the biggest account sheet allowed. */
 const MAX_RANGE_CELLS = MAX_ACCOUNT_ROWS * MAX_ACCOUNT_COLUMNS;
 /** Cells exceljs creates for merged ranges and defined names, per workbook. */
@@ -22,7 +24,7 @@ const SHEET_COLUMNS = 16_384;
 const SHEET_ROWS = 1_048_576;
 
 // ponytail: regex over the XML text, not an XML parser. It only has to find the
-// attributes exceljs expands; the ceiling is the 64 MiB per-entry cap on the text.
+// attributes exceljs expands; the ceiling is the 32 MiB per-entry cap on the text.
 const MERGE = /<mergeCell\b[^>]*?\bref="([^"]*)"/g;
 const VALIDATION = /<dataValidation\b[^>]*?\bsqref="([^"]*)"/g;
 const SHARED_FORMULA = /<f\b[^>]*?\bref="([^"]*)"/g;
