@@ -68,7 +68,9 @@ function createConfiguredRateLimiter(definition: RateLimitDefinition): RateLimit
     const key = `memory:${definition.keyPrefix}`;
     const existing = sharedRateLimiters.get(key);
     if (existing) return existing;
-    const maxRequests = process.env.NODE_ENV === "test" && process.env.LEDGERHARBOUR_PLAYWRIGHT_HARNESS === "true"
+    // The browser harness runs `next dev`, which compiles NODE_ENV as "development". Production never reaches
+    // this branch: memory mode is refused above.
+    const maxRequests = process.env.NODE_ENV !== "production" && process.env.LEDGERHARBOUR_PLAYWRIGHT_HARNESS === "true"
       ? Math.max(definition.maxRequests, 100)
       : definition.maxRequests;
     const limiter = new InMemoryRateLimiter({ maxRequests, windowMs: definition.windowMs });
