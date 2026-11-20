@@ -1,6 +1,7 @@
 import { expect, test } from "../fixtures";
 import { createApprovedBusiness } from "../helpers/business";
 import { browserApiRequest } from "../helpers/browser-api";
+import { relayFetches } from "./relay-fetch";
 
 test.describe.configure({ mode: "serial" });
 
@@ -48,19 +49,6 @@ const validProgressiveJpeg = {
 const ocrCompile = { timeout: 60_000 };
 const filesInput = (page: import("@playwright/test").Page) => page.locator('input[type="file"][multiple]');
 const queueRow = (page: import("@playwright/test").Page, name: string) => page.getByRole("listitem").filter({ hasText: name });
-
-async function stubDuplicateUpload(page: import("@playwright/test").Page, fileName: string) {
-  await page.evaluate((fileName) => {
-    const originalFetch = window.fetch.bind(window);
-    window.fetch = async (input, init) => {
-      const file = init?.body instanceof FormData ? init.body.get("file") : null;
-      if (file instanceof File && file.name === fileName) {
-        return new Response(JSON.stringify({ error: { code: "DOCUMENT_DUPLICATE_CHECKSUM" } }), { status: 409, headers: { "Content-Type": "application/json" } });
-      }
-      return originalFetch(input, init);
-    };
-  }, fileName);
-}
 
 test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks another business", async ({ browserWithDiagnostics: browser }) => {
   const ownerContext = await browser.newContext();
@@ -184,15 +172,15 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 
 test("shows a duplicate file error while the other file in the selection succeeds", async ({ page, browserWithDiagnostics: browser }) => {
   await signIn(page, "documents-duplicate@example.com");
   const businessId = await createApprovedBusiness(browser, page, "E2E Duplicate Harbour");
+  // The real duplicate answers 409, which Chromium would log as a console error: relay the uploads past the gate.
+  const relayed = await relayFetches(page, /^\/api\/businesses\/[^/]+\/documents$/);
   await page.goto(`/business/${businessId}/upload`);
   await filesInput(page).setInputFiles(validPdf);
   await expect(queueRow(page, "invoice.pdf").getByRole("status")).toContainText("Ready for review", ocrCompile);
 
-  // Stubbed 409: Chromium logs real 4xx responses as console errors (which the gate rejects), and in the
-  // memory-mode dev server a real duplicate upload currently answers 500 instead of 409 (see LH-016 report).
-  await stubDuplicateUpload(page, "invoice-again.pdf");
   await filesInput(page).setInputFiles([{ ...validPdf, name: "invoice-again.pdf" }, validPng]);
   await expect(queueRow(page, "invoice-again.pdf").getByRole("status")).toContainText("This document has already been uploaded.");
+  expect(relayed.slice(0, 2).map(({ status }) => status)).toEqual([201, 409]);
   await expect(queueRow(page, "receipt.png").getByRole("status")).toContainText("Ready for review", ocrCompile);
   await expect(queueRow(page, "invoice.pdf").getByRole("status")).toContainText("Ready for review", ocrCompile);
   await expect(page.getByRole("list", { name: "Selected documents" }).getByRole("listitem")).toHaveCount(3);
