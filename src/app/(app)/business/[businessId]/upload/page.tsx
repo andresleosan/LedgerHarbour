@@ -1,13 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { use, useRef, useState } from "react";
+import { use, useEffect, useRef, useState } from "react";
 
 import { messages } from "@/i18n/config";
 import { useUrlLocale } from "@/ui/useUrlLocale";
 
 type SafeDocument = { id: string; originalFileName: string; status: string };
+type UploadState = "queued" | "uploading" | "reading" | "done" | "failed";
+type UploadItem = { key: number; file: File; previewUrl: string | null; state: UploadState; documentId?: string; invoiceId?: string; errorCode?: string };
+
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const ACCEPTED_FILES = ".pdf,.jpg,.jpeg,.png,.heic,.tif,.tiff,application/pdf,image/jpeg,image/png,image/heic,image/tiff";
+const stepValue: Record<UploadState, number> = { queued: 0, uploading: 1, reading: 2, done: 3, failed: 3 };
 
 const documentErrorMessageKeys = {
   INVALID_UPLOAD: "invalidUploadError",
@@ -28,54 +33,88 @@ const documentErrorMessageKeys = {
   DOCUMENT_NOT_FOUND: "downloadError",
   DOWNLOAD_FAILED: "downloadError",
   OCR_PROCESSING_FAILED: "processingError",
+  RATE_LIMITED: "rateLimitError",
 } as const satisfies Record<string, keyof typeof messages.en.documents>;
 
 function messageForError(code: string | undefined, copy: typeof messages.en.documents): string {
   return copy[documentErrorMessageKeys[code as keyof typeof documentErrorMessageKeys] ?? "storageError"];
 }
 
+async function errorCodeOf(response: Response, fallback: string): Promise<string> {
+  const payload = await response.json().catch(() => null) as { error?: { code?: string } } | null;
+  return payload?.error?.code ?? fallback;
+}
+
 export default function UploadPage({ params }: { params: Promise<{ businessId: string }> }) {
   const { businessId } = use(params);
   const { locale, hrefFor } = useUrlLocale();
-  const router = useRouter();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [document, setDocument] = useState<SafeDocument | null>(null);
-  const [errorCode, setErrorCode] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
-  const [processing, setProcessing] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const filesInputRef = useRef<HTMLInputElement>(null);
+  const queueRef = useRef<Promise<void>>(Promise.resolve());
+  const nextKeyRef = useRef(0);
+  const previewUrlsRef = useRef<string[]>([]);
+  const [items, setItems] = useState<UploadItem[]>([]);
+  const [brokenPreviews, setBrokenPreviews] = useState<Set<number>>(new Set());
   const copy = messages[locale].documents;
 
-  const upload = async () => {
-    const selectedFile = file ?? fileInputRef.current?.files?.[0] ?? null;
-    if (!selectedFile) { setErrorCode("UNSUPPORTED_DOCUMENT_FORMAT"); return; }
-    setErrorCode(null); setDocument(null); setUploading(true);
+  useEffect(() => {
+    const previewUrls = previewUrlsRef.current;
+    return () => previewUrls.forEach((url) => URL.revokeObjectURL(url));
+  }, []);
+
+  const update = (key: number, change: Partial<UploadItem>) => {
+    setItems((current) => current.map((item) => (item.key === key ? { ...item, ...change } : item)));
+  };
+
+  // ponytail: stepwise states only; send the upload with XMLHttpRequest and upload.onprogress for byte progress.
+  const run = async ({ key, file }: UploadItem) => {
+    if (file.size > MAX_FILE_BYTES) { update(key, { state: "failed", errorCode: "DOCUMENT_TOO_LARGE" }); return; }
+    update(key, { state: "uploading" });
     try {
       const form = new FormData();
-      form.set("file", selectedFile);
-      const response = await fetch(`/api/businesses/${businessId}/documents`, { method: "POST", body: form });
-      const payload = await response.json() as SafeDocument & { error?: { code?: string } };
-      if (!response.ok) { setErrorCode(payload.error?.code ?? "UPLOAD_FAILED"); return; }
-      setDocument(payload);
+      form.set("file", file);
+      const uploaded = await fetch(`/api/businesses/${businessId}/documents`, { method: "POST", body: form });
+      if (!uploaded.ok) { update(key, { state: "failed", errorCode: await errorCodeOf(uploaded, "UPLOAD_FAILED") }); return; }
+      const document = await uploaded.json() as SafeDocument;
+      update(key, { state: "reading", documentId: document.id });
+      const processed = await fetch(`/api/documents/${document.id}/process`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+      if (!processed.ok) {
+        const code = await errorCodeOf(processed, "OCR_PROCESSING_FAILED");
+        update(key, { state: "failed", errorCode: code === "RATE_LIMITED" ? code : "OCR_PROCESSING_FAILED" });
+        return;
+      }
+      // The job does not carry the invoice it produced; the document list does.
+      const listed = await fetch(`/api/businesses/${businessId}/documents`).then((response) => (response.ok ? response.json() : null)).catch(() => null) as
+        { documents?: { id: string; invoiceId: string | null }[] } | null;
+      const invoiceId = listed?.documents?.find((listedDocument) => listedDocument.id === document.id)?.invoiceId ?? undefined;
+      update(key, { state: "done", invoiceId });
     } catch {
-      setErrorCode("UPLOAD_FAILED");
-    } finally {
-      setUploading(false);
+      update(key, { state: "failed", errorCode: "UPLOAD_FAILED" });
     }
   };
 
-  const process = async () => {
-    if (!document) return;
-    setErrorCode(null); setProcessing(true);
-    try {
-      const response = await fetch(`/api/documents/${document.id}/process`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
-      if (!response.ok) { setErrorCode("OCR_PROCESSING_FAILED"); return; }
-      router.push(hrefFor(`/business/${businessId}/invoices`));
-    } catch {
-      setErrorCode("OCR_PROCESSING_FAILED");
-    } finally {
-      setProcessing(false);
-    }
+  const addFiles = (input: HTMLInputElement) => {
+    const added = Array.from(input.files ?? []).map((file): UploadItem => {
+      const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : null;
+      if (previewUrl) previewUrlsRef.current.push(previewUrl);
+      return { key: nextKeyRef.current++, file, previewUrl, state: "queued" };
+    });
+    input.value = "";
+    setItems((current) => [...current, ...added]);
+    for (const item of added) queueRef.current = queueRef.current.then(() => run(item));
+  };
+
+  // Files picked before hydration never reached onChange; queue them once React is attached.
+  useEffect(() => {
+    for (const input of [cameraInputRef.current, filesInputRef.current]) if (input?.files?.length) addFiles(input);
+  }, []);
+
+  const statusText = (item: UploadItem) => {
+    if (item.state === "failed") return messageForError(item.errorCode, copy);
+    if (item.state === "queued") return copy.queued;
+    if (item.state === "uploading") return copy.uploading;
+    if (item.state === "reading") return copy.reading;
+    return copy.done;
   };
 
   return (
@@ -87,13 +126,36 @@ export default function UploadPage({ params }: { params: Promise<{ businessId: s
           <h1 className="page-title" id="upload-title">{copy.title}</h1>
           <p className="page-description">{copy.description}</p>
           <div className="upload-drop">
-            <label htmlFor="invoice-file">{copy.fileLabel}</label>
-            <input className="page-input" ref={fileInputRef} id="invoice-file" aria-label={copy.fileLabel} type="file" accept=".pdf,.jpg,.jpeg,.png,.heic,.tif,.tiff,application/pdf,image/jpeg,image/png,image/heic,image/tiff" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+            <input ref={cameraInputRef} hidden aria-label={copy.cameraLabel} type="file" accept="image/*" capture="environment" onChange={(event) => addFiles(event.currentTarget)} />
+            <input ref={filesInputRef} hidden aria-label={copy.fileLabel} type="file" multiple accept={ACCEPTED_FILES} onChange={(event) => addFiles(event.currentTarget)} />
+            <div className="upload-actions">
+              <button className="primary-button" type="button" onClick={() => cameraInputRef.current?.click()}>{copy.cameraAction}</button>
+              <button className="tertiary-button" type="button" onClick={() => filesInputRef.current?.click()}>{copy.chooseAction}</button>
+            </div>
             <p className="page-description upload-hint">{copy.limit}</p>
-            <button className="primary-button" type="button" onClick={() => void upload()} disabled={uploading || processing}>{uploading ? copy.uploading : copy.uploadAction}</button>
           </div>
-          {errorCode && <p className="page-error" role="alert">{messageForError(errorCode, copy)}</p>}
-          {document && <p className="page-feedback" role="status" aria-live="polite">{copy.uploaded.replace("{status}", document.status)} <Link href={`/api/documents/${document.id}/download`}>{copy.download.replace("{name}", document.originalFileName)}</Link> <button className="tertiary-button" type="button" onClick={() => void process()} disabled={uploading || processing}>{processing ? copy.processing : copy.processAction}</button></p>}
+          {items.length > 0 && (
+            <ul className="upload-queue" aria-label={copy.queueLabel}>
+              {items.map((item) => (
+                <li className="upload-item" key={item.key}>
+                  {item.previewUrl && !brokenPreviews.has(item.key)
+                    ? <img className="upload-thumb" src={item.previewUrl} alt="" onError={() => setBrokenPreviews((current) => new Set(current).add(item.key))} />
+                    : <span className="upload-thumb" aria-hidden="true">{item.file.name.includes(".") ? item.file.name.split(".").pop()?.toUpperCase().slice(0, 4) : "FILE"}</span>}
+                  <div className="upload-item-body">
+                    <p className="upload-name">{item.file.name}</p>
+                    {item.state !== "failed" && <progress max={3} value={stepValue[item.state]} aria-hidden="true" />}
+                    <p className={item.state === "failed" ? "page-error" : "page-feedback"} role="status" aria-live="polite">{statusText(item)}</p>
+                    {item.documentId && (
+                      <p className="upload-links">
+                        <Link href={`/api/documents/${item.documentId}/download`}>{copy.download.replace("{name}", item.file.name)}</Link>
+                        {item.state === "done" && <Link href={hrefFor(`/business/${businessId}/invoices${item.invoiceId ? `/${item.invoiceId}` : ""}`)}>{copy.reviewLink}</Link>}
+                      </p>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
     </main>

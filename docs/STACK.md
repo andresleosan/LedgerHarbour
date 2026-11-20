@@ -18,7 +18,7 @@ Prototipo local/no comercial. El objetivo de la siguiente fase es una prueba des
 
 ## Arquitectura de prototipo desplegable
 
-- Hosting: Vercel Hobby.
+- Hosting: app en la VPS existente, con Cloudflare Pages como entrada HTTPS y Cloudflare Tunnel para llegar al origen privado (LH-029). Vercel Hobby fue el hosting del prototipo.
 - PostgreSQL objetivo: Neon Free; adapter PostgreSQL y migraciones versionadas. Existe una base Neon operativa con `0001` a `0006` verificadas read-only; el backup productivo y la retencion operativa siguen `operator-controlled`.
 - Auth: Firebase Authentication; adapter email/password + Google implementado, activacion operator-controlled pendiente.
 - Storage privado: Cloudflare R2 Standard.
@@ -36,7 +36,7 @@ read-only de [docs/provider-alerts-limits-checklist.md](provider-alerts-limits-c
 |---|---|---|---|---|
 | Firebase | Adapter de autenticacion email/password + Google. | Contrato y documentacion local. | Activacion `operator-controlled`. | Boundary de identidad y estado externo `unverified`. |
 | Neon | Adapter PostgreSQL y migraciones versionadas. | PGlite y verificacion read-only de Neon. | Backup y retencion requieren control operativo. | Conexion y migracion verificadas; backup `operator-controlled`. |
-| Vercel | Hosting objetivo. | Deployment Production `Ready` y verificacion browser. | Despliegue `operator-controlled`. | Cuenta y plan actuales `unverified`. |
+| Cloudflare Tunnel | Entrada HTTPS al origen en la VPS. | Compose de producción validado localmente y plan en LH-029. | Dominio, origen y túnel pendientes de activación. | Verificación del dominio en Firebase y recorrido en navegador pendientes. |
 | Cloudflare R2 | Adapter de storage privado. | Bucket observado read-only; acceso publico deshabilitado; alerta mensual de `$1` y token bucket-scoped verificados. | Activacion `operator-controlled`. | Plan `R2 Paid`; uso y facturacion futura dependen del operador. |
 | Neon rate limiting | Tabla `rate_limit_windows` y `UPSERT` atómico con claves HMAC. | Migración `0007_rate_limit_windows`, adapter, pruebas locales y verificación remota de tabla/índice en `ledgerharbour-staging`. | Producción requiere despliegue explícitamente aprobado; `RATE_LIMIT_KEY_SECRET` y `RATE_LIMIT_MODE=postgres` ya están cargados en Vercel Production. | Cuota Free compartida con la persistencia; limpiar ventanas antiguas como mantenimiento. |
 | Google Document AI | Adapter Invoice Parser. | Processor habilitado en `us`; IAM API User observado. | Activacion runtime y billing requieren control del operador. | Cuotas visibles; alerta de billing `blocked` sin cuenta vinculada. |
@@ -66,7 +66,7 @@ La aplicacion dispone del selector reversible `PERSISTENCE_MODE=memory|postgres`
 
 El estado local verificado cubre selección de modo, fail-closed sin fallback, cache del contexto runtime, aislamiento tenant-aware y wiring explícito de las rutas API. La evidencia usa PGlite y la migración SQL versionada; no se usó Neon, PostgreSQL remoto ni se aplicaron migraciones productivas.
 
-El esquema relacional versionado en `src/db/schema` y `src/db/migrations` es la fuente de persistencia. `0001_initial.sql` crea el dominio existente, `0002_platform_control_plane.sql` agrega `platform_members` y `platform_audit_events`, `0003_business_lifecycle.sql` agrega los estados y fechas manuales del negocio, `0006_business_request_audit.sql` permite auditar `business_requested` con el requester antes de que exista membresía, y `0007_rate_limit_windows.sql` agrega las ventanas distribuidas del limitador; el runner exige aplicar las migraciones en orden.
+El esquema relacional versionado en `src/db/schema` y `src/db/migrations` es la fuente de persistencia. `0001_initial.sql` crea el dominio existente, `0002_platform_control_plane.sql` agrega `platform_members` y `platform_audit_events`, `0003_business_lifecycle.sql` agrega los estados y fechas manuales del negocio, `0006_business_request_audit.sql` permite auditar `business_requested` con el requester antes de que exista membresía, `0007_rate_limit_windows.sql` agrega las ventanas distribuidas del limitador, `0008_account_headings.sql` agrega las partidas contables de cada negocio, `0009_business_templates.sql` guarda la plantilla de cuentas importada por negocio, `0010_money_movements.sql` agrega ejercicios, cuentas de dinero, saldos de apertura y movimientos, `0011_invoice_codings.sql` agrega la imputación de cada factura a partidas, y `0012_invoice_payments.sql` agrega a las facturas el tipo, el estado de pago y la anulación; el runner exige aplicar las migraciones en orden. De `0008` a `0012` solo se han ejecutado en PGlite.
 
 El bootstrap de administradores globales vive en `scripts/db/bootstrap-platform-admins.ts`. Solo acepta una lista explícita mediante `--emails` en producción; el fallback por `PLATFORM_ADMIN_EMAILS` requiere `PLATFORM_ADMIN_BOOTSTRAP=true` y un `NODE_ENV` controlado (`development`, `test` o `staging`), y no se permite en producción. Las direcciones se normalizan y se guardan sin allowlist de autorización en código; el enlace a `users` queda nullable para el primer login verificado.
 
@@ -86,7 +86,7 @@ El storage de documentos dispone de `STORAGE_MODE=local|r2`. `local` es el valor
 - Rate limiting sigue siendo obligatorio antes de exposición pública; activar `RATE_LIMIT_MODE=postgres` en staging con la migración `0007_rate_limit_windows` aplicada y `RATE_LIMIT_KEY_SECRET` server-only.
 - Las migraciones productivas requieren backup verificado, rollback probado y confirmacion explicita.
 - R2/Firebase/Neon tienen adapters implementados y pruebas locales; Neon además tiene `0007_rate_limit_windows` aplicado y verificado en el branch `production` de staging. El runtime productivo no se considera activado hasta completar el despliegue aprobado en `docs/production-activation.md`. El OCR real requiere configuración runtime, IAM y alerta de billing verificada.
-- El production gate en `src/modules/config/production-gate.ts` exige `AUTH_MODE=firebase`, `OCR_PROVIDER=google-document-ai`, `PERSISTENCE_MODE=postgres`, `STORAGE_MODE=r2`, `RATE_LIMIT_MODE=postgres`, `DATABASE_URL`, `RATE_LIMIT_KEY_SECRET` y las demás variables privadas/públicas documentadas. Dev auth, fake OCR, memoria y storage local no son defaults de producción.
+- El production gate en `src/modules/config/production-gate.ts` exige `AUTH_MODE=firebase`, `OCR_PROVIDER=local-tesseract` en la VPS (o `google-document-ai` con su configuración específica), `PERSISTENCE_MODE=postgres`, `STORAGE_MODE=r2`, `RATE_LIMIT_MODE=postgres`, `DATABASE_URL`, `RATE_LIMIT_KEY_SECRET` y las demás variables privadas/públicas documentadas. Dev auth, fake OCR, memoria y storage local no son defaults de producción.
 - `corepack pnpm audit --json` queda en cero vulnerabilidades conocidas tras fijar `sharp@0.35.0` y `postcss@8.5.23` bajo Next; debe repetirse en cada release.
 - Este documento no autoriza despliegue, migraciones, billing, OCR pago ni gasto.
 

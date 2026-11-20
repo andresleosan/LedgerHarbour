@@ -1,0 +1,32 @@
+{
+  "id": "LH-031",
+  "titulo": "Pantalla de ajustes: plantilla del contable y plan de cuentas",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "En Ajustes, el dueño sube la plantilla del contable y ve qué hojas y cuántos rótulos se leyeron.",
+    "Los defectos de la plantilla que falsean el resultado se muestran en palabras llanas, en inglés y español.",
+    "La lista de rótulos sale agrupada por sección; se puede renombrar y activar o desactivar; los bloqueados dicen por qué.",
+    "Comprobado a 390 px y 1280 px sin errores de consola."
+  ],
+  "depende": [
+    "LH-014"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/app/(app)/business/[businessId]/settings/**",
+    "tests/e2e/settings/**",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "Ajustes > plantilla del contable: subir o reemplazar la plantilla, ver hojas y rótulos leídos, los defectos en palabras llanas (inglés y español) y el plan de cuentas agrupado por sección con renombrar y activar o desactivar.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "Commit edae3d0.",
+    "e2e settings/workbook.spec.ts pasada con API real: subir, defectos, renombrar, activar, bloqueado sin botón, reemplazar conserva el nombre, español, 390 px y 1280 px sin desbordamiento.",
+    "No comprobado: los caminos 413 y 403 (solo lectura), ni revisión visual con capturas.",
+    "Verificación de lote 3 sobre 87424be: lint 0, tsc 0, vitest --no-file-parallelism 1018 pasadas y 7 omitidas (101 archivos), build 0; e2e documentos, facturas, ajustes, critical-path y navegación 16 pasadas en el puerto alternativo 3101 (el 3100 lo ocupa un servidor huérfano)."
+  ],
+  "actualizado": "2026-11-19"
+}

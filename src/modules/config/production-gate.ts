@@ -9,7 +9,6 @@ const R2_HOST_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*\.r2\.cloudflarestorage\.com$/
 
 const requiredProductionModes = {
   AUTH_MODE: "firebase",
-  OCR_PROVIDER: "google-document-ai",
   PERSISTENCE_MODE: "postgres",
   STORAGE_MODE: "r2",
   RATE_LIMIT_MODE: "postgres",
@@ -29,15 +28,11 @@ const requiredProductionValues = [
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
   "RATE_LIMIT_KEY_SECRET",
-  "GOOGLE_CLOUD_PROJECT_ID",
-  "GOOGLE_CLOUD_LOCATION",
-  "GOOGLE_DOCUMENT_AI_PROCESSOR_ID",
-  "GOOGLE_SERVICE_ACCOUNT_JSON",
 ] as const;
 
 export type ProductionConfiguration = {
   readonly authMode: "firebase";
-  readonly ocrProvider: "google-document-ai";
+  readonly ocrProvider: "google-document-ai" | "local-tesseract";
   readonly persistenceMode: "postgres";
   readonly storageMode: "r2";
   readonly rateLimitMode: "postgres";
@@ -157,6 +152,16 @@ function hasRequiredValues(environment: NodeJS.ProcessEnv): boolean {
   return requiredProductionValues.every((name) => requiredValue(environment, name) !== null);
 }
 
+function hasGoogleConfiguration(environment: NodeJS.ProcessEnv, firebaseProjectId: string): boolean {
+  const googleProjectId = requiredValue(environment, "GOOGLE_CLOUD_PROJECT_ID");
+  const googleLocation = requiredValue(environment, "GOOGLE_CLOUD_LOCATION");
+  const processorId = requiredValue(environment, "GOOGLE_DOCUMENT_AI_PROCESSOR_ID");
+  const serviceAccount = requiredValue(environment, "GOOGLE_SERVICE_ACCOUNT_JSON");
+  return googleProjectId === firebaseProjectId && ["us", "eu"].includes(googleLocation ?? "") &&
+    processorId !== null && PROCESSOR_ID_PATTERN.test(processorId) &&
+    isValidServiceAccount(serviceAccount, googleProjectId);
+}
+
 export function parseProductionConfiguration(
   environment: NodeJS.ProcessEnv = process.env,
 ): ProductionConfiguration | null {
@@ -171,17 +176,10 @@ export function parseProductionConfiguration(
   const publicAuthDomain = requiredValue(environment, "NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN");
   const publicProjectId = requiredValue(environment, "NEXT_PUBLIC_FIREBASE_PROJECT_ID");
   const publicAppId = requiredValue(environment, "NEXT_PUBLIC_FIREBASE_APP_ID");
-  const googleProjectId = requiredValue(environment, "GOOGLE_CLOUD_PROJECT_ID");
-  const googleLocation = requiredValue(environment, "GOOGLE_CLOUD_LOCATION");
-  const processorId = requiredValue(environment, "GOOGLE_DOCUMENT_AI_PROCESSOR_ID");
-  const serviceAccount = requiredValue(environment, "GOOGLE_SERVICE_ACCOUNT_JSON");
-
   if (
     !isValidProjectId(firebaseProjectId) ||
     !isValidProjectId(publicProjectId) ||
-    !isValidProjectId(googleProjectId) ||
     firebaseProjectId !== publicProjectId ||
-    firebaseProjectId !== googleProjectId ||
     !firebaseClientEmail ||
     !SERVICE_ACCOUNT_EMAIL_PATTERN.test(firebaseClientEmail) ||
     !isValidPrivateKey(firebasePrivateKey) ||
@@ -194,16 +192,16 @@ export function parseProductionConfiguration(
     !BUCKET_NAME_PATTERN.test(requiredValue(environment, "R2_BUCKET_NAME") ?? "") ||
     !requiredValue(environment, "R2_ACCESS_KEY_ID") ||
     !requiredValue(environment, "R2_SECRET_ACCESS_KEY") ||
-    !isValidRateLimitSecret(requiredValue(environment, "RATE_LIMIT_KEY_SECRET")) ||
-    !["us", "eu"].includes(googleLocation ?? "") ||
-    !processorId ||
-    !PROCESSOR_ID_PATTERN.test(processorId) ||
-    !isValidServiceAccount(serviceAccount, googleProjectId)
+    !isValidRateLimitSecret(requiredValue(environment, "RATE_LIMIT_KEY_SECRET"))
   ) return null;
+
+  const ocrProvider = environment.OCR_PROVIDER;
+  if (ocrProvider !== "local-tesseract" &&
+      (ocrProvider !== "google-document-ai" || !hasGoogleConfiguration(environment, firebaseProjectId))) return null;
 
   return {
     authMode: "firebase",
-    ocrProvider: "google-document-ai",
+    ocrProvider,
     persistenceMode: "postgres",
     storageMode: "r2",
     rateLimitMode: "postgres",

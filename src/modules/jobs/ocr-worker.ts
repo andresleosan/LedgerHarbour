@@ -17,12 +17,12 @@ import {
   getJobDependencies,
   JOB_ERROR_CODES,
   JobError,
+  MAX_RETRY_COUNT,
   type Job,
   type JobRepository,
   type JobServiceDependencies,
 } from "./job-service";
 
-const MAX_RETRY_COUNT = 3;
 const GENERIC_FAILURE = "OCR processing failed.";
 
 export interface OcrWorkerDependencies extends JobServiceDependencies {

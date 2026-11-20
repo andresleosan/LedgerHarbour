@@ -3,8 +3,16 @@ import { Pool } from "pg";
 import { createDbClient, type Database } from "../../db/client";
 import { resolveDefaultCurrencyRepository } from "../accounting/currency-service";
 import { createPostgresCurrencyRepository } from "../accounting/postgres-currency-repository";
+import { resolveDefaultHeadingRepository, type HeadingRepository } from "../accounting/heading-service";
+import { createPostgresHeadingRepository } from "../accounting/postgres-heading-repository";
+import { resolveDefaultTemplateRepository, type TemplateRepository } from "../accounting/template-service";
+import { createPostgresTemplateRepository } from "../accounting/postgres-template-repository";
+import { resolveDefaultMoneyRepository, type MoneyRepository } from "../accounting/money-repository";
+import { createPostgresMoneyRepository } from "../accounting/postgres-money-repository";
 import { resolveDefaultDocumentRepository, resolveDefaultInvoiceRepository } from "../invoices/invoice-service";
 import { createPostgresInvoiceRepository } from "../invoices/postgres-invoice-repository";
+import { resolveInvoiceCodingRepository, type InvoiceCodingRepository } from "../invoices/invoice-coding-repository";
+import { createPostgresInvoiceCodingRepository } from "../invoices/postgres-invoice-coding-repository";
 import { resolveDefaultJobRepository } from "../jobs/job-service";
 import { createPostgresJobRepository } from "../jobs/postgres-job-repository";
 import { createPostgresDocumentRepository } from "../documents/postgres-document-repository";
@@ -30,8 +38,12 @@ export type PersistenceContext = {
   projectRepository: ProjectRepository;
   documentRepository: DocumentRepository;
   invoiceRepository: InvoiceRepository;
+  invoiceCodingRepository: InvoiceCodingRepository;
   jobRepository: JobRepository;
   currencyRepository: CurrencyRepository;
+  headingRepository: HeadingRepository;
+  templateRepository: TemplateRepository;
+  moneyRepository: MoneyRepository;
   storage: StorageAdapter;
   database?: Database;
   transaction?: <T>(operation: (tenancyRepository: OnboardingRepository) => Promise<T>) => Promise<T>;
@@ -81,8 +93,12 @@ export function createPersistenceContext(input: PersistenceInput = {}): Persiste
       projectRepository: defaultProjectRepository,
       documentRepository: resolveDefaultDocumentRepository(),
       invoiceRepository: resolveDefaultInvoiceRepository(),
+      invoiceCodingRepository: resolveInvoiceCodingRepository(resolveDefaultInvoiceRepository()),
       jobRepository: resolveDefaultJobRepository(),
       currencyRepository: resolveDefaultCurrencyRepository(),
+      headingRepository: resolveDefaultHeadingRepository(),
+      templateRepository: resolveDefaultTemplateRepository(),
+      moneyRepository: resolveDefaultMoneyRepository(),
       storage,
       close: async () => {},
     };
@@ -110,8 +126,12 @@ function postgresContext(database: Database, pool: Pool | undefined, storage: St
     projectRepository: createPostgresProjectRepository(database),
     documentRepository: createPostgresDocumentRepository(database),
     invoiceRepository: createPostgresInvoiceRepository(database),
+    invoiceCodingRepository: createPostgresInvoiceCodingRepository(database),
     jobRepository: createPostgresJobRepository(database),
     currencyRepository: createPostgresCurrencyRepository(database),
+    headingRepository: createPostgresHeadingRepository(database),
+    templateRepository: createPostgresTemplateRepository(database),
+    moneyRepository: createPostgresMoneyRepository(database),
     storage,
     database,
     transaction: async (operation) => {

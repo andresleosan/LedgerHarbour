@@ -4,9 +4,9 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   applyAllMigrations,
   checkAllMigrations,
-  applyRateLimitMigration,
-  checkRateLimitMigration,
-  rollbackRateLimitMigration,
+  applyInvoicePaymentsMigration,
+  checkInvoicePaymentsMigration,
+  rollbackInvoicePaymentsMigration,
   type MigrationConfig,
 } from "../../../src/db/migration-runner";
 
@@ -32,6 +32,9 @@ function assertDisposableDatabaseUrl(value: string): void {
     throw new Error("Native PostgreSQL gate requires a loopback disposable test database");
   }
 }
+
+/** Compares names as sets: the SQL ORDER BY follows the server collation, which differs between PGlite and other PostgreSQL installs. */
+const sorted = (names: string[]) => [...names].sort();
 
 describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
   const config: MigrationConfig = {
@@ -65,6 +68,11 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       "0005_projects",
       "0006_business_request_audit",
       "0007_rate_limit_windows",
+      "0008_account_headings",
+      "0009_business_templates",
+      "0010_money_movements",
+      "0011_invoice_codings",
+      "0012_invoice_payments",
     ]);
     expect(Object.values(applied).every((migration) => migration.applied)).toBe(true);
     expect(checked).toMatchObject({
@@ -75,6 +83,11 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       projects: { applied: true, requiredTableCount: 2, ledgerRecordPresent: true },
       businessRequestAudit: { applied: true, ledgerRecordPresent: true },
       rateLimit: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
+      accountHeadings: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
+      businessTemplates: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
+      moneyMovements: { applied: true, requiredTableCount: 4, ledgerRecordPresent: true },
+      invoiceCodings: { applied: true, requiredTableCount: 1, ledgerRecordPresent: true },
+      invoicePayments: { applied: true, requiredTableCount: 6, ledgerRecordPresent: true },
     });
   });
 
@@ -88,24 +101,31 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
         AND table_type = 'BASE TABLE'
       ORDER BY table_name
     `);
-    expect(tables.rows.map((row) => row.table_name)).toEqual([
+    expect(sorted(tables.rows.map((row) => row.table_name))).toEqual(sorted([
+      "account_headings",
       "audit_events",
+      "business_templates",
       "businesses",
       "categories",
       "currencies",
       "documents",
+      "financial_years",
+      "invoice_codings",
       "invoices",
       "jobs",
       "join_requests",
       "ledgerharbour_schema_migrations",
       "memberships",
+      "money_account_openings",
+      "money_accounts",
+      "movements",
       "platform_audit_events",
       "platform_members",
       "project_memberships",
       "projects",
       "rate_limit_windows",
       "users",
-    ]);
+    ]));
 
     const constraints = await client.query<{ conname: string }>(`
       SELECT conname
@@ -121,7 +141,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       )
       ORDER BY conname
     `);
-    expect(constraints.rows.map((row) => row.conname)).toEqual([
+    expect(sorted(constraints.rows.map((row) => row.conname))).toEqual(sorted([
       "audit_events_user_actor_fk",
       "documents_uploader_business_fk",
       "invoices_business_document_fk",
@@ -129,7 +149,7 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
       "join_requests_reviewer_business_fk",
       "project_memberships_status_activity_consistency_check",
       "projects_status_activity_consistency_check",
-    ]);
+    ]));
 
     const triggers = await client.query<{ trigger_name: string }>(`
       SELECT DISTINCT trigger_name
@@ -143,12 +163,12 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
         )
       ORDER BY trigger_name
     `);
-    expect(triggers.rows.map((row) => row.trigger_name)).toEqual([
+    expect(sorted(triggers.rows.map((row) => row.trigger_name))).toEqual(sorted([
       "audit_events_append_only",
       "documents_uploader_active_membership",
       "memberships_exactly_one_active_owner",
       "platform_audit_events_append_only",
-    ]);
+    ]));
 
     const indexes = await client.query<{ indexname: string }>(`
       SELECT indexname
@@ -164,30 +184,30 @@ describe.skipIf(!databaseUrl)("native PostgreSQL migration gate", () => {
         )
       ORDER BY indexname
     `);
-    expect(indexes.rows.map((row) => row.indexname)).toEqual([
+    expect(sorted(indexes.rows.map((row) => row.indexname))).toEqual(sorted([
       "documents_business_checksum_unique",
       "jobs_business_document_type_unique",
       "memberships_one_active_owner_per_business",
       "project_memberships_project_user_unique",
       "projects_business_normalized_name_unique",
       "rate_limit_windows_window_started_at_idx",
-    ]);
+    ]));
   }, 30_000);
 
   it("rolls back and reapplies the latest migration with ledger parity", async () => {
-    await expect(rollbackRateLimitMigration(config)).resolves.toEqual({
-      version: "0007_rate_limit_windows",
+    await expect(rollbackInvoicePaymentsMigration(config)).resolves.toEqual({
+      version: "0012_invoice_payments",
       applied: true,
     });
-    await expect(checkRateLimitMigration(config)).resolves.toMatchObject({
+    await expect(checkInvoicePaymentsMigration(config)).resolves.toMatchObject({
       applied: false,
       ledgerRecordPresent: false,
     });
-    await expect(applyRateLimitMigration(config)).resolves.toEqual({
-      version: "0007_rate_limit_windows",
+    await expect(applyInvoicePaymentsMigration(config)).resolves.toEqual({
+      version: "0012_invoice_payments",
       applied: true,
     });
-    await expect(checkRateLimitMigration(config)).resolves.toMatchObject({
+    await expect(checkInvoicePaymentsMigration(config)).resolves.toMatchObject({
       applied: true,
       ledgerRecordPresent: true,
     });

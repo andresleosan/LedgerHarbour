@@ -18,6 +18,7 @@ vi.mock("@google-cloud/documentai", () => ({
   },
 }));
 
+import { LocalOcrProvider } from "../../../src/modules/invoices/local-ocr-provider";
 import { FakeOcrProvider } from "../../../src/modules/invoices/fake-ocr-provider";
 import {
   createOcrProvider,
@@ -82,6 +83,11 @@ describe("OCR provider factory", () => {
         LEDGERHARBOUR_TEST_MODE: "true",
       })),
     ).toBeInstanceOf(FakeOcrProvider);
+  });
+
+  it("creates the local provider without configuring a Google client", () => {
+    expect(createOcrProvider({ NODE_ENV: "production", OCR_PROVIDER: "local-tesseract" }))
+      .toBeInstanceOf(LocalOcrProvider);
   });
 
   it("rejects Google configuration when required values are missing", () => {

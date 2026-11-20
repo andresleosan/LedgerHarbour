@@ -40,6 +40,19 @@ describe("production configuration gate", () => {
     expect(() => assertProductionConfiguration(validProductionEnvironment())).not.toThrow();
   });
 
+  it("allows local OCR in production without Document AI credentials and retains the other gates", () => {
+    const environment = validProductionEnvironment();
+    environment.OCR_PROVIDER = "local-tesseract";
+    for (const variable of Object.keys(environment).filter((name) => name.startsWith("GOOGLE_"))) {
+      delete environment[variable];
+    }
+
+    expect(() => assertProductionConfiguration(environment)).not.toThrow();
+
+    environment.RATE_LIMIT_MODE = "memory";
+    expect(() => assertProductionConfiguration(environment)).toThrow(ProductionConfigurationError);
+  });
+
   it("fails closed with a generic error when a required value is missing", () => {
     const environment = validProductionEnvironment();
     delete environment.FIREBASE_PRIVATE_KEY;

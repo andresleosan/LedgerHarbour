@@ -4,6 +4,9 @@ import { AUTH_ERROR_CODES, AuthError } from "../auth/auth-errors";
 import { createAuthRateLimiter } from "./rate-limit";
 
 function requestAddress(requestHeaders: Headers): string {
+  if (process.env.LEDGERHARBOUR_TRUSTED_PROXY === "cloudflare-pages") {
+    return requestHeaders.get("x-ledgerharbour-client-ip")?.trim() || "unknown";
+  }
   return requestHeaders.get("x-forwarded-for")?.split(",", 1)[0]?.trim() ||
     requestHeaders.get("x-real-ip")?.trim() || "unknown";
 }

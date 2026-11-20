@@ -10,8 +10,13 @@ try {
     projects,
     businessRequestAudit,
     rateLimit,
+    accountHeadings,
+    businessTemplates,
+    moneyMovements,
+    invoiceCodings,
+    invoicePayments,
   } = await checkAllMigrations(config);
-  console.log(`Verified: ${initial.version} + ${platform.version} + ${lifecycle.version} + ${membershipLifecycle.version} + ${projects.version} + ${businessRequestAudit.version} + ${rateLimit.version} (${initial.requiredTableCount} initial tables, ${platform.requiredTableCount} platform tables, ${lifecycle.requiredTableCount} lifecycle columns, ${membershipLifecycle.requiredTableCount} membership lifecycle columns, ${projects.requiredTableCount} project tables, ${rateLimit.requiredTableCount} rate-limit tables, ledger records verified)`);
+  console.log(`Verified: ${initial.version} + ${platform.version} + ${lifecycle.version} + ${membershipLifecycle.version} + ${projects.version} + ${businessRequestAudit.version} + ${rateLimit.version} + ${accountHeadings.version} + ${businessTemplates.version} + ${moneyMovements.version} + ${invoiceCodings.version} + ${invoicePayments.version} (${initial.requiredTableCount} initial tables, ${platform.requiredTableCount} platform tables, ${lifecycle.requiredTableCount} lifecycle columns, ${membershipLifecycle.requiredTableCount} membership lifecycle columns, ${projects.requiredTableCount} project tables, ${rateLimit.requiredTableCount} rate-limit tables, ${accountHeadings.requiredTableCount} account heading tables, ${businessTemplates.requiredTableCount} business template tables, ${moneyMovements.requiredTableCount} money movement tables, ${invoiceCodings.requiredTableCount} invoice coding tables, ${invoicePayments.requiredTableCount} invoice payment columns, ledger records verified)`);
 } catch (error) {
   console.error(error instanceof Error ? error.message : "Migration check failed");
   process.exitCode = 1;

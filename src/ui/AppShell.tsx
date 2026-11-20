@@ -37,7 +37,8 @@ export default function AppShell({ children, identity, businesses, locale, platf
         upload: "Cargar",
         invoices: "Facturas / revisión",
         documents: "Documentos",
-        unavailable: "No disponible aún",
+        movements: "Movimientos",
+        year: "Ejercicio",
         settings: "Configuración",
         signOut: "Cerrar sesión",
          workspace: "Espacio de trabajo",
@@ -48,7 +49,8 @@ export default function AppShell({ children, identity, businesses, locale, platf
         upload: "Upload",
         invoices: "Invoices / review",
         documents: "Documents",
-        unavailable: "Not available yet",
+        movements: "Movements",
+        year: "Year",
         settings: "Settings",
         signOut: "Sign out",
          workspace: "Workspace",
@@ -90,7 +92,7 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .language-switcher { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border: 1px solid #9bb7b0; border-radius: 999px; background: #fff; transition: background-color .18s ease, border-color .18s ease; }
          .language-switcher a { border-radius: 999px; padding: 6px 8px; color: #315b60; font-size: .76rem; font-weight: 800; text-decoration: none; }
          .language-switcher a:hover, .language-switcher a[aria-current="page"] { background: #d9eeea; color: #075b57; }
-          .language-switcher a:focus-visible, .app-shell button:focus-visible, .app-shell a:focus-visible, .app-shell input:focus-visible, .app-shell textarea:focus-visible { outline: 3px solid var(--lh-coral-focus); outline-offset: 3px; }
+          .language-switcher a:focus-visible, .app-shell button:focus-visible, .app-shell a:focus-visible, .app-shell input:focus-visible, .app-shell textarea:focus-visible, .app-shell summary:focus-visible { outline: 3px solid var(--lh-coral-focus); outline-offset: 3px; }
           .app-shell .invoice-hero a:focus-visible, .app-shell .review-preview a:focus-visible { outline-color: #fff; }
          .operational-page { min-width: 0; }
          .page-shell { width: min(100%, 980px); margin: 0 auto; }
@@ -118,6 +120,17 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .upload-drop { display: grid; gap: 12px; margin-top: 24px; padding: 22px; border: 2px dashed #8db6b0; border-radius: 14px; background: #f5fbf8; }
          .upload-hint { margin: 0; font-size: .88rem; }
          .upload-drop button { justify-self: start; }
+         .upload-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+         .upload-actions button { flex: 1 1 160px; }
+         .upload-queue { display: grid; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; }
+         .upload-item { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: start; padding: 12px; border: 1px solid var(--lh-border); border-radius: 12px; background: var(--lh-surface); }
+         .upload-thumb { display: grid; place-items: center; width: 56px; height: 56px; border: 1px solid var(--lh-border); border-radius: 8px; object-fit: cover; background: #edf7f3; color: var(--lh-muted); font-size: .78rem; font-weight: 800; }
+         .upload-item-body { display: grid; gap: 6px; min-width: 0; }
+         .upload-item-body p { margin: 0; }
+         .upload-name { color: var(--lh-navy); font-weight: 800; overflow-wrap: anywhere; }
+         .upload-item progress { width: 100%; height: 8px; accent-color: var(--lh-teal); }
+         .upload-links { display: flex; flex-wrap: wrap; gap: 0 16px; }
+         .upload-links a { display: inline-flex; align-items: center; min-height: 44px; overflow-wrap: anywhere; }
          .invoice-shell { max-width: 1040px; }
          .invoice-hero { display: flex; justify-content: space-between; gap: 24px; align-items: flex-end; margin-bottom: 22px; padding: 28px; border-radius: 16px; background: var(--lh-navy); color: #fff; }
          .invoice-hero .page-eyebrow { color: #a8d5c9; }
@@ -144,6 +157,16 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .review-fields { display: grid; gap: 12px; margin-top: 20px; }
          .review-field { display: grid; gap: 6px; }
          .review-field label { font-weight: 750; }
+         .review-coding { display: grid; gap: 12px; padding-top: 14px; border-top: 1px solid var(--lh-border); }
+         .review-coding .tertiary-button { justify-self: start; }
+         .coding-line { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 9rem) auto; gap: 8px; align-items: end; }
+         .coding-hint { margin: 0; color: var(--lh-muted); font-size: .88rem; }
+         .review-choice { display: grid; gap: 8px; min-width: 0; margin: 0; padding: 0; border: 0; }
+         .review-choice legend { padding: 0; font-weight: 750; }
+         .review-choice > label { display: flex; align-items: center; gap: 10px; min-height: 44px; overflow-wrap: anywhere; }
+         .review-choice input[type="radio"] { flex: none; width: 20px; height: 20px; margin: 0; }
+         .review-banner { margin: 0 0 14px; padding: 12px 14px; border: 1px solid #e3b7a8; border-radius: 10px; background: #f4dbd2; color: #793e35; font-weight: 750; }
+         @media (max-width: 650px) { .coding-line { grid-template-columns: minmax(0, 1fr); } }
          .low-confidence { border-color: #c77c52; background: #fff7ed; }
          .confidence { color: #8d4d2d; font-size: .78rem; }
          .review-actions, .page-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px; }
@@ -159,6 +182,47 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .settings-create { grid-template-columns: minmax(0, 1fr) auto; }
          .currency-create { grid-template-columns: 2fr 1fr 1fr 1fr auto; }
          .settings-item small { display: block; margin-top: 4px; color: var(--lh-muted); }
+         .workbook-shell .page-card + .page-card { margin-top: 18px; }
+         .workbook-shell h2 { margin: 0 0 10px; color: var(--lh-navy); font-size: 1.15rem; }
+         .workbook-list { display: grid; gap: 6px; margin: 0; padding-left: 20px; overflow-wrap: anywhere; }
+         .workbook-group { margin-top: 14px; border-top: 1px solid var(--lh-border); }
+         .workbook-group summary { min-height: 44px; padding: 10px 0; color: var(--lh-navy); font-weight: 800; cursor: pointer; }
+         .workbook-group .settings-items { margin-top: 8px; }
+         .workbook-group .settings-item > div:first-child { flex: 1 1 auto; }
+         .workbook-rename { display: grid; gap: 9px; margin-top: 10px; }
+         .workbook-rename .page-actions { margin-top: 0; }
+         .money-shell .page-card + .page-card { margin-top: 18px; }
+         .money-shell h2, .money-shell h3 { margin: 0 0 10px; color: var(--lh-navy); font-size: 1.15rem; }
+         .money-shell h3 { margin-top: 22px; font-size: 1rem; }
+         .money-shell .settings-item > div:first-child { flex: 1 1 auto; }
+         .money-form { display: grid; gap: 12px; margin-top: 12px; }
+         .money-form .page-actions { margin-top: 0; }
+         .money-add { padding-top: 6px; border-top: 1px solid var(--lh-border); }
+         .money-dates { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr)); gap: 12px; }
+         .money-field, .money-kind { display: grid; gap: 6px; min-width: 0; margin: 0; padding: 0; border: 0; }
+         .money-field > label, .money-kind legend { padding: 0; font-weight: 750; }
+         .money-kind > div { display: flex; flex-wrap: wrap; gap: 0 18px; }
+         .money-kind label { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; cursor: pointer; }
+         .money-kind input { width: 20px; height: 20px; margin: 0; accent-color: var(--lh-teal); }
+         .money-hint { margin: 0; color: var(--lh-muted); font-size: .88rem; line-height: 1.5; }
+         .money-shell .page-card > .money-hint { margin: 12px 0; }
+         .money-link { display: inline-flex; align-items: center; min-height: 44px; color: var(--lh-teal); font-weight: 800; }
+         .movement-kinds > div { display: grid; gap: 8px; }
+         .movement-kinds label { min-height: 52px; padding: 10px 14px; border: 1px solid var(--lh-border); border-radius: 12px; background: #fff; }
+         .movement-kinds label:has(input:checked) { border-color: var(--lh-teal); background: #edf7f3; }
+         .movement-balances { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 12px; }
+         .movement-balance { min-width: 0; padding: 15px; border: 1px solid #d0ded8; border-radius: 12px; }
+         .money-shell .movement-balance h3 { margin: 0 0 8px; overflow-wrap: anywhere; }
+         .movement-balance dl { display: grid; gap: 6px; margin: 0; }
+         .movement-balance dl > div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 0 12px; }
+         .movement-balance dt { color: var(--lh-muted); }
+         .movement-balance dd, .movement-amount { margin: 0; color: var(--lh-navy); font-weight: 850; font-variant-numeric: tabular-nums; white-space: nowrap; }
+         .movement-filter { max-width: 22rem; }
+         .movement-side { display: grid; justify-items: end; gap: 8px; }
+         .movement-side .page-actions { margin-top: 0; }
+         .movement-origin { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #edf7f3; color: #315b60; font-size: .78rem; font-weight: 800; }
+         @media (max-width: 650px) { .movement-side { justify-items: stretch; } }
+         .app-shell select:focus-visible { outline: 3px solid var(--lh-coral-focus); outline-offset: 3px; }
          .member-info { min-width: 0; }
          .transfer-panel { margin-top: 22px; padding: 18px; border: 1px solid #e1b9a8; border-radius: 12px; background: #fff6ef; }
          .transfer-panel h2 { margin: 0; font-size: 1.15rem; }
@@ -173,6 +237,14 @@ export default function AppShell({ children, identity, businesses, locale, platf
          @media (max-width: 900px) { .shell-header { grid-template-columns: 1fr auto; } .shell-nav { grid-column: 1 / -1; grid-row: 2; } }
          @media (max-width: 900px) { .currency-create { grid-template-columns: 1fr 1fr; } .currency-create input:first-of-type { grid-column: span 2; } }
           @media (max-width: 650px) { .shell-header, .shell-main { width: min(100% - 28px, 1240px); } .shell-header { gap: 12px; } .shell-brand-logo { width: 116px; height: 77px; } .shell-user span { display: none; } .shell-layout { grid-template-columns: 1fr; gap: 18px; } .business-switcher { position: static; order: 2; } .shell-content { order: 1; } .shell-nav { overflow-x: auto; flex-wrap: nowrap; } .shell-nav a, .shell-nav-disabled { white-space: nowrap; } .page-shell { width: 100%; } .invoice-hero { display: block; } .invoice-settings { margin-top: 18px; } .review-grid { grid-template-columns: 1fr; } .review-preview { min-height: auto; } .request-row, .settings-item { align-items: stretch; flex-direction: column; } .page-actions { width: 100%; } .page-actions button { flex: 1 1 100%; } .settings-create, .currency-create { grid-template-columns: 1fr; } .currency-create input:first-of-type { grid-column: auto; } .upload-drop { padding: 18px; } }
+         .year-actions a { display: inline-flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
+         .year-sheets { margin-top: 14px; }
+         .year-counts { margin-top: 14px; }
+         .movement-balance .year-subtotal { padding-top: 6px; border-top: 1px solid var(--lh-border); }
+         .year-subtotal dt { color: var(--lh-navy); font-weight: 800; }
+         .year-refresh { align-items: center; justify-content: space-between; }
+         .year-refresh p { margin: 0; }
+         @media (max-width: 650px) { .year-actions a { flex: 1 1 100%; } }
         @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
       `}</style>
       <header className="shell-header">
@@ -182,7 +254,9 @@ export default function AppShell({ children, identity, businesses, locale, platf
             {platformAdmin && <a href={hrefFor("/admin")} aria-current={pathname.startsWith("/admin") ? "page" : undefined}>{copy.platform}</a>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/upload`)}>{copy.upload}</a> : <span className="shell-nav-disabled">{copy.upload}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/invoices`)}>{copy.invoices}</a> : <span className="shell-nav-disabled">{copy.invoices}</span>}
-           <span className="shell-nav-disabled" aria-disabled="true" title={copy.unavailable}>{copy.documents}</span>
+           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/documents`)}>{copy.documents}</a> : <span className="shell-nav-disabled">{copy.documents}</span>}
+           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/movements`)}>{copy.movements}</a> : <span className="shell-nav-disabled">{copy.movements}</span>}
+           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/year`)}>{copy.year}</a> : <span className="shell-nav-disabled">{copy.year}</span>}
            {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/settings/members`)}>{copy.settings}</a> : <span className="shell-nav-disabled">{copy.settings}</span>}
         </nav>
           <div className="shell-user"><LanguageSwitcher locale={activeLocale} /><span><strong>{identity.displayName}</strong>{identity.email}</span><form action={signOutAction} onSubmit={async (event) => { event.preventDefault(); try { await signOutFirebaseUser(firebaseConfig); } finally { await signOutAction(); } }}><button className="sign-out" type="submit">{copy.signOut}</button></form></div>

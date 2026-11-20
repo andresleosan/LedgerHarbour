@@ -1,0 +1,23 @@
+name: ledgerharbour-production
+
+services:
+  app:
+    image: ${LEDGERHARBOUR_IMAGE:?Indica la imagen del commit verificado}
+    env_file:
+      - path: ${LEDGERHARBOUR_RUNTIME_ENV:?Indica el archivo privado de entorno}
+        format: raw
+    environment:
+      NODE_ENV: production
+      PORT: '3000'
+      AUTH_MODE: firebase
+      OCR_PROVIDER: local-tesseract
+      PERSISTENCE_MODE: postgres
+      STORAGE_MODE: r2
+      RATE_LIMIT_MODE: postgres
+      LEDGERHARBOUR_TRUSTED_PROXY: cloudflare-pages
+    ports:
+      - target: 3000
+        published: ${LEDGERHARBOUR_ORIGIN_PORT:?Indica el puerto local libre de producción}
+        host_ip: 127.0.0.1
+        protocol: tcp
+    restart: unless-stopped

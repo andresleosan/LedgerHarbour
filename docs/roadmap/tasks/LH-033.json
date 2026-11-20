@@ -1,0 +1,22 @@
+{
+  "id": "LH-033",
+  "titulo": "Abrir en Excel un libro exportado de prueba",
+  "estado": "hecho",
+  "responsable": "operador",
+  "criterio": [
+    "El archivo de prueba abre en Excel sin aviso de reparación.",
+    "En cada hoja de cuenta se ven las 12 filas de prueba con fecha, concepto, código e importe, y el saldo corre.",
+    "Queda anotado si las fechas se ven como fecha y si alguna celda sale con error nuevo."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [],
+  "hecho": "El operador abrió en Excel el libro exportado de prueba (plantilla real con filas inventadas): abre bien.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "2026-11-20: respuesta del operador en la sesión: «LH-033 abre bien»."
+  ],
+  "actualizado": "2026-11-20"
+}

@@ -1,14 +1,24 @@
 import { defaultOnboardingRepository, resolveOnboardingActor, type OnboardingActor, type OnboardingRepository } from "../tenancy/business-service";
 import { BusinessLifecycleError, LIFECYCLE_ERROR_CODES, requireBusinessOperational } from "../tenancy/business-lifecycle-service";
+import { requireCapability } from "../permissions/authorize";
 import { createTenantContext } from "../tenancy/tenant-context";
 import type { UserId } from "../tenancy/types";
 import type { DocumentRepository } from "../documents/document-service";
-import { resolveDefaultDocumentRepository, type InvoiceDependencies, type InvoiceRepository } from "../invoices/invoice-service";
-import type { DocumentId } from "../invoices/ocr-provider";
+import {
+  createInvoiceFromOcr,
+  resolveDefaultDocumentRepository,
+  resolveDefaultInvoiceRepository,
+  type InvoiceDependencies,
+  type InvoiceRepository,
+} from "../invoices/invoice-service";
+import { OCR_FIELD_NAMES, type DocumentId, type InvoiceId, type OcrResult } from "../invoices/ocr-provider";
 export type { DocumentId } from "../invoices/ocr-provider";
 
 export const JOB_STATUSES = ["queued", "processing", "completed", "failed"] as const;
 export type JobStatus = (typeof JOB_STATUSES)[number];
+
+/** A reading is attempted at most this many times; afterwards the invoice is filled in by hand. */
+export const MAX_RETRY_COUNT = 3;
 
 export const JOB_ERROR_CODES = {
   INVALID_JOB_REQUEST: "INVALID_JOB_REQUEST",
@@ -17,6 +27,8 @@ export const JOB_ERROR_CODES = {
   INACTIVE_BUSINESS: "INACTIVE_BUSINESS",
   OCR_JOB_CONFLICT: "OCR_JOB_CONFLICT",
   JOB_NOT_FOUND: "JOB_NOT_FOUND",
+  OCR_RETRIES_EXHAUSTED: "OCR_RETRIES_EXHAUSTED",
+  DOCUMENT_NOT_FAILED: "DOCUMENT_NOT_FAILED",
 } as const;
 export type JobErrorCode = (typeof JOB_ERROR_CODES)[keyof typeof JOB_ERROR_CODES];
 
@@ -27,6 +39,8 @@ const messages: Record<JobErrorCode, string> = {
   INACTIVE_BUSINESS: "This business is inactive.",
   OCR_JOB_CONFLICT: "An OCR job already exists for this document.",
   JOB_NOT_FOUND: "OCR job not found.",
+  OCR_RETRIES_EXHAUSTED: "This document could not be read. Fill the invoice in by hand.",
+  DOCUMENT_NOT_FAILED: "Only a document whose reading failed can be filled in by hand.",
 };
 
 export class JobError extends Error {
@@ -35,6 +49,19 @@ export class JobError extends Error {
   constructor(readonly code: JobErrorCode) {
     super(messages[code]);
   }
+}
+
+/**
+ * In development every route bundle has its own copy of this module while the in-memory
+ * repositories are shared through globalThis, so `instanceof` alone misses their errors.
+ */
+export function asJobError(error: unknown): JobError | null {
+  if (error instanceof JobError) return error;
+  const candidate = error as { name?: unknown; code?: unknown } | null;
+  if (candidate?.name === "JobError" && typeof candidate.code === "string" && Object.hasOwn(messages, candidate.code)) {
+    return new JobError(candidate.code as JobErrorCode);
+  }
+  return null;
 }
 
 export interface Job {
@@ -101,6 +128,10 @@ export class InMemoryJobRepository implements JobRepository {
       const existing = await this.findByDocumentId(candidate.documentId);
       if (existing) {
         if (existing.status === "queued" || existing.status === "processing") return existing;
+        if (existing.status === "failed") {
+          if (existing.retryCount >= MAX_RETRY_COUNT) throw new JobError(JOB_ERROR_CODES.OCR_RETRIES_EXHAUSTED);
+          return this.update({ ...existing, status: "queued", updatedAt: new Date().toISOString() });
+        }
         throw new JobError(JOB_ERROR_CODES.OCR_JOB_CONFLICT);
       }
       return this.create(candidate);
@@ -110,7 +141,7 @@ export class InMemoryJobRepository implements JobRepository {
   async claim(jobId: string): Promise<Job | null> {
     return this.transaction(async () => {
       const current = this.jobs.get(jobId);
-      if (!current || current.status === "completed" || current.status === "processing" || (current.status === "failed" && current.retryCount >= 3)) {
+      if (!current || current.status === "completed" || current.status === "processing" || (current.status === "failed" && current.retryCount >= MAX_RETRY_COUNT)) {
         return null;
       }
       const claimed = { ...current, status: "processing" as const, updatedAt: new Date().toISOString() };
@@ -208,6 +239,12 @@ export function createJobService(input: JobServiceDependencies = {}): JobService
         throw new JobError(JOB_ERROR_CODES.INVALID_JOB_REQUEST);
       }
       const document = await validateDocumentAccess(documentId, actorId, input);
+      const membership = await createTenantContext(deps.tenancyRepository).getMembership(actorId, document.businessId);
+      try {
+        requireCapability(membership!, "edit_finance");
+      } catch {
+        throw new JobError(JOB_ERROR_CODES.BUSINESS_ACCESS_DENIED);
+      }
       return deps.jobs.createOrReuse(() => {
         const now = new Date().toISOString();
         return {
@@ -234,4 +271,61 @@ export function queueOcr(documentId: DocumentId, actor: OnboardingActor, input: 
 export function getJobDependencies(input: JobServiceDependencies = {}) {
   const deps = resolved(input);
   return { ...deps, input };
+}
+
+const EMPTY_READING: OcrResult = {
+  fields: Object.fromEntries(OCR_FIELD_NAMES.map((field) => [field, null])) as unknown as OcrResult["fields"],
+  confidence: Object.fromEntries(OCR_FIELD_NAMES.map((field) => [field, 0])) as OcrResult["confidence"],
+};
+
+/**
+ * Creates the document's one invoice with every field empty so it is filled in by hand on the
+ * review page. The job ends as "completed": the reading step is over and no longer blocks the invoice.
+ */
+export async function createManualInvoice(documentId: DocumentId, actor: OnboardingActor, input: JobServiceDependencies = {}): Promise<InvoiceId> {
+  if (typeof documentId !== "string" || !documentId.trim()) throw new JobError(JOB_ERROR_CODES.INVALID_JOB_REQUEST);
+  const deps = resolved(input);
+  let actorId: UserId;
+  try {
+    actorId = await resolveOnboardingActor(deps.tenancyRepository, actor);
+  } catch {
+    throw new JobError(JOB_ERROR_CODES.INVALID_JOB_REQUEST);
+  }
+  const document = await validateDocumentAccess(documentId, actorId, input);
+  const membership = await createTenantContext(deps.tenancyRepository).getMembership(actorId, document.businessId);
+  try {
+    requireCapability(membership!, "edit_finance");
+  } catch {
+    throw new JobError(JOB_ERROR_CODES.BUSINESS_ACCESS_DENIED);
+  }
+  const invoices = input.invoices ?? resolveDefaultInvoiceRepository();
+  // The PostgreSQL tenancy transaction only passes through the error types it knows.
+  let rejection: JobError | undefined;
+
+  const createInTransaction = async (tenancy: OnboardingRepository): Promise<InvoiceId> => {
+    const current = await deps.documentRepository.findById(documentId);
+    if (current?.status !== "failed" || await invoices.findByDocumentId(documentId)) {
+      rejection = new JobError(JOB_ERROR_CODES.DOCUMENT_NOT_FAILED);
+      throw rejection;
+    }
+    const job = await deps.jobs.findByDocumentId(documentId);
+    const invoice = await createInvoiceFromOcr(document.businessId, documentId, EMPTY_READING, { ...input, invoices });
+    try {
+      await deps.documentRepository.setStatus(documentId, "needs_review");
+      if (job) await deps.jobs.update({ ...job, status: "completed", errorSummary: null, updatedAt: new Date().toISOString() });
+      await tenancy.appendAuditEvent({ businessId: document.businessId, actorId, type: "invoice_created_manually", entityId: invoice.id });
+    } catch (error) {
+      await deps.documentRepository.setStatus(documentId, "failed");
+      if (job) await deps.jobs.update(job);
+      throw error;
+    }
+    return invoice.id;
+  };
+
+  try {
+    if (input.transaction) return await input.transaction(createInTransaction);
+    return await invoices.transaction(() => deps.tenancyRepository.transaction((transaction) => createInTransaction(transaction)));
+  } catch (error) {
+    throw rejection ?? error;
+  }
 }

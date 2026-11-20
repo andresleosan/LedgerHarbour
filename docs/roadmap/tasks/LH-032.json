@@ -1,0 +1,34 @@
+{
+  "id": "LH-032",
+  "titulo": "Leer la plantilla con memoria acotada",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Leer la plantilla real pide menos de 300 MB de memoria, medido.",
+    "Un archivo que supere el límite de memoria o de tiempo se rechaza sin tumbar el servidor.",
+    "El perfil que devuelve el lector no cambia: las pruebas existentes pasan sin tocarlas."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/workbook/**",
+    "tests/unit/workbook/**",
+    "tests/fixtures/workbook/**",
+    "package.json",
+    "pnpm-lock.yaml"
+  ],
+  "hecho": "El lector lee las partes XML directamente, una a una: el libro real pasa de unos 954 MB a unos 160 MB de memoria y de 5 s a 2,6 s. Límite de tiempo de 20 s y tope de 8.192 caracteres por fórmula. exceljs queda solo para generar la sintética en pruebas.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "Commits 3b95ae0 y b40520a.",
+    "Perfil idéntico al del lector anterior en 41 casos, incluido el libro real; las 5 suites existentes pasan sin tocarlas. tests/unit/workbook 71 pasadas.",
+    "Medido con process.resourceUsage().maxRSS en un proceso nuevo: 157–172 MB; también lee con el montón limitado a 64 MB.",
+    "pnpm audit --audit-level high: salida 0 (2 bajas y 4 moderadas, ninguna alta).",
+    "Aviso de seguridad atendido en b40520a (fórmula compartida larga con miles de copias).",
+    "No medido: muchas hojas llenas de copias de 8 KB; acotado por los topes, sin prueba.",
+    "Verificación de lote 3 sobre 87424be: lint 0, tsc 0, vitest --no-file-parallelism 1018 pasadas y 7 omitidas (101 archivos), build 0; e2e documentos, facturas, ajustes, critical-path y navegación 16 pasadas en el puerto alternativo 3101 (el 3100 lo ocupa un servidor huérfano)."
+  ],
+  "actualizado": "2026-11-19"
+}

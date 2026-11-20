@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getCurrentIdentity } from "../../../../../modules/auth/session";
-import { JobError, JOB_ERROR_CODES, queueOcr } from "../../../../../modules/jobs/job-service";
+import { asJobError, JobError, JOB_ERROR_CODES, queueOcr } from "../../../../../modules/jobs/job-service";
 import { processOcrJob } from "../../../../../modules/jobs/ocr-worker";
 import type { DocumentId } from "../../../../../modules/invoices/ocr-provider";
 import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
@@ -17,11 +17,12 @@ import {
 type RouteContext = { params: Promise<{ documentId: string }> };
 const requestSchema = z.object({}).strict();
 
-function errorResponse(error: unknown): NextResponse {
-  if (error instanceof JobError) {
+function errorResponse(unknownError: unknown): NextResponse {
+  const error = asJobError(unknownError);
+  if (error) {
     const status = error.code === JOB_ERROR_CODES.DOCUMENT_NOT_FOUND || error.code === JOB_ERROR_CODES.JOB_NOT_FOUND ? 404 :
       error.code === JOB_ERROR_CODES.BUSINESS_ACCESS_DENIED || error.code === JOB_ERROR_CODES.INACTIVE_BUSINESS ? 403 :
-      error.code === JOB_ERROR_CODES.OCR_JOB_CONFLICT ? 409 : 400;
+      error.code === JOB_ERROR_CODES.OCR_JOB_CONFLICT || error.code === JOB_ERROR_CODES.OCR_RETRIES_EXHAUSTED ? 409 : 400;
     return NextResponse.json({ error: { code: error.code, message: error.message } }, { status });
   }
   return NextResponse.json({ error: { code: "OCR_PROCESSING_FAILED", message: "The OCR request could not be processed." } }, { status: 500 });

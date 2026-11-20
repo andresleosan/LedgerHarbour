@@ -6,13 +6,12 @@ import { jobs } from "../../db/schema";
 import {
   JOB_ERROR_CODES,
   JobError,
+  MAX_RETRY_COUNT,
   type Job,
   type JobRepository,
 } from "./job-service";
 import type { DocumentId } from "../invoices/ocr-provider";
 import type { BusinessId, UserId } from "../tenancy/types";
-
-const MAX_RETRY_COUNT = 3;
 
 function id<T extends string>(value: string): T {
   return value as T;
@@ -150,6 +149,18 @@ function createRepository(database: Database): JobRepository {
           )).limit(1);
           if (!existing) throw new JobError(JOB_ERROR_CODES.OCR_JOB_CONFLICT);
           if (existing.status === "queued" || existing.status === "processing") return mapJob(existing);
+          if (existing.status === "failed") {
+            if (existing.retryCount >= MAX_RETRY_COUNT) throw new JobError(JOB_ERROR_CODES.OCR_RETRIES_EXHAUSTED);
+            const [requeued] = await db.update(jobs).set({ status: "queued", updatedAt: new Date() }).where(and(
+              eq(jobs.id, existing.id),
+              eq(jobs.status, "failed"),
+              lt(jobs.retryCount, MAX_RETRY_COUNT),
+            )).returning();
+            if (requeued) return mapJob(requeued);
+            // A concurrent retry re-queued it first; reuse that run instead of starting another.
+            const [latest] = await db.select().from(jobs).where(eq(jobs.id, existing.id)).limit(1);
+            if (latest?.status === "queued" || latest?.status === "processing") return mapJob(latest);
+          }
           throw new JobError(JOB_ERROR_CODES.OCR_JOB_CONFLICT);
         } catch (error) {
           return preserveOrMap(error);

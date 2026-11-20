@@ -1,0 +1,22 @@
+{
+  "id": "LH-028",
+  "titulo": "Respuestas del contable sobre su plantilla",
+  "estado": "hecho",
+  "responsable": "operador",
+  "criterio": [
+    "Cada respuesta queda anotada en el spec de LH-012 y, si cambia el resultado, en la ficha afectada."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [],
+  "hecho": "El operador delegó las ocho preguntas en la opción más conveniente para el proyecto. Cinco se resuelven manteniendo el valor por defecto; dos (saldos iniciales y fechas del ejercicio) los introduce el dueño en Ajustes; el registro en GST se mantiene en «no registrado» hasta que el dueño diga otra cosa.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "2026-11-20: el operador en la sesión: «resolver según lo más conveniente para el proyecto».",
+    "Resoluciones anotadas en la tabla «Answers» del spec de LH-012.",
+    "Si el negocio está registrado en GST hace falta una tarea nueva (rótulo de GST y fila separada)."
+  ],
+  "actualizado": "2026-11-20"
+}

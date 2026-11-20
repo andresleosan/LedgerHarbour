@@ -125,6 +125,36 @@ function createRepository(database: Database): DocumentRepository {
       }
     },
 
+    async findByChecksum(businessId, checksum) {
+      const db = databaseForOperation(database);
+      try {
+        const [row] = await db.select().from(documents).where(and(
+          eq(documents.businessId, businessId),
+          eq(documents.checksum, checksum),
+        )).limit(1);
+        return row ? mapDocument(row) : null;
+      } catch (error) {
+        return preserveOrMap(error);
+      }
+    },
+
+    async replaceFailedUpload(documentId, replacement) {
+      const db = databaseForOperation(database);
+      try {
+        const [row] = await db.update(documents).set({
+          privateObjectKey: replacement.privateObjectKey,
+          originalFileName: replacement.originalFileName,
+          originalMimeType: replacement.originalMimeType,
+          originalSizeBytes: replacement.originalSizeBytes,
+          status: "uploaded",
+          updatedAt: new Date(),
+        }).where(and(eq(documents.id, documentId), eq(documents.status, "failed"))).returning();
+        return row ? mapDocument(row) : null;
+      } catch (error) {
+        return preserveOrMap(error);
+      }
+    },
+
     async getStatus(documentId) {
       const document = await repository.findById(documentId);
       return document?.status ?? null;

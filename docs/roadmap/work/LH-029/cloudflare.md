@@ -1,0 +1,16 @@
+# LH-029 · Publicación en ledgerharbour.pages.dev
+
+El navegador llega por HTTPS a `ledgerharbour.pages.dev`. Una función de Pages reenvía las peticiones a un Worker privado mediante un binding. El Worker accede a un único servicio HTTP de Workers VPC que usa Cloudflare Tunnel para llegar a `cloudflared` en el host y al puerto de loopback de LedgerHarbour. El contenedor de producción reutiliza el Dockerfile de LH-027 y ejecuta Tesseract localmente. Firebase autentica a los usuarios. PostgreSQL conserva los registros y R2 almacena los archivos privados.
+
+## Preparar el origen
+
+1. Identificar el commit, el dominio y un puerto de loopback libre para producción. El `vercel.json` de esta rama desactiva los despliegues automáticos de Vercel. Al publicar el PR, comprobar que GitHub no registra un despliegue nuevo en Vercel. El PR ejecuta la verificación de GitHub Actions.
+2. Construir y etiquetar la imagen con el commit de la rama verificada. Configurar `LEDGERHARBOUR_IMAGE`, `LEDGERHARBOUR_ORIGIN_PORT` y `LEDGERHARBOUR_RUNTIME_ENV` para [el Compose de producción](compose.production.yaml). Este último apunta al archivo de entorno privado del servicio, fuera del repositorio. Los modos de producción se fijan en Compose. La configuración y los datos de la vista previa viven en su propio proyecto.
+3. Identificar la base de destino y verificar un backup restaurable. Aplicar las migraciones `0008` a `0012` con el procedimiento aprobado y comprobar el registro de migraciones y el esquema según el [runbook de activación](../../../production-activation.md#migraciones-y-rollback). Arrancar el origen de producción y comprobarlo en loopback antes de enrutar el dominio.
+
+## Enrutar y verificar
+
+1. Conectar el túnel dedicado con `cloudflared` por HTTP/2, el transporte comprobado en la VPS, y asociar un servicio Workers VPC de tipo HTTP para `127.0.0.1` y el puerto de producción, alcance de un solo servicio. Desplegar el [Worker de origen](cloudflare/worker/) con el ID real de ese servicio en su configuración privada. Desplegar [Pages](cloudflare/pages/) con el binding `ORIGIN`. Comprobar que la página pública llega al origen y que el Worker de enlace solo está disponible mediante el binding. La función de Pages conserva las cookies y marca las respuestas como privadas. [Workers VPC](https://developers.cloudflare.com/workers-vpc/configuration/vpc-services/) · [Bindings de Pages](https://developers.cloudflare.com/pages/functions/wrangler-configuration/#service-bindings)
+2. Añadir el dominio a los dominios autorizados de Firebase si falta. Verificar alta e inicio de sesión según los proveedores habilitados y comprobar que una cuenta de otro negocio recibe denegación al acceder a facturas o libros ajenos.
+3. Comprobar memoria del contenedor durante importación y exportación con una plantilla sintética representativa. En una cuenta de prueba autorizada, validar carga, lectura Tesseract, revisión y exportación .xlsx. Cotejar fecha, moneda e importes, y que el libro conserva sus fórmulas. Usar una factura real solo con la autorización de LH-027.
+4. Si una comprobación falla, conservar la evidencia sin datos privados y pausar el corte. Para recuperar el servicio, volver a la imagen anterior compatible o restaurar el destino previo del dominio. Un cambio de versión o DNS no revierte cambios de la base de datos.

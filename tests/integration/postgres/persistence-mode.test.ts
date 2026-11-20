@@ -20,7 +20,11 @@ import { defaultOnboardingRepository } from "../../../src/modules/tenancy/busine
 import { resolveDefaultDocumentRepository, resolveDefaultInvoiceRepository } from "../../../src/modules/invoices/invoice-service";
 import { resolveDefaultCurrencyRepository, setCurrency } from "../../../src/modules/accounting/currency-service";
 import { resolveDefaultJobRepository } from "../../../src/modules/jobs/job-service";
+import { resolveDefaultHeadingRepository } from "../../../src/modules/accounting/heading-service";
+import { resolveDefaultTemplateRepository } from "../../../src/modules/accounting/template-service";
+import { resolveDefaultMoneyRepository } from "../../../src/modules/accounting/money-repository";
 import { resolveDefaultStorage } from "../../../src/modules/invoices/invoice-service";
+import { resolveInvoiceCodingRepository } from "../../../src/modules/invoices/invoice-coding-repository";
 import { listUserBusinesses } from "../../../src/modules/tenancy/portfolio-service";
 import {
   PersistenceConfigurationError,
@@ -65,6 +69,10 @@ describe("persistence mode factory", () => {
     expect(context.invoiceRepository).toBe(resolveDefaultInvoiceRepository());
     expect(context.jobRepository).toBe(resolveDefaultJobRepository());
     expect(context.currencyRepository).toBe(resolveDefaultCurrencyRepository());
+    expect(context.headingRepository).toBe(resolveDefaultHeadingRepository());
+    expect(context.templateRepository).toBe(resolveDefaultTemplateRepository());
+    expect(context.moneyRepository).toBe(resolveDefaultMoneyRepository());
+    expect(context.invoiceCodingRepository).toBe(resolveInvoiceCodingRepository(resolveDefaultInvoiceRepository()));
     expect(context.storage).toBe(resolveDefaultStorage());
     expect(context.database).toBeUndefined();
   });
@@ -82,6 +90,14 @@ describe("persistence mode factory", () => {
       expect(context.invoiceRepository).not.toBe(resolveDefaultInvoiceRepository());
       expect(context.jobRepository).not.toBe(resolveDefaultJobRepository());
       expect(context.currencyRepository).not.toBe(resolveDefaultCurrencyRepository());
+      expect(context.headingRepository).not.toBe(resolveDefaultHeadingRepository());
+      expect(context.templateRepository).not.toBe(resolveDefaultTemplateRepository());
+      await expect(context.templateRepository.findByBusinessId("no-business" as never)).resolves.toBeNull();
+      expect(context.moneyRepository).not.toBe(resolveDefaultMoneyRepository());
+      await expect(context.moneyRepository.listYears("no-business" as never)).resolves.toEqual([]);
+      expect(context.invoiceCodingRepository).not.toBe(resolveInvoiceCodingRepository(resolveDefaultInvoiceRepository()));
+      await expect(context.invoiceCodingRepository.list("no-business" as never, "no-invoice" as never)).resolves.toEqual([]);
+      await expect(context.headingRepository.listByBusinessId("no-business" as never)).resolves.toEqual([]);
       expect(context.storage).toBe(resolveDefaultStorage());
 
       await context.close();

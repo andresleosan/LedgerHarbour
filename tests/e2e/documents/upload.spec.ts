@@ -1,6 +1,7 @@
 import { expect, test } from "../fixtures";
 import { createApprovedBusiness } from "../helpers/business";
 import { browserApiRequest } from "../helpers/browser-api";
+import { relayFetches } from "./relay-fetch";
 
 test.describe.configure({ mode: "serial" });
 
@@ -29,6 +30,11 @@ const validPdf = {
   mimeType: "application/pdf",
   buffer: Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\nstartxref\n0\n%%EOF\n"),
 };
+const validPng = {
+  name: "receipt.png",
+  mimeType: "image/png",
+  buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64"),
+};
 const validProgressiveJpeg = {
   name: "invoice.jpeg",
   mimeType: "image/jpeg",
@@ -38,15 +44,20 @@ const validProgressiveJpeg = {
   ),
 };
 
+
+// The dev server compiles the OCR route on first use, which can exceed the default expect timeout.
+const ocrCompile = { timeout: 60_000 };
+const filesInput = (page: import("@playwright/test").Page) => page.locator('input[type="file"][multiple]');
+const queueRow = (page: import("@playwright/test").Page, name: string) => page.getByRole("listitem").filter({ hasText: name });
+
 test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks another business", async ({ browserWithDiagnostics: browser }) => {
   const ownerContext = await browser.newContext();
   const owner = await ownerContext.newPage();
   await signIn(owner, "documents-owner@example.com");
   const businessId = await createApprovedBusiness(browser, owner, "E2E Document Harbour");
   await owner.goto(`/business/${businessId}/upload`);
-  await owner.locator('input[type="file"]').setInputFiles(validPdf);
-  await owner.getByRole("button", { name: "Upload document" }).click();
-  await expect(owner.getByRole("status")).toContainText("uploaded");
+  await filesInput(owner).setInputFiles(validPdf);
+  await expect(queueRow(owner, "invoice.pdf").getByRole("status")).toContainText("Ready for review", ocrCompile);
   const downloadLink = owner.getByRole("link", { name: "Download invoice.pdf" });
   await expect(downloadLink).toBeVisible();
   const downloadHref = await downloadLink.getAttribute("href");
@@ -60,7 +71,7 @@ test("uploads a real invoice fixture, shows uploaded, downloads it, and blocks a
   const other = await otherContext.newPage();
   await signIn(other, "documents-other@example.com");
   const otherBusinessId = await createApprovedBusiness(browser, other, "E2E Other Document Harbour");
-  const documentId = (await owner.getByRole("link", { name: "Download invoice.pdf" }).getAttribute("href"))?.match(/documents\/([^/]+)\/download/)?.[1];
+  const documentId = downloadHref?.match(/documents\/([^/]+)\/download/)?.[1];
   expect(documentId).toBeTruthy();
   const forbidden = await browserApiRequest(other, `/api/documents/${documentId}/download`);
   expect(forbidden.status).toBe(403);
@@ -75,6 +86,8 @@ test("shows invalid and oversized validation errors, including Spanish copy", as
   const businessId = await createApprovedBusiness(browser, page, "E2E Validation Harbour");
   await page.goto(`/business/${businessId}/upload`);
   await page.getByRole("link", { name: "Español" }).click();
+  await expect(page.getByRole("button", { name: "Hacer foto" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Elegir archivos" })).toBeVisible();
   const invalidResponse = await browserApiRequest(page, `/api/businesses/${businessId}/documents`, {
     method: "POST",
     multipart: { file: { name: "bad.txt", mimeType: "text/plain", buffer: Buffer.from("not a document") } },
@@ -82,28 +95,29 @@ test("shows invalid and oversized validation errors, including Spanish copy", as
   expect(invalidResponse.status).toBe(400);
   expect(JSON.parse(invalidResponse.body)).toMatchObject({ error: { code: "UNSUPPORTED_DOCUMENT_FORMAT" } });
   await stubUploadResponse(page, 400, "UNSUPPORTED_DOCUMENT_FORMAT");
-  await page.locator('input[type="file"]').setInputFiles({ name: "bad.txt", mimeType: "text/plain", buffer: Buffer.from("not a document") });
-  await page.getByRole("button", { name: "Subir documento" }).click();
-  await expect(page.locator("p[role='alert']")).toContainText("formato");
+  await filesInput(page).setInputFiles({ name: "bad.txt", mimeType: "text/plain", buffer: Buffer.from("not a document") });
+  await expect(queueRow(page, "bad.txt").getByRole("status")).toContainText("formato");
   const oversizedResponse = await browserApiRequest(page, `/api/businesses/${businessId}/documents`, {
     method: "POST",
     multipart: { file: { name: "large.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(10 * 1024 * 1024 + 1, 0x20) } },
   });
   expect(oversizedResponse.status).toBe(413);
   expect(JSON.parse(oversizedResponse.body)).toMatchObject({ error: { code: "DOCUMENT_TOO_LARGE" } });
-  await stubUploadResponse(page, 413, "DOCUMENT_TOO_LARGE");
-  await page.locator('input[type="file"]').setInputFiles({ name: "large.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(10 * 1024 * 1024 + 1, 0x20) });
-  await page.getByRole("button", { name: "Subir documento" }).click();
-  await expect(page.locator("p[role='alert']")).toContainText("10 MiB");
+  let oversizedSent = false;
+  page.on("request", (request) => { if (request.method() === "POST" && request.url().endsWith("/documents")) oversizedSent = true; });
+  await filesInput(page).setInputFiles({ name: "large.pdf", mimeType: "application/pdf", buffer: Buffer.alloc(10 * 1024 * 1024 + 1, 0x20) });
+  await expect(queueRow(page, "large.pdf").getByRole("status")).toContainText("10 MiB");
+  await expect(queueRow(page, "bad.txt").getByRole("status")).toContainText("formato");
+  expect(oversizedSent).toBe(false);
 });
 
 test("uploads and downloads a real progressive JPEG fixture", async ({ page, browserWithDiagnostics: browser }) => {
   await signIn(page, "documents-jpeg@example.com");
   const businessId = await createApprovedBusiness(browser, page, "E2E JPEG Harbour");
   await page.goto(`/business/${businessId}/upload`);
-  await page.locator('input[type="file"]').setInputFiles(validProgressiveJpeg);
-  await page.getByRole("button", { name: "Upload document" }).click();
-  await expect(page.getByRole("status")).toContainText("uploaded");
+  await filesInput(page).setInputFiles(validProgressiveJpeg);
+  await expect(queueRow(page, "invoice.jpeg").getByRole("status")).toContainText("Ready for review", ocrCompile);
+  await expect(queueRow(page, "invoice.jpeg").locator("img")).toHaveAttribute("src", /^blob:/);
   const link = page.getByRole("link", { name: "Download invoice.jpeg" });
   await expect(link).toBeVisible();
   const jpegHref = await link.getAttribute("href");
@@ -121,6 +135,57 @@ test("uploads and downloads a real progressive JPEG fixture", async ({ page, bro
   expect(response.length).toBe(validProgressiveJpeg.buffer.length);
 });
 
+for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 }]) {
+  test(`uploads and reads several files in one selection at ${viewport.width}px`, async ({ page, browserWithDiagnostics: browser }) => {
+    await page.setViewportSize(viewport);
+    await signIn(page, `documents-batch-${viewport.width}@example.com`);
+    const businessId = await createApprovedBusiness(browser, page, `E2E Batch Harbour ${viewport.width}`);
+    await page.goto(`/business/${businessId}/upload`);
+
+    const camera = page.locator('input[type="file"][capture="environment"]');
+    await expect(camera).toHaveCount(1);
+    await expect(camera).toHaveAttribute("accept", "image/*");
+    await expect(page.getByRole("button", { name: "Take photo" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Choose files" })).toBeVisible();
+
+    const processed: string[] = [];
+    page.on("response", (response) => { if (response.url().endsWith("/process") && response.status() === 202) processed.push(response.url()); });
+    await filesInput(page).setInputFiles([validPdf, validPng]);
+    await expect(page.getByRole("list", { name: "Selected documents" }).getByRole("listitem")).toHaveCount(2);
+    for (const name of ["invoice.pdf", "receipt.png"]) {
+      const row = queueRow(page, name);
+      await expect(row.getByRole("status")).toContainText("Ready for review", ocrCompile);
+      await expect(row.getByRole("link", { name: "Review invoices" })).toHaveAttribute("href", new RegExp(`^/business/${businessId}/invoices/[^/?]+\\?locale=en$`));
+    }
+    expect(processed).toHaveLength(2);
+    await expect(queueRow(page, "invoice.pdf").getByText("PDF", { exact: true })).toBeVisible();
+    await expect(queueRow(page, "receipt.png").locator("img")).toHaveAttribute("src", /^blob:/);
+
+    if (viewport.width === 390) {
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(
+        await page.evaluate(() => document.documentElement.clientWidth),
+      );
+    }
+  });
+}
+
+test("shows a duplicate file error while the other file in the selection succeeds", async ({ page, browserWithDiagnostics: browser }) => {
+  await signIn(page, "documents-duplicate@example.com");
+  const businessId = await createApprovedBusiness(browser, page, "E2E Duplicate Harbour");
+  // The real duplicate answers 409, which Chromium would log as a console error: relay the uploads past the gate.
+  const relayed = await relayFetches(page, /^\/api\/businesses\/[^/]+\/documents$/);
+  await page.goto(`/business/${businessId}/upload`);
+  await filesInput(page).setInputFiles(validPdf);
+  await expect(queueRow(page, "invoice.pdf").getByRole("status")).toContainText("Ready for review", ocrCompile);
+
+  await filesInput(page).setInputFiles([{ ...validPdf, name: "invoice-again.pdf" }, validPng]);
+  await expect(queueRow(page, "invoice-again.pdf").getByRole("status")).toContainText("This document has already been uploaded.");
+  expect(relayed.slice(0, 2).map(({ status }) => status)).toEqual([201, 409]);
+  await expect(queueRow(page, "receipt.png").getByRole("status")).toContainText("Ready for review", ocrCompile);
+  await expect(queueRow(page, "invoice.pdf").getByRole("status")).toContainText("Ready for review", ocrCompile);
+  await expect(page.getByRole("list", { name: "Selected documents" }).getByRole("listitem")).toHaveCount(3);
+});
+
 test("keeps upload usable on mobile with keyboard focus and reduced motion", async ({ page, browserWithDiagnostics: browser }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await signIn(page, "documents-accessibility@example.com");
@@ -131,36 +196,33 @@ test("keeps upload usable on mobile with keyboard focus and reduced motion", asy
     "scrollWidth",
     await page.evaluate(() => document.documentElement.clientWidth),
   );
-  const fileInput = page.locator('input[type="file"]');
-  const uploadButton = page.getByRole("button", { name: "Upload document" });
-   const shellEnglish = page.getByRole("link", { name: "English" });
-   const shellSpanish = page.getByRole("link", { name: "Español" });
-   await shellEnglish.focus();
-   await expect(shellEnglish).toBeFocused();
-   await expect(shellEnglish).toHaveCSS("outline-style", "solid");
-   await shellSpanish.focus();
-   await expect(shellSpanish).toBeFocused();
-   await page.getByRole("link", { name: /LedgerHarbour/ }).first().focus();
-   await expect(page.getByRole("link", { name: /LedgerHarbour/ }).first()).toBeFocused();
-   await fileInput.focus();
-  await expect(fileInput).toBeFocused();
-  await expect(fileInput).toHaveCSS("outline-style", "solid");
-  await expect(fileInput).toHaveCSS("outline-width", "3px");
-  await fileInput.setInputFiles(validPdf);
+  const cameraButton = page.getByRole("button", { name: "Take photo" });
+  const filesButton = page.getByRole("button", { name: "Choose files" });
+  const shellEnglish = page.getByRole("link", { name: "English" });
+  await shellEnglish.focus();
+  await expect(shellEnglish).toBeFocused();
+  await expect(shellEnglish).toHaveCSS("outline-style", "solid");
+  await cameraButton.focus();
+  await expect(cameraButton).toBeFocused();
+  await expect(cameraButton).toHaveCSS("outline-style", "solid");
+  await expect(cameraButton).toHaveCSS("outline-width", "3px");
   await page.keyboard.press("Tab");
-  await expect(uploadButton).toBeFocused();
-  await expect(uploadButton).toHaveCSS("outline-style", "solid");
-  await expect(uploadButton).toHaveCSS("outline-width", "3px");
-  await page.keyboard.press("Shift+Tab");
-  await expect(fileInput).toBeFocused();
-  await page.keyboard.press("Tab");
+  await expect(filesButton).toBeFocused();
+  await expect(filesButton).toHaveCSS("outline-style", "solid");
+  for (const button of [cameraButton, filesButton]) {
+    expect((await button.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+  }
+  const chooser = page.waitForEvent("filechooser");
   await page.keyboard.press("Space");
-  await expect(page.getByRole("status")).toContainText("uploaded");
+  const fileChooser = await chooser;
+  expect(fileChooser.isMultiple()).toBe(true);
+  await fileChooser.setFiles(validPdf);
+  await expect(queueRow(page, "invoice.pdf").getByRole("status")).toContainText("Ready for review", ocrCompile);
 
   await page.emulateMedia({ reducedMotion: "no-preference" });
-  const normalDuration = await uploadButton.evaluate((element) => parseFloat(getComputedStyle(element).transitionDuration));
+  const normalDuration = await filesButton.evaluate((element) => parseFloat(getComputedStyle(element).transitionDuration));
   await page.emulateMedia({ reducedMotion: "reduce" });
-  const reducedDuration = await uploadButton.evaluate((element) => parseFloat(getComputedStyle(element).transitionDuration));
+  const reducedDuration = await filesButton.evaluate((element) => parseFloat(getComputedStyle(element).transitionDuration));
   expect(normalDuration).toBeGreaterThan(0.1);
   expect(reducedDuration).toBeLessThan(0.1);
   const styles = (await page.locator("style").allTextContents()).join("\n");

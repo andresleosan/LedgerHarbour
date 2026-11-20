@@ -1,0 +1,34 @@
+{
+  "id": "LH-036",
+  "titulo": "Mismo comportamiento en memoria y en PostgreSQL",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Un error propio lanzado dentro de una transacción de dinero llega igual en memoria y en PostgreSQL, con prueba en PGlite.",
+    "Dos cambios simultáneos de fechas de ejercicio no pueden dejar ejercicios solapados.",
+    "Los eventos de auditoría nuevos guardan un tipo de entidad propio.",
+    "La prueba de esquema nativo no depende del orden de colación y los documentos nombran las migraciones 0008 a 0012."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/accounting/postgres-money-repository.ts",
+    "src/modules/accounting/money-service.ts",
+    "src/modules/tenancy/postgres-tenancy-repository.ts",
+    "tests/integration/postgres/**",
+    "docs/**"
+  ],
+  "hecho": "Un error propio dentro de una transacción llega igual en memoria y en PostgreSQL (dinero, rótulos, plantilla, monedas); se quitaron los dos rodeos anteriores. Crear o cambiar un ejercicio toma un bloqueo por negocio. Cada acción de auditoría tiene tipo de entidad propio. La prueba de esquema nativo no depende del orden y los documentos nombran las migraciones 0008 a 0012.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "Creada el 2026-11-20 al repasar MEJORAS: LH-023 y LH-021 tuvieron que rodear esa diferencia cada uno por su cuenta.",
+    "Commit a8676d6. money-repository (PGlite) 25, audit-entity-types 19, money-service 42; pasadas.",
+    "No demostrado: la concurrencia real del bloqueo de ejercicios. PGlite ejecuta una transacción a la vez y la prueba pasa también sin el bloqueo; la evidencia es que el bloqueo se toma (pg_locks) y en qué orden.",
+    "Sin cambiar, solo informado: los repositorios de facturas, documentos, trabajos y tenencia siguen convirtiendo errores ajenos en un conflicto genérico.",
+    "Las filas de auditoría ya escritas conservan el tipo antiguo: no hay migración.",
+    "Verificación de lote 6 sobre f413c66: lint 0, tsc 0, build 0; vitest --no-file-parallelism 1247 pasadas y 7 omitidas (118 archivos); e2e por carpetas: documentos 10, facturas 7, ajustes y movimientos 4, ejercicio 2, critical-path y navegación 2. Las dos de ejercicio fallaron en una pasada conjunta (una con «Page crashed») y pasaron al repetirlas solas."
+  ],
+  "actualizado": "2026-11-20"
+}

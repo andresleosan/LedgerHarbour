@@ -106,6 +106,25 @@ describe("authenticated endpoint rate limit", () => {
     await expect(unavailable?.json()).resolves.toEqual({ error: { code: "RATE_LIMIT_UNAVAILABLE", message: "Platform protection is temporarily unavailable." } });
   });
 
+  it("uses the verified Pages address and ignores public forwarding headers", async () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("LEDGERHARBOUR_TRUSTED_PROXY", "cloudflare-pages");
+    try {
+      const headers = new Headers({
+        "x-ledgerharbour-client-ip": "192.0.2.30",
+        "x-vercel-forwarded-for": "203.0.113.30",
+        "x-forwarded-for": "198.51.100.30",
+      });
+      await enforceAuthenticatedRateLimit("upload", "firebase-user-3", headers);
+      expect(aggregateLimit).toHaveBeenLastCalledWith("authenticated:upload:address:192.0.2.30");
+      headers.delete("x-ledgerharbour-client-ip");
+      await enforceAuthenticatedRateLimit("upload", "firebase-user-3", headers);
+      expect(aggregateLimit).toHaveBeenLastCalledWith("authenticated:upload:address:edge-unknown");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it("uses edge-unknown in production instead of client-controlled fallback headers", async () => {
     vi.stubEnv("NODE_ENV", "production");
 

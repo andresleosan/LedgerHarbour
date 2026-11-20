@@ -1,0 +1,38 @@
+{
+  "id": "LH-013",
+  "titulo": "Lector de la plantilla del contable y plantilla sintética de pruebas",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Un generador de pruebas crea una plantilla .xlsx sintética con la misma forma: hojas de cuenta, fila de rótulos, columnas de análisis con fórmula, fila de totales y balance de comprobación.",
+    "El lector devuelve las hojas de cuenta, los rótulos en orden con su grupo y su tipo, y las filas útiles de cada hoja.",
+    "Informa de los defectos que falsean el resultado: rótulo vacío, espacios finales, rótulos numéricos, referencias rotas y columnas de fórmula truncadas.",
+    "Si se añade una dependencia para leer hojas de cálculo, pasa `pnpm audit --audit-level high`.",
+    "Pruebas unitarias sobre la sintética; contrastado a mano con la plantilla real privada sin copiar nada de ella al repositorio."
+  ],
+  "depende": [
+    "LH-012"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/workbook/**",
+    "tests/unit/workbook/**",
+    "tests/fixtures/workbook/**",
+    "package.json",
+    "pnpm-lock.yaml"
+  ],
+  "hecho": "Lector de la plantilla (src/modules/workbook): devuelve hojas de cuenta, rótulos con grupo y tipo, filas útiles y defectos. Generador de plantilla sintética en tests/fixtures/workbook. Antes de cargar el archivo, una compuerta descomprime cada parte con tope real y rechaza lo que no puede interpretar.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "Commits 4722020, a749002, 43375e3, 97aa244, ea1fcfd.",
+    "Dependencia: exceljs 4.4.0, versión exacta. Motivo: lee fórmulas compartidas, tipos y formatos y escribe la sintética. pnpm audit --audit-level high: salida 0 (2 bajas y 4 moderadas, las mismas de antes, ninguna de exceljs).",
+    "corepack pnpm exec vitest run tests/unit/workbook → 52 pasadas en 5 archivos.",
+    "Contraste a mano con la plantilla real privada, fuera del repositorio: coincide con todo lo esperado del análisis de partida y encuentra una referencia rota más en otra hoja. Nada de ella está en el repositorio (grep sin coincidencias).",
+    "Cuatro avisos de la revisión de seguridad atendidos: rangos sin expandir, límites validados, tamaño real al descomprimir, y lectura estricta de atributos que falla en cerrado.",
+    "Riesgo abierto: exceljs carga el libro entero, unas 20 veces el XML descomprimido (cerca de 1 GB con el libro real). Topes bajados a 64 MiB en total y 32 MiB por parte. Solución de fondo en LH-032.",
+    "Verificación de lote 2: lint 0, tsc 0, vitest --no-file-parallelism 793 pasadas y 7 omitidas (87 archivos), build 0; e2e documentos, facturas y navegación 13 pasadas, critical-path pasada en la repetición (la primera vez agotó 15 s creando el negocio con el servidor en frío). Tras ea1fcfd: tests/unit/workbook y template-service 65 pasadas, lint 0, tsc 0."
+  ],
+  "actualizado": "2026-11-19"
+}

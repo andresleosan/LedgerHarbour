@@ -1,3 +1,4 @@
+import { buildSyntheticTemplate } from "../../fixtures/workbook/synthetic-template";
 import { expect, test } from "../fixtures";
 import { createApprovedBusiness } from "../helpers/business";
 import { browserApiRequest } from "../helpers/browser-api";
@@ -40,6 +41,26 @@ test.describe("invoice review workspace", () => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(page.locator("main.invoice-list-page")).toBeVisible();
+  });
+
+  test("a load error on the review follows a later language change", async ({ page }) => {
+    await signIn(page);
+    // Answered inside the page, so the expected 404 is not a browser network error.
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+        if (url.includes("/api/invoices/missing-invoice/review")) return new Response(JSON.stringify({ error: { code: "INVOICE_NOT_FOUND" } }), { status: 404, headers: { "Content-Type": "application/json" } });
+        if (url.includes("/api/businesses/demo-business/")) return new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+        return originalFetch(input, init);
+      };
+    });
+    await page.goto("/business/demo-business/invoices/missing-invoice?locale=en");
+    const loadError = page.locator("main .page-error");
+    await expect(loadError).toHaveText("This invoice is no longer available.");
+    await page.getByRole("link", { name: "Español" }).first().click();
+    await expect(page).toHaveURL(/locale=es/);
+    await expect(loadError).toHaveText("Esta factura ya no está disponible.");
   });
 
   test("settings routes expose category and currency controls", async ({ page }) => {
@@ -106,58 +127,51 @@ test.describe("invoice review workspace", () => {
     await expect(currencyItem).toContainText(/inactive|inactiva/i);
   });
 
-  test("review supports low-confidence correction, save, approval, and approved immutability", async ({ page }) => {
-    await signIn(page);
-    const invoice = {
-      id: "demo-invoice",
-      reviewState: "needs_review",
-      supplier: "Harbour Supplier",
-      invoiceNumber: "INV-42",
-      invoiceDate: "2026-08-11",
-      dueDate: null,
-      subtotal: "100.00",
-      taxAmount: "20.00",
-      total: "120.00",
-      currencyReference: "GBP",
-      expenseCategoryReference: null,
-      notes: "",
-      confidenceData: { supplier: .6, invoiceNumber: 1, invoiceDate: 1, dueDate: 1, subtotal: 1, taxAmount: 1, total: 1, currencyReference: 1, expenseCategoryReference: 1, notes: 1 },
-    };
-    await page.addInitScript(({ invoice }) => {
-      let corrected = false;
-      const originalFetch = window.fetch.bind(window);
-      window.fetch = async (input, init) => {
-        const requestUrl = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
-        if (!requestUrl.endsWith("/api/invoices/demo-invoice/review")) return originalFetch(input, init);
-        const body = init?.body ? JSON.parse(String(init.body)) as { action?: string; notes?: string; supplier?: string } : {};
-        if (!init?.method || init.method === "GET") {
-          return new Response(JSON.stringify({ invoice, document: { originalFileName: "invoice.pdf", originalMimeType: "application/pdf" }, documentDownloadUrl: "/download" }), { headers: { "Content-Type": "application/json" } });
-        }
-        if (body.action === "approve" && corrected) {
-          return new Response(JSON.stringify({ invoice: { ...invoice, reviewState: "approved" }, document: { originalFileName: "invoice.pdf", originalMimeType: "application/pdf" }, documentDownloadUrl: "/download" }), { headers: { "Content-Type": "application/json" } });
-        }
-        if (body.action === "approve") {
-          return new Response(JSON.stringify({ error: { code: "INVOICE_INVALID_FOR_APPROVAL" } }), { status: 400, headers: { "Content-Type": "application/json" } });
-        }
-        if (body.supplier === "Corrected Supplier") {
-          corrected = true;
-          invoice.confidenceData.supplier = 1;
-        }
-        return new Response(JSON.stringify({ invoice: { ...invoice, notes: body.notes ?? "" }, document: { originalFileName: "invoice.pdf", originalMimeType: "application/pdf" }, documentDownloadUrl: "/download" }), { headers: { "Content-Type": "application/json" } });
-      };
-    }, { invoice });
+  test("review saves and approves through the real review API without errors", async ({ page, browserWithDiagnostics: browser }) => {
+    const suffix = Date.now().toString();
+    await page.goto("/login");
+    await page.getByLabel("Work email").fill(`review-${suffix}@example.com`);
+    await page.getByRole("button", { name: "Continue with email" }).click();
+    await expect(page.getByRole("status")).toContainText("Signed in as");
+    const businessId = await createApprovedBusiness(browser, page, `Review Books ${suffix}`);
+    // Approval needs a code from the business's chart of accounts, which comes from its template.
+    const template = await browserApiRequest(page, `/api/businesses/${businessId}/template`, {
+      method: "POST",
+      multipart: { file: { name: "accounts.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: await buildSyntheticTemplate() } },
+    });
+    expect(template.status).toBeLessThan(300);
 
-    await page.goto("/business/demo-business/invoices/demo-invoice");
-    await expect(page.getByText(/low confidence/i)).toBeVisible();
-    page.on("dialog", (dialog) => dialog.accept());
-    await page.getByRole("button", { name: /approve invoice|aprobar factura/i }).click();
-    await expect(page.locator(".page-error")).toContainText(/complete required fields|completa los campos/i);
-    await page.getByLabel(/supplier|proveedor/i).fill("Corrected Supplier");
+    await page.goto(`/business/${businessId}/upload?locale=en`);
+    await page.locator('input[type="file"][multiple]').setInputFiles({
+      name: "review-invoice.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\nstartxref\n0\n%%EOF\n"),
+    });
+    await expect(page.getByRole("listitem").filter({ hasText: "review-invoice.pdf" }).getByRole("status")).toContainText("Ready for review");
+    await page.getByRole("link", { name: "Review invoices" }).click();
+    await expect(page).toHaveURL(new RegExp(`/business/${businessId}/invoices/[^/?]+\\?locale=en$`));
+    await expect(page.getByRole("heading", { name: "Extracted fields" })).toBeVisible();
+    await expect(page.getByText(/low confidence/i).first()).toBeVisible();
+
+    await page.getByLabel(/supplier/i).fill("Corrected Supplier");
+    await page.getByLabel(/invoice number/i).fill("REVIEW-001");
     await page.getByLabel(/notes/i).fill("Checked by finance");
-    await page.getByRole("button", { name: /save correction|guardar corrección/i }).click();
-    await expect(page.getByRole("status")).toContainText(/saved|guardada/i);
-    await page.getByRole("button", { name: /approve invoice|aprobar factura/i }).click();
-    await expect(page.getByRole("status")).toContainText(/approved|aprobada/i);
+    await page.getByLabel("Code", { exact: true }).selectOption({ label: "Premises" });
+    await page.getByRole("button", { name: "Save correction" }).click();
+    await expect(page.getByRole("status")).toContainText("Correction saved.");
+    await expect(page.locator(".page-error")).toHaveCount(0);
+    await expect(page.getByLabel(/supplier/i)).toHaveValue("Corrected Supplier");
+
+    await page.getByRole("button", { name: "Approve invoice" }).click();
+    await page.getByLabel("Not paid yet").check();
+    await page.getByRole("button", { name: "Approve", exact: true }).click();
+    await expect(page.getByRole("status")).toContainText("Invoice approved.");
+    await expect(page.locator(".page-error")).toHaveCount(0);
+    await expect(page.getByLabel(/notes/i)).toBeDisabled();
+    await expect(page.getByRole("button", { name: "Approve invoice" })).toBeDisabled();
+
+    await page.reload();
+    await expect(page.getByLabel(/notes/i)).toHaveValue("Checked by finance");
     await expect(page.getByLabel(/notes/i)).toBeDisabled();
   });
 });

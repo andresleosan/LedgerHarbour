@@ -1,0 +1,30 @@
+{
+  "id": "LH-034",
+  "titulo": "Pantalla de ajustes: cuentas de dinero y ejercicio",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "En Ajustes, el dueño crea el ejercicio (por defecto el año natural), cambia sus fechas mientras no tenga movimientos y lo cierra o reabre.",
+    "Crea cuentas de banco y caja eligiendo la hoja de la plantilla de una lista, las renombra, las desactiva y pone el saldo inicial del ejercicio abierto.",
+    "Si falta la plantilla o el ejercicio, la pantalla dice qué hacer primero.",
+    "Inglés y español; comprobado a 390 px y 1280 px sin errores de consola."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/app/(app)/business/[businessId]/settings/**",
+    "tests/e2e/settings/**",
+    "src/i18n/messages/**"
+  ],
+  "hecho": "Ajustes > cuentas de dinero y ejercicio: crear el ejercicio (por defecto el año natural), cambiar fechas, cerrar y reabrir; crear cuentas de banco y caja eligiendo la hoja de la plantilla, renombrar, desactivar y poner el saldo inicial. Dice qué falta si no hay plantilla o ejercicio. Inglés y español.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "Commit 355aa98.",
+    "e2e settings/accounts.spec.ts pasada con API real a 390 px y 1280 px.",
+    "No comprobado: el mensaje de «el ejercicio tiene movimientos» ni el modo de solo lectura tras un 403.",
+    "Verificación de lote 4 sobre 527f16b: lint 0, tsc 0, vitest --no-file-parallelism 1091 pasadas y 7 omitidas (107 archivos), build 0; e2e 16 pasadas en la pasada larga y las 3 restantes (movements, settings/accounts, settings/workbook) pasadas al repetirlas solas: en la larga fallaron con la máquina saturada y un «Page crashed» de Chromium. Servidor de pruebas en modo sondeo porque la máquina está sin vigilantes de archivos."
+  ],
+  "actualizado": "2026-11-20"
+}

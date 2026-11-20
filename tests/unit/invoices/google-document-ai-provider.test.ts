@@ -72,7 +72,7 @@ describe("Google Document AI invoice provider", () => {
         subtotal: 0.86,
         taxAmount: 0.84,
         total: 0.93,
-        currencyReference: 0.99,
+        currencyReference: 0.86,
         expenseCategoryReference: 0,
         notes: 0,
       },
@@ -194,6 +194,69 @@ describe("Google Document AI invoice provider", () => {
 
     expect(result.fields.taxAmount).toBe("20.10");
     expect(result.fields.total).toBe("120.60");
+  });
+
+  it("prefers normalized values over printed mention text", async () => {
+    const client: GoogleDocumentAiClient = {
+      processDocument: async () => ({
+        entities: [
+          {
+            type: "invoice_date",
+            mentionText: "16/08/2026",
+            normalizedValue: { dateValue: { year: 2026, month: 8, day: 16 } },
+            confidence: 0.91,
+          },
+          {
+            type: "total_amount",
+            mentionText: "£1,234.56",
+            normalizedValue: { moneyValue: { units: "1234", nanos: 560000000, currencyCode: "GBP" } },
+            confidence: 0.93,
+          },
+          { type: "currency", mentionText: "£", confidence: 0.7 },
+        ],
+      }),
+    };
+
+    const result = await new GoogleDocumentAiInvoiceProvider({ client, processorName: "processor" }).extract(input);
+
+    expect(result.fields).toMatchObject({ invoiceDate: "2026-08-16", total: "1234.56", currencyReference: "GBP" });
+    expect(result.confidence.currencyReference).toBe(0.93);
+  });
+
+  it("falls back to printed mention text when there is no normalized value", async () => {
+    const client: GoogleDocumentAiClient = {
+      processDocument: async () => ({
+        entities: [
+          { type: "due_date", mentionText: "30/09/2026", confidence: 0.9 },
+          { type: "total_amount", mentionText: "£120.60", confidence: 0.93 },
+          { type: "currency", mentionText: "£", confidence: 0.88 },
+        ],
+      }),
+    };
+
+    const result = await new GoogleDocumentAiInvoiceProvider({ client, processorName: "processor" }).extract(input);
+
+    expect(result.fields).toMatchObject({ dueDate: "30/09/2026", total: "£120.60", currencyReference: "£" });
+    expect(result.confidence.currencyReference).toBe(0.88);
+  });
+
+  it("reads normalized money whose zero nanos were omitted", async () => {
+    const client: GoogleDocumentAiClient = {
+      processDocument: async () => ({
+        entities: [
+          {
+            type: "net_amount",
+            mentionText: "£100",
+            normalizedValue: { moneyValue: { units: "100", currencyCode: "GBP" } },
+            confidence: 0.86,
+          },
+        ],
+      }),
+    };
+
+    const result = await new GoogleDocumentAiInvoiceProvider({ client, processorName: "processor" }).extract(input);
+
+    expect(result.fields.subtotal).toBe("100.00");
   });
 
   it("translates transient provider failures without exposing provider details", async () => {

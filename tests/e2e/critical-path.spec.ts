@@ -1,3 +1,4 @@
+import { buildSyntheticTemplate } from "../fixtures/workbook/synthetic-template";
 import { expect, test } from "./fixtures";
 import { createApprovedBusiness } from "./helpers/business";
 import { browserApiRequest } from "./helpers/browser-api";
@@ -24,28 +25,27 @@ test("verifies the local MVP critical path and cross-tenant access block", async
   await expect(owner.getByText("0", { exact: true }).first()).toBeVisible();
 
   await owner.goto(`/business/${businessId}/upload`);
-  await owner.locator('input[type="file"]').setInputFiles({
+  const processResponsePromise = owner.waitForResponse((response) => response.url().endsWith("/process") && response.request().method() === "POST");
+  await owner.locator('input[type="file"][multiple]').setInputFiles({
     name: "task11-invoice.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("%PDF-1.7\n1 0 obj\n<<>>\nendobj\nstartxref\n0\n%%EOF\n"),
   });
-  await owner.getByRole("button", { name: "Upload document" }).click();
-  await expect(owner.getByRole("status")).toContainText("uploaded");
   const download = owner.getByRole("link", { name: "Download task11-invoice.pdf" });
+  await expect(download).toBeVisible();
   const downloadHref = await download.getAttribute("href");
   expect(downloadHref).toMatch(/\/api\/documents\/.+\/download/);
 
   const documentId = downloadHref?.match(/documents\/([^/]+)\/download/)?.[1];
   expect(documentId).toBeTruthy();
 
-  const processResponsePromise = owner.waitForResponse((response) => response.url().endsWith(`/api/documents/${documentId}/process`) && response.request().method() === "POST");
-  await owner.getByRole("button", { name: "Process with OCR" }).click();
   const processResponse = await processResponsePromise;
+  expect(processResponse.url()).toContain(`/api/documents/${documentId}/process`);
   expect(processResponse.status()).toBe(202);
   await expect(processResponse.json()).resolves.toMatchObject({ job: { documentId, status: "completed" } });
-  await expect(owner).toHaveURL(`/business/${businessId}/invoices?locale=en`);
-
-  const reviewLink = owner.getByRole("link", { name: "Open review" });
+  await expect(owner.getByRole("listitem").filter({ hasText: "task11-invoice.pdf" }).getByRole("status")).toContainText("Ready for review");
+  // The success link opens the review of the invoice just read.
+  const reviewLink = owner.getByRole("link", { name: "Review invoices" });
   await expect(reviewLink).toHaveCount(1);
   const reviewHref = await reviewLink.getAttribute("href");
   expect(reviewHref).toMatch(new RegExp(`/business/${businessId}/invoices/[^?]+\\?locale=en`));
@@ -68,14 +68,23 @@ test("verifies the local MVP critical path and cross-tenant access block", async
   await owner.getByLabel(/proveedor/i).fill("Corrected Supplier");
   await owner.getByLabel(/número de factura/i).fill("TASK-11-001");
   await owner.getByLabel(/notas/i).fill("Reviewed in Task 11");
-  const savedResponse = await owner.evaluate(async (id) => {
+  // Approval needs a code from the chart of accounts, which comes from the business's template.
+  const template = await browserApiRequest(owner, `/api/businesses/${businessId}/template`, {
+    method: "POST",
+    multipart: { file: { name: "accounts.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buffer: await buildSyntheticTemplate() } },
+  });
+  expect(template.status).toBeLessThan(300);
+  const headings = JSON.parse((await browserApiRequest(owner, `/api/businesses/${businessId}/headings`)).body) as Array<{ id: string; isActive: boolean; blockedReason: string | null }>;
+  const headingId = headings.find((heading) => heading.isActive && heading.blockedReason === null)?.id;
+  expect(headingId).toBeTruthy();
+  const savedResponse = await owner.evaluate(async ({ id, headingId }) => {
     const response = await fetch(`/api/invoices/${id}/review`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ supplier: "Corrected Supplier", invoiceNumber: "TASK-11-001", notes: "Reviewed in Task 11" }),
+      body: JSON.stringify({ supplier: "Corrected Supplier", invoiceNumber: "TASK-11-001", notes: "Reviewed in Task 11", coding: [{ headingId, amount: "120.00" }] }),
     });
     return { status: response.status, body: await response.json() };
-  }, invoiceId);
+  }, { id: invoiceId, headingId });
   expect(savedResponse.status).toBe(200);
   expect(savedResponse.body).toMatchObject({ supplier: "Corrected Supplier", invoiceNumber: "TASK-11-001", notes: "Reviewed in Task 11" });
 
@@ -83,7 +92,7 @@ test("verifies the local MVP critical path and cross-tenant access block", async
     const response = await fetch(`/api/invoices/${id}/review`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "approve" }),
+      body: JSON.stringify({ action: "approve", payment: { status: "unpaid" } }),
     });
     return { status: response.status, body: await response.json() };
   }, invoiceId);

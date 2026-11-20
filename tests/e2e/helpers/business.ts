@@ -14,7 +14,8 @@ export async function createApprovedBusiness(browser: DiagnosticBrowser, page: P
   await page.getByLabel("Business name").fill(name);
   await page.getByRole("button", { name: "Submit request" }).click();
   const status = page.getByRole("status");
-  await expect(status).toContainText(name);
+  // The first request of a run waits for the dev server to compile the route; 15 s is not enough on a loaded machine.
+  await expect(status).toContainText(name, { timeout: 90_000 });
   const businessId = (await status.textContent())?.match(/business-[\w-]+/)?.[0];
   expect(businessId).toBeTruthy();
 

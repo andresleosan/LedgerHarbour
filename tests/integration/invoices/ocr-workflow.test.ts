@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST as processRoute } from "../../../src/app/api/documents/[documentId]/process/route";
 import { GET as invoiceGetRoute, PATCH as invoicePatchRoute } from "../../../src/app/api/invoices/[invoiceId]/route";
@@ -18,6 +18,8 @@ import {
   resolveDefaultStorage,
   type InMemoryInvoiceRepository,
 } from "../../../src/modules/invoices/invoice-service";
+import { resolveInvoiceCodingRepository } from "../../../src/modules/invoices/invoice-coding-repository";
+import { MAX_REVIEW_PATCH_BYTES } from "../../../src/modules/invoices/review-validation";
 import { createOcrWorker } from "../../../src/modules/jobs/ocr-worker";
 import { resetRateLimitersForTests } from "../../../src/modules/security/rate-limit";
 import {
@@ -108,6 +110,7 @@ describe("OCR workflow boundaries", () => {
   async function correctLowConfidence(invoice: Awaited<ReturnType<InMemoryInvoiceRepository["findById"]>>) {
     if (!invoice) throw new Error("invoice fixture missing");
     await invoices.update({ ...invoice, confidenceData: { ...invoice.confidenceData, supplier: 1, invoiceNumber: 1 } });
+    await resolveInvoiceCodingRepository(invoices).replace(invoice.businessId, invoice.id, [{ headingId: "heading-purchases", amount: invoice.total! }], invoice.updatedAt);
   }
 
   it("queues, processes, links the invoice to the document, and routes low confidence to review", async () => {
@@ -352,7 +355,7 @@ describe("OCR workflow boundaries", () => {
     const invoice = (await invoices.listByBusinessId(ownerBusiness.id))[0];
     await correctLowConfidence(invoice);
 
-    const approved = await approveInvoice(invoice.id, user("member"), dependencies);
+    const approved = await approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" });
 
     expect(approved.reviewState).toBe("approved");
     await expect(documentRepository.getStatus(documentId)).resolves.toBe("approved");
@@ -370,7 +373,7 @@ describe("OCR workflow boundaries", () => {
     await worker.processOcrJob(job.id);
     const invoice = (await invoices.listByBusinessId(ownerBusiness.id))[0];
     await correctLowConfidence(invoice);
-    await approveInvoice(invoice.id, user("member"), dependencies);
+    await approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" });
     const before = await getInvoice(invoice.id, user("member"), dependencies);
 
     await expect(updateInvoice(invoice.id, user("member"), { notes: "tampered" }, dependencies)).rejects.toMatchObject({
@@ -401,7 +404,7 @@ describe("OCR workflow boundaries", () => {
     try {
       const staleUpdate = updateInvoice(invoice.id, user("member"), { notes: "stale overwrite" }, dependencies);
       await new Promise((resolve) => setTimeout(resolve, 0));
-      await approveInvoice(invoice.id, user("member"), dependencies);
+      await approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" });
       releaseStaleRead();
       await expect(staleUpdate).rejects.toMatchObject({ code: "INVOICE_REPOSITORY_CONFLICT" });
     } finally {
@@ -434,7 +437,7 @@ describe("OCR workflow boundaries", () => {
     };
 
     try {
-      const approval = approveInvoice(invoice.id, user("member"), dependencies);
+      const approval = approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" });
       await approvalReadStarted;
       await updateInvoice(invoice.id, user("member"), { total: null }, dependencies);
       releaseApprovalRead();
@@ -467,7 +470,7 @@ describe("OCR workflow boundaries", () => {
     };
 
     try {
-      await expect(approveInvoice(invoice.id, user("member"), dependencies)).rejects.toMatchObject({
+      await expect(approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" })).rejects.toMatchObject({
         code: "INVOICE_REPOSITORY_CONFLICT",
       });
     } finally {
@@ -489,7 +492,7 @@ describe("OCR workflow boundaries", () => {
     tenancy.appendAuditEvent = async () => { throw new Error("audit failure"); };
 
     try {
-      await expect(approveInvoice(invoice.id, user("member"), dependencies)).rejects.toThrow("audit failure");
+      await expect(approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" })).rejects.toThrow("audit failure");
     } finally {
       tenancy.appendAuditEvent = originalAppend;
     }
@@ -506,7 +509,7 @@ describe("OCR workflow boundaries", () => {
     const invoice = (await invoices.listByBusinessId(ownerBusiness.id))[0];
     await correctLowConfidence(invoice);
 
-    await expect(approveInvoice(invoice.id, user("member"), dependencies)).resolves.toMatchObject({ reviewState: "approved" });
+    await expect(approveInvoice(invoice.id, user("member"), dependencies, { status: "unpaid" })).resolves.toMatchObject({ reviewState: "approved" });
     expect(documentRepository).toBeDefined();
     expect(tenancy.auditEvents).toContainEqual(expect.objectContaining({ entityId: invoice.id, type: "invoice_approved" }));
   });
@@ -566,6 +569,37 @@ describe("OCR workflow boundaries", () => {
     });
     expect(invalidPatch.status).toBe(400);
     await expect(invalidPatch.json()).resolves.toMatchObject({ error: { code: "INVALID_INVOICE_UPDATE", message: expect.any(String) } });
+  });
+
+  it("bounds the plain invoice PATCH body and refuses an update with nothing to change", async () => {
+    const routeState = await setupDefaultRouteState("route-bounded-patch-document");
+    await setCurrentIdentity(identityFor("route-member"));
+    expect((await processRoute(new Request("http://localhost", { method: "POST", body: "{}" }), { params: Promise.resolve({ documentId: routeState.documentId }) })).status).toBe(202);
+    const defaultInvoices = globalRepository<InMemoryInvoiceRepository>("ledgerharbour.task8.inMemoryInvoiceRepository");
+    const invoice = (await defaultInvoices.listByBusinessId(routeState.businessId as typeof ownerBusiness.id))[0];
+    const params = { params: Promise.resolve({ invoiceId: invoice.id }) };
+    const invalid = { error: { code: "INVALID_INVOICE_UPDATE", message: "The invoice update is invalid." } };
+
+    const paymentOnly = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ payment: { status: "unpaid" } }) }), params);
+    expect(paymentOnly.status).toBe(400);
+    await expect(paymentOnly.json()).resolves.toEqual(invalid);
+
+    const approveWithField = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ action: "approve", payment: { status: "unpaid" }, supplier: "Ignored" }) }), params);
+    expect(approveWithField.status).toBe(400);
+    await expect(approveWithField.json()).resolves.toEqual(invalid);
+
+    const json = vi.fn(async () => { throw new Error("body should not be parsed"); });
+    const declaredTooLarge = { headers: new Headers({ "content-length": String(MAX_REVIEW_PATCH_BYTES + 1) }), body: null, json } as unknown as Request;
+    const declared = await invoicePatchRoute(declaredTooLarge, params);
+    expect(declared.status).toBe(400);
+    await expect(declared.json()).resolves.toEqual(invalid);
+    expect(json).not.toHaveBeenCalled();
+
+    const streamed = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ notes: "n".repeat(MAX_REVIEW_PATCH_BYTES) }) }), params);
+    expect(streamed.status).toBe(400);
+    await expect(streamed.json()).resolves.toEqual(invalid);
+
+    await expect(defaultInvoices.findById(invoice.id)).resolves.toEqual(invoice);
   });
 
   it("covers positive route contracts and exact 403, 404, 409, and 500 bodies", async () => {
@@ -654,7 +688,14 @@ describe("OCR workflow boundaries", () => {
     });
     expect(restoreRequiredField.status).toBe(200);
 
-    const approvePositive = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ action: "approve" }) }), {
+    const uncodedApproval = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ action: "approve" }) }), {
+      params: Promise.resolve({ invoiceId }),
+    });
+    expect(uncodedApproval.status).toBe(409);
+    await expect(uncodedApproval.json()).resolves.toMatchObject({ error: { code: "CODING_REQUIRED" } });
+    await resolveInvoiceCodingRepository(defaultInvoices).replace(routeState.businessId as typeof ownerBusiness.id, invoiceId, [{ headingId: "heading-purchases", amount: "120.00" }], new Date().toISOString());
+
+    const approvePositive = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ action: "approve", payment: { status: "unpaid" } }) }), {
       params: Promise.resolve({ invoiceId }),
     });
     expect(approvePositive.status).toBe(200);

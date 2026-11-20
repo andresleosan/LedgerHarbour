@@ -499,3 +499,7 @@ This file is the canonical source for development status. Specs and plans provid
 - Evidencia: `E:\SecurityAudit-2026-10-26\execution\round2-20261027\projects\next-ledger\validation.json`, `audits.json` e `integration.json`. Consultar los registros antes de considerar el trabajo verificado.
 - Aceptación: pruebas pertinentes sin regresiones nuevas; auditorías consultadas correctamente; cambios ajenos e índice Git preservados. Los fallos de línea base y límites externos se documentan, no se desactivan.
 - Reversión: snapshot protegido en el mismo directorio de auditoría; restaurar únicamente los archivos revisados y reinstalar el lockfile previo. No restaura ni modifica datos remotos.
+
+## Accounts-workbook roadmap (LH-012 onward)
+
+Tasks LH-012 and later are tracked as one card per task in `docs/roadmap/tasks/`, not in this file. `docs/roadmap/AVANZAR.md` holds the goal, the commands and what may be done without operator confirmation; `docs/roadmap/COLA.md` lists what is waiting for the operator. The rules above still apply: production, billing, migrations, destructive operations and new spending require explicit operator confirmation.

@@ -1,0 +1,29 @@
+{
+  "id": "LH-039",
+  "titulo": "Mejorar toda la interfaz con referencias de Mobbin",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "El inventario cubre acceso, onboarding, administración, navegación, facturas, movimientos, ajustes y cierre de ejercicio.",
+    "El MCP de Mobbin aporta referencias para los flujos identificados y las decisiones quedan documentadas en la ficha.",
+    "La interfaz aplica un sistema visual coherente a las pantallas principales, con navegación, formularios y estados de carga, error y vacío comprobados a 390 px y 1280 px.",
+    "Las comprobaciones del repositorio y las pruebas de navegador de los flujos afectados pasan con datos sintéticos."
+  ],
+  "depende": [
+    "LH-029"
+  ],
+  "comprueba": [],
+  "recursos": [
+    "src/app/**",
+    "src/ui/**",
+    "tests/e2e/**"
+  ],
+  "hecho": "",
+  "falta": "Inventariar la interfaz, consultar el MCP de Mobbin e implementar y verificar las mejoras.",
+  "bloqueo": "",
+  "siguiente": "Después de LH-029, inventariar las pantallas y buscar referencias de Mobbin para los flujos principales.",
+  "evidencia": [
+    "2026-11-20 · El operador pidió mejorar toda la interfaz con el MCP de Mobbin después del trabajo de despliegue."
+  ],
+  "actualizado": "2026-11-20"
+}

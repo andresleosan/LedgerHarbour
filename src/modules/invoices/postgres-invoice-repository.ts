@@ -7,7 +7,9 @@ import {
   INVOICE_ERROR_CODES,
   InvoiceError,
   type Invoice,
+  type InvoiceKind,
   type InvoiceRepository,
+  type PaymentStatus,
 } from "./invoice-service";
 import type { InvoiceDraft } from "./invoice-parser";
 import type { BusinessId } from "../tenancy/types";
@@ -136,6 +138,12 @@ async function mapInvoice(database: Database, row: typeof invoices.$inferSelect)
     reviewState: row.reviewState,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    kind: row.kind as InvoiceKind,
+    paymentStatus: row.paymentStatus as PaymentStatus | null,
+    paidAccountId: row.paidAccountId,
+    paidOn: row.paidOn,
+    amountDebited: row.amountDebited,
+    voidedAt: row.voidedAt?.toISOString() ?? null,
   };
 }
 
@@ -158,6 +166,13 @@ async function valuesFor(database: Database, invoice: Invoice) {
     reviewState: invoice.reviewState,
     createdAt: new Date(invoice.createdAt),
     updatedAt: new Date(invoice.updatedAt),
+    // Left undefined, the column keeps its default on insert and its value on update.
+    kind: invoice.kind,
+    paymentStatus: invoice.paymentStatus,
+    paidAccountId: invoice.paidAccountId,
+    paidOn: invoice.paidOn,
+    amountDebited: invoice.amountDebited,
+    voidedAt: invoice.voidedAt === undefined ? undefined : invoice.voidedAt === null ? null : new Date(invoice.voidedAt),
   };
 }
 

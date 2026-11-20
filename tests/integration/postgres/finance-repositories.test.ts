@@ -52,6 +52,12 @@ function makeDocument(input: Partial<Document> = {}): Document {
   };
 }
 
+async function codeInvoice(context: ReturnType<typeof createPersistenceContext>, invoice: Invoice): Promise<void> {
+  const now = new Date().toISOString();
+  await context.headingRepository.create({ id: `heading-${invoice.id}`, businessId: invoice.businessId, position: 1, templateValue: "Purchases", valueType: "text", group: "expenses", sortOrder: 1, displayName: "Purchases", isActive: true, blockedReason: null, createdAt: now, updatedAt: now });
+  await context.invoiceCodingRepository.replace(invoice.businessId, invoice.id, [{ headingId: `heading-${invoice.id}`, amount: invoice.total! }], now);
+}
+
 function makeInvoice(input: Partial<Invoice> = {}): Invoice {
   return {
     id: input.id ?? invoiceId("invoice-1"),
@@ -237,6 +243,7 @@ describe("PostgreSQL finance repositories", () => {
       const document = makeDocument({ id: "approval-document", businessId: state.businessId, uploaderId: state.ownerId, status: "needs_review" });
       await context.documentRepository.create(document);
       const invoice = await context.invoiceRepository.create(makeInvoice({ id: invoiceId("approval-invoice"), businessId: state.businessId, documentId: documentId(document.id) }));
+      await codeInvoice(context, invoice);
       const transaction = async (operation: Parameters<NonNullable<typeof context.transaction>>[0]) => {
         return context.tenancyRepository.transaction(async (transactionTenancy) => {
           await operation(transactionTenancy);
@@ -248,8 +255,9 @@ describe("PostgreSQL finance repositories", () => {
         tenancyRepository: context.tenancyRepository,
         documentRepository: context.documentRepository,
         invoices: context.invoiceRepository,
+        codings: context.invoiceCodingRepository,
         transaction,
-      })).rejects.toThrow("cross-repository rollback sentinel");
+      }, { status: "unpaid" })).rejects.toThrow("cross-repository rollback sentinel");
 
       await expect(context.invoiceRepository.findById(invoice.id)).resolves.toMatchObject({ reviewState: "needs_review" });
       await expect(context.documentRepository.getStatus(document.id)).resolves.toBe("needs_review");
@@ -266,13 +274,15 @@ describe("PostgreSQL finance repositories", () => {
       const document = makeDocument({ id: "approval-commit-document", businessId: state.businessId, uploaderId: state.ownerId, status: "needs_review" });
       await context.documentRepository.create(document);
       const invoice = await context.invoiceRepository.create(makeInvoice({ id: invoiceId("approval-commit-invoice"), businessId: state.businessId, documentId: documentId(document.id) }));
+      await codeInvoice(context, invoice);
 
       await expect(approveInvoice(invoice.id, state.ownerId, {
         tenancyRepository: context.tenancyRepository,
         documentRepository: context.documentRepository,
         invoices: context.invoiceRepository,
+        codings: context.invoiceCodingRepository,
         transaction: context.transaction,
-      })).resolves.toMatchObject({ reviewState: "approved" });
+      }, { status: "unpaid" })).resolves.toMatchObject({ reviewState: "approved" });
 
       await expect(context.invoiceRepository.findById(invoice.id)).resolves.toMatchObject({ reviewState: "approved" });
       await expect(context.documentRepository.getStatus(document.id)).resolves.toBe("approved");

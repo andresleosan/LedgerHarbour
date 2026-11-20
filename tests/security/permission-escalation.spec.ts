@@ -9,6 +9,7 @@ import { createCategory } from "../../src/modules/accounting/category-service";
 import { createCurrencyRepository, setCurrency } from "../../src/modules/accounting/currency-service";
 import { createInvoiceRepository, approveInvoice, type Invoice } from "../../src/modules/invoices/invoice-service";
 import { createDocumentRepository, type Document } from "../../src/modules/documents/document-service";
+import { resolveInvoiceCodingRepository } from "../../src/modules/invoices/invoice-coding-repository";
 import { createMembershipService } from "../../src/modules/tenancy/membership-service";
 import type { BusinessId, Membership, UserId } from "../../src/modules/tenancy/types";
 import type { DocumentId, InvoiceId } from "../../src/modules/invoices/ocr-provider";
@@ -145,6 +146,7 @@ describe("Task 11 permission escalation matrix", () => {
     };
     await invoices.create(invoice);
     const dependencies = { tenancyRepository: repository, documentRepository: documents, invoices };
-    await expect(approveInvoice(invoice.id, user("administrator"), dependencies)).resolves.toMatchObject({ reviewState: "approved" });
+    await resolveInvoiceCodingRepository(invoices).replace(business.id, invoice.id, [{ headingId: "permission-heading", amount: "12.00" }], invoice.updatedAt);
+    await expect(approveInvoice(invoice.id, user("administrator"), dependencies, { status: "unpaid" })).resolves.toMatchObject({ reviewState: "approved" });
   });
 });

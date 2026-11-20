@@ -1,0 +1,36 @@
+{
+  "id": "LH-037",
+  "titulo": "Detalles de uso antes de la primera prueba real",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Un importe leído con más de dos decimales va a revisión en vez de guardarse.",
+    "Tras leer una factura, el enlace lleva a su revisión.",
+    "«Facturas sin pagar» del ejercicio cuenta solo las de ese ejercicio y anteriores; el resumen y la exportación tratan igual las cuentas inactivas.",
+    "Un traspaso sin concepto se guarda con el texto del idioma de la pantalla; reimportar la plantilla cuenta solo los rótulos que cambian.",
+    "Los errores de la pantalla de revisión siguen el idioma elegido y no quedan textos sin uso."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/invoices/**",
+    "src/modules/accounting/**",
+    "src/app/(app)/business/[businessId]/**",
+    "src/app/api/**",
+    "src/i18n/messages/**",
+    "tests/**"
+  ],
+  "hecho": "Importes con más de dos decimales: a revisión si vienen de la lectura, rechazados si los escribe una persona. Tras leer una factura el enlace lleva a su revisión. Las facturas sin pagar y pagadas con dinero propio del ejercicio usan la definición del anexo. El resumen trata las cuentas inactivas como la exportación. Traspaso sin concepto en el idioma de la pantalla. Reimportar la plantilla cuenta solo lo que cambia. Errores de revisión en el idioma elegido. 35 textos sin uso eliminados por idioma.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "Creada el 2026-11-20 al repasar MEJORAS: ocho detalles pequeños que verá quien use la app.",
+    "Commit f413c66. invoice-parser 69, export-service 12, heading-service 20; e2e de subida, revisión, ejercicio, movimientos y ajustes pasadas.",
+    "Vistas en rojo antes: importes (6 casos), cuentas inactivas, recuento de rótulos y facturas sin pagar por ejercicio. No vistas en rojo: el traspaso en español y el error traducido.",
+    "Caso límite aceptado: un importe leído como «1.234» se guarda marcado para revisión y la factura no se puede guardar hasta corregirlo.",
+    "Nota: si falla la lectura del anexo, la pantalla «Ejercicio» omite las dos líneas de facturas en vez de avisar.",
+    "Verificación de lote 6 sobre f413c66: lint 0, tsc 0, build 0; vitest --no-file-parallelism 1247 pasadas y 7 omitidas (118 archivos); e2e por carpetas: documentos 10, facturas 7, ajustes y movimientos 4, ejercicio 2, critical-path y navegación 2. Las dos de ejercicio fallaron en una pasada conjunta (una con «Page crashed») y pasaron al repetirlas solas."
+  ],
+  "actualizado": "2026-11-20"
+}

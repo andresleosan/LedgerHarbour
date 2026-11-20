@@ -1,0 +1,28 @@
+{
+  "id": "LH-012",
+  "titulo": "Diseño: de la foto de la factura al libro del contable",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Spec en docs/superpowers/specs/ con el contrato de una fila del libro: cuenta de dinero, fecha, concepto, código e importe con signo en libras.",
+    "Define el plan de cuentas guiado por la plantilla (rótulo exacto, grupo por posición, tipo texto o número), las cuentas de dinero, el ejercicio y lo que queda fuera.",
+    "Cada decisión de producto lleva su fuente; lo que solo puede responder el contable está en LH-028 y no bloquea.",
+    "Describe la plantilla sintética de pruebas, sin datos de ningún cliente."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "docs/superpowers/specs/**"
+  ],
+  "hecho": "Spec en docs/superpowers/specs/2026-11-19-lh-012-invoice-photo-to-accounts-workbook-design.md: contrato de fila, plan de cuentas guiado por la plantilla, cuentas de dinero, ejercicio, movimientos, exportación con informe de control, plantilla sintética y fuera de alcance.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "Cada decisión del spec lleva su fuente (meta, fichas, análisis privado del libro, app, opción más simple); las 8 preguntas del contable están en su tabla final con el valor por defecto y en LH-028.",
+    "Privacidad: grep del spec sin nombres, banco, rótulos ni coordenadas del libro real (sin coincidencias).",
+    "Decisión: la unidad del libro es el movimiento de dinero por una cuenta, no la factura. Fuente: análisis privado del libro.",
+    "Sin revisión del operador ni del contable antes de construir: el spec lo dice en su estado."
+  ],
+  "actualizado": "2026-11-19"
+}
