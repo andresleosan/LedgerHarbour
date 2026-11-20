@@ -30,7 +30,8 @@
     "Docker run efímero sin red con Tesseract y facturas sintéticas → JPEG, PNG, HEIC, TIFF y PDF extraen número, fecha, total y moneda y quedan en revisión. TIFF y PDF de dos páginas, rechazo de PDF sobre el límite y limpieza temporal comprobados.",
     "Verificación de lote: corepack pnpm lint, corepack pnpm exec tsc --noEmit, corepack pnpm exec vitest run --no-file-parallelism y corepack pnpm build correctos. Vitest: 1.252 pruebas pasadas y 7 omitidas.",
     "2026-11-20 · El operador autorizó la instancia privada de validación en la VPS.",
-    "Docker run efímero sin red, con OCR y almacenamiento local en tmpfs, sobre 4df8f61. Vitest: 1 de 1 prueba de las rutas de la app pasada. Carga 201, worker nativo 202 con trabajo completado, borrador privado 200 y acceso desde otra empresa 403. Fecha, moneda y total coincidieron con la factura sintética."
+    "Docker run efímero sin red, con OCR y almacenamiento local en tmpfs, sobre 4df8f61. Vitest: 1 de 1 prueba de las rutas de la app pasada. Carga 201, worker nativo 202 con trabajo completado, borrador privado 200 y acceso desde otra empresa 403. Fecha, moneda y total coincidieron con la factura sintética.",
+    "2026-11-20 · Búsqueda local: se encontró un comprobante exportado rotulado como muestra y capturas de interfaz. Docker run efímero, sin red: el comprobante completó carga, OCR y revisión, pero quedó sin campos estructurados. No aporta evidencia de fecha, moneda e importes de una factura fotografiada."
   ],
   "actualizado": "2026-11-20"
 }
