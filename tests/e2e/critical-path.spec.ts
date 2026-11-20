@@ -44,10 +44,8 @@ test("verifies the local MVP critical path and cross-tenant access block", async
   expect(processResponse.status()).toBe(202);
   await expect(processResponse.json()).resolves.toMatchObject({ job: { documentId, status: "completed" } });
   await expect(owner.getByRole("listitem").filter({ hasText: "task11-invoice.pdf" }).getByRole("status")).toContainText("Ready for review");
-  await owner.getByRole("link", { name: "Review invoices" }).click();
-  await expect(owner).toHaveURL(`/business/${businessId}/invoices?locale=en`);
-
-  const reviewLink = owner.getByRole("link", { name: "Open review" });
+  // The success link opens the review of the invoice just read.
+  const reviewLink = owner.getByRole("link", { name: "Review invoices" });
   await expect(reviewLink).toHaveCount(1);
   const reviewHref = await reviewLink.getAttribute("href");
   expect(reviewHref).toMatch(new RegExp(`/business/${businessId}/invoices/[^?]+\\?locale=en`));

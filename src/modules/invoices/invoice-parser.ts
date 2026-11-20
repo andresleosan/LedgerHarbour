@@ -42,6 +42,8 @@ const REQUIRED_FIELDS: readonly (keyof OcrExtractedFields)[] = [
 const CONFIDENCE_THRESHOLD = 0.8;
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/;
+// Money is stored in pence; more than two decimals would be rounded silently, so it is never accepted.
+const OVER_PRECISE = /\.\d{3,}$/;
 // ponytail: printed dates are read day first (DD/MM/YYYY) because the product serves UK/Jersey businesses.
 const PRINTED_DATE_PATTERN = /^(\d{1,2})([/.-])(\d{1,2})\2(\d{4})$/;
 // A currency symbol or seeded ISO code is only accepted at the start or end of the whole value.
@@ -107,6 +109,8 @@ function printedAmount(value: string): string | null {
   const digits = integer.replace(/[.,]/g, "");
   if (digits !== integer && !THOUSANDS_GROUPING.test(integer)) return null;
   if (fraction !== null && !/^\d+$/.test(fraction)) return null;
+  // Only the ambiguous "1.234" keeps three decimals, and it is already capped below the review threshold.
+  if (fraction !== null && fraction.length > 2 && !AMBIGUOUS_AMOUNT.test(bare)) return null;
   return decimal(fraction === null ? digits : `${digits}.${fraction}`);
 }
 
@@ -144,7 +148,7 @@ export function parseInvoice(result: OcrResult, source: InvoiceInputSource = "hu
   };
   const date = ocr ? printedDate : isoDate;
   const amount = (field: keyof OcrExtractedFields): string | null => {
-    if (!ocr) return read(field, decimal);
+    if (!ocr) return read(field, (value) => (OVER_PRECISE.test(value) ? null : decimal(value)));
     const parsed = read(field, printedAmount);
     // A lone "," or "." before exactly three digits was resolved by the UK rule above; a human confirms it.
     if (parsed !== null && AMBIGUOUS_AMOUNT.test(bareAmount(text(fields[field])!))) ambiguous.push(field);

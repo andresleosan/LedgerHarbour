@@ -4,6 +4,7 @@ import Link from "next/link";
 import { use, useEffect, useState, type ReactNode } from "react";
 
 import { messages } from "@/i18n/config";
+import type { YearAnnex } from "@/modules/accounting/annex-service";
 import type { ExportBlocker, ExportReport } from "@/modules/accounting/export-service";
 import type { AccountHeading, HeadingGroup } from "@/modules/accounting/heading-service";
 import { formatPence, parsePounds, sumPence } from "@/modules/accounting/money";
@@ -79,9 +80,10 @@ export default function YearPage({ params }: { params: Promise<{ businessId: str
         if (responses.some((response) => response.status === 403)) { setForbidden(true); return; }
         if (responses.some((response) => !response.ok)) throw new Error();
         const [summary, report, accounts, headings, movements] = await Promise.all(responses.map((response) => response.json())) as [YearSummary, ExportReport, MoneyAccountWithOpening[], AccountHeading[], Movement[]];
-        const invoicesResponse = await fetch(`${api}/invoices/unpaid`);
-        const invoices = invoicesResponse.ok ? await invoicesResponse.json() as { unpaid: unknown[]; paidPrivately: unknown[] } : null;
-        setData({ summary, report, accounts, headings, movements, invoices: invoices && { unpaid: invoices.unpaid.length, paidPrivately: invoices.paidPrivately.length } });
+        // The closing notes decide which invoices belong to this year.
+        const annexResponse = await fetch(`${api}/financial-years/${id}/annex?format=json`);
+        const annex = annexResponse.ok ? await annexResponse.json() as YearAnnex : null;
+        setData({ summary, report, accounts, headings, movements, invoices: annex && { unpaid: annex.totals.unpaidInvoices.count, paidPrivately: annex.totals.privatelyPaidInvoices.count } });
       } else {
         setData(null);
       }
@@ -165,7 +167,7 @@ export default function YearPage({ params }: { params: Promise<{ businessId: str
       <div className="movement-balances">
         {accounts.flatMap((account) => {
           const totals = summary.byAccount.find((row) => row.accountId === account.id);
-          if (!totals || (!account.isActive && totals.count === 0)) return [];
+          if (!totals) return [];
           const amounts = movements.filter((movement) => movement.moneyAccountId === account.id).map((movement) => parsePounds(movement.amount));
           const moneyIn = sumPence(amounts.filter((pence) => pence > 0));
           const moneyOut = -sumPence(amounts.filter((pence) => pence < 0));

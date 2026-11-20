@@ -155,6 +155,7 @@ export interface TemplateFileInput {
 export interface TemplateImportResult {
   inserted: number;
   updated: number;
+  unchanged: number;
   missing: number;
   sheets: AccountSheet[];
   defects: TemplateDefect[];
@@ -233,7 +234,7 @@ export async function importTemplate(businessId: BusinessId, file: TemplateFileI
 
   const now = new Date().toISOString();
   let previousKey: string | undefined;
-  let counts: { inserted: number; updated: number; missing: number };
+  let counts: { inserted: number; updated: number; unchanged: number; missing: number };
   try {
     counts = await headings.transaction(() => templates.transaction(async () => {
       previousKey = (await templates.findByBusinessId(businessId))?.privateObjectKey;

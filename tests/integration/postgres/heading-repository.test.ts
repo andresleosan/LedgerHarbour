@@ -127,7 +127,7 @@ describe("PostgreSQL account heading repository", () => {
       expect(after.find((item) => item.position === 2)).toMatchObject({ isActive: false, blockedReason: "missing_from_template" });
 
       const audit = await db.execute<{ action: string; entity_type: string; metadata: unknown }>(`SELECT action, entity_type, metadata FROM audit_events WHERE action = 'account_heading_imported' ORDER BY created_at`);
-      expect(audit.rows.at(-1)).toEqual({ action: "account_heading_imported", entity_type: "account_heading", metadata: { inserted: 1, updated: 1, missing: 1 } });
+      expect(audit.rows.at(-1)).toEqual({ action: "account_heading_imported", entity_type: "account_heading", metadata: { inserted: 1, updated: 1, unchanged: 0, missing: 1 } });
 
       tenancy.transaction = async () => { throw new Error("audit failed"); };
       await expect(importHeadings(businessA.id, [input(9, "Late")], owner, dependencies)).rejects.toMatchObject({ code: HEADING_ERROR_CODES.HEADING_REPOSITORY_CONFLICT });

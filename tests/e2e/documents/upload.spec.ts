@@ -155,7 +155,7 @@ for (const viewport of [{ width: 390, height: 844 }, { width: 1280, height: 800 
     for (const name of ["invoice.pdf", "receipt.png"]) {
       const row = queueRow(page, name);
       await expect(row.getByRole("status")).toContainText("Ready for review", ocrCompile);
-      await expect(row.getByRole("link", { name: "Review invoices" })).toHaveAttribute("href", `/business/${businessId}/invoices?locale=en`);
+      await expect(row.getByRole("link", { name: "Review invoices" })).toHaveAttribute("href", new RegExp(`^/business/${businessId}/invoices/[^/?]+\\?locale=en$`));
     }
     expect(processed).toHaveLength(2);
     await expect(queueRow(page, "invoice.pdf").getByText("PDF", { exact: true })).toBeVisible();

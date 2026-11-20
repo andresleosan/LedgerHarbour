@@ -43,6 +43,26 @@ test.describe("invoice review workspace", () => {
     await expect(page.locator("main.invoice-list-page")).toBeVisible();
   });
 
+  test("a load error on the review follows a later language change", async ({ page }) => {
+    await signIn(page);
+    // Answered inside the page, so the expected 404 is not a browser network error.
+    await page.addInitScript(() => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+        if (url.includes("/api/invoices/missing-invoice/review")) return new Response(JSON.stringify({ error: { code: "INVOICE_NOT_FOUND" } }), { status: 404, headers: { "Content-Type": "application/json" } });
+        if (url.includes("/api/businesses/demo-business/")) return new Response("[]", { status: 200, headers: { "Content-Type": "application/json" } });
+        return originalFetch(input, init);
+      };
+    });
+    await page.goto("/business/demo-business/invoices/missing-invoice?locale=en");
+    const loadError = page.locator("main .page-error");
+    await expect(loadError).toHaveText("This invoice is no longer available.");
+    await page.getByRole("link", { name: "Español" }).first().click();
+    await expect(page).toHaveURL(/locale=es/);
+    await expect(loadError).toHaveText("Esta factura ya no está disponible.");
+  });
+
   test("settings routes expose category and currency controls", async ({ page }) => {
     await signIn(page);
     await page.route("**/api/businesses/demo-business/categories", (route) => route.fulfill({ status: 200, contentType: "application/json", body: "[]" }));
@@ -129,8 +149,7 @@ test.describe("invoice review workspace", () => {
     });
     await expect(page.getByRole("listitem").filter({ hasText: "review-invoice.pdf" }).getByRole("status")).toContainText("Ready for review");
     await page.getByRole("link", { name: "Review invoices" }).click();
-    await expect(page).toHaveURL(`/business/${businessId}/invoices?locale=en`);
-    await page.getByRole("link", { name: "Open review" }).click();
+    await expect(page).toHaveURL(new RegExp(`/business/${businessId}/invoices/[^/?]+\\?locale=en$`));
     await expect(page.getByRole("heading", { name: "Extracted fields" })).toBeVisible();
     await expect(page.getByText(/low confidence/i).first()).toBeVisible();
 

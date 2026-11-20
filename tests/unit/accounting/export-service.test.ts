@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 import { EXPORT_ERROR_CODES, buildYearExport, getExportReport, type ExportDependencies } from "../../../src/modules/accounting/export-service";
 import { createHeadingRepository, listHeadings, setHeadingActive, type AccountHeading } from "../../../src/modules/accounting/heading-service";
 import { createMoneyRepository, type Movement } from "../../../src/modules/accounting/money-repository";
-import { createFinancialYear, createMoneyAccount, createMovement, setOpeningBalance } from "../../../src/modules/accounting/money-service";
+import { createFinancialYear, createMoneyAccount, createMovement, setMoneyAccountActive, setOpeningBalance } from "../../../src/modules/accounting/money-service";
 import { createTemplateRepository, importTemplate } from "../../../src/modules/accounting/template-service";
 import { getYearSummary, summarizeYear } from "../../../src/modules/accounting/year-summary";
 import type { StorageAdapter } from "../../../src/modules/documents/storage-adapter";
@@ -125,6 +125,24 @@ describe("year export", () => {
     const report = await getExportReport(f.business.id, f.year.id, owner, f.dependencies);
     expect(report).toEqual((await buildYearExport(f.business.id, f.year.id, owner, f.dependencies)).report);
     expect((await f.tenancy.listAuditEvents(f.business.id)).filter((e) => e.type === "workbook_exported")).toHaveLength(1);
+  });
+
+  it("leaves out an inactive account with no movements in the summary as in the export", async () => {
+    const f = await fixture();
+    const { bank } = await accounts(f);
+    const closed = await createMoneyAccount(f.business.id, { name: "Closed bank", kind: "bank", sheetName: SYNTHETIC_SHEETS.deposit }, owner, f.dependencies);
+    await move(f, bank.id, "2026-05-02", "Rent", "Premises", "-800.00");
+    // An account closed during the year still carries its movements; one never used drops out.
+    await f.insert({ moneyAccountId: closed.id, amount: "-1.00" });
+    await setMoneyAccountActive(f.business.id, closed.id, false, owner, f.dependencies);
+    const dormant = await createMoneyAccount(f.business.id, { name: "Dormant bank", kind: "bank", sheetName: SYNTHETIC_SHEETS.deposit }, owner, f.dependencies);
+    await setMoneyAccountActive(f.business.id, dormant.id, false, owner, f.dependencies);
+
+    const summary = await getYearSummary(f.business.id, f.year.id, owner, f.dependencies);
+    const report = await getExportReport(f.business.id, f.year.id, owner, f.dependencies);
+    expect(summary.byAccount.map((row) => row.accountId)).not.toContain(dormant.id);
+    expect(summary.byAccount.map((row) => row.accountId)).toContain(closed.id);
+    expect(summary.byAccount).toEqual(report.totals.byAccount);
   });
 
   it("matches the stored totals to the penny for hundreds of movements", async () => {

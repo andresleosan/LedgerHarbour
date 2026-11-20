@@ -10,7 +10,7 @@ import { useUrlLocale } from "@/ui/useUrlLocale";
 
 type Copy = typeof messages.en.workbookSettings;
 type Template = { fileName: string; uploadedAt: string; sheets: AccountSheet[]; defects: TemplateDefect[] };
-type ImportCounts = { inserted: number; updated: number; missing: number };
+type ImportCounts = { inserted: number; updated: number; unchanged: number; missing: number };
 type HeadingChange = { displayName?: string; isActive?: boolean };
 type ErrorPayload = { error?: { code?: string } };
 
@@ -112,7 +112,7 @@ export default function WorkbookSettingsPage({ params }: { params: Promise<{ bus
         setUploadError(uploadErrorFor(response.status, payload.error?.code, copy));
         return;
       }
-      setCounts({ inserted: payload.inserted, updated: payload.updated, missing: payload.missing });
+      setCounts({ inserted: payload.inserted, updated: payload.updated, unchanged: payload.unchanged, missing: payload.missing });
       await load();
     } catch {
       setUploadError(copy.uploadError);
@@ -212,7 +212,7 @@ export default function WorkbookSettingsPage({ params }: { params: Promise<{ bus
           )}
           <p className="page-feedback" role="status" aria-live="polite">{uploading ? copy.uploading : counts ? copy.uploaded : ""}</p>
           {uploadError && <p id="template-error" className="page-error" role="alert">{uploadError}</p>}
-          {counts && <p>{fill(copy.headingCounts, counts)}</p>}
+          {counts && <p>{fill(counts.unchanged > 0 ? copy.headingCountsUnchanged : copy.headingCounts, counts)}</p>}
           {template && (
             <>
               <p>{fill(plural(copy.sheetsRead, template.sheets.length), { count: template.sheets.length })}</p>

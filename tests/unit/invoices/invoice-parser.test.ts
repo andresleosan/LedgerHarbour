@@ -83,6 +83,8 @@ describe("invoice parser", () => {
     ["non-ISO invoice date", { invoiceDate: "01/08/2026" }],
     ["negative subtotal", { subtotal: "-1.00" }],
     ["malformed total", { total: "12.3.4" }],
+    ["total with more than two decimals", { total: "1.2345" }],
+    ["tax amount with three decimals", { taxAmount: "20.005" }],
   ])("rejects %s with a typed parser error", (_description, fields) => {
     expect(() => parseInvoice(result(fields))).toThrowError(InvoiceParserError);
     expect(() => parseInvoice(result(fields))).toThrowError(
@@ -163,6 +165,9 @@ describe("invoice parser reading OCR output", () => {
     ["total", "120.60 JPY"],
     ["total", "£120.60 GBP £"],
     ["total", "1 23.45"],
+    ["total", "1,2345"],
+    ["total", "1.2345"],
+    ["total", "£1,234.567"],
     ["currencyReference", "Pounds"],
   ] as const)("leaves an unreadable %s (%s) empty with zero confidence for review", (field, printed) => {
     const parsed = ocr({ [field]: printed });

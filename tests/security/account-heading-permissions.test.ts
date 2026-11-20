@@ -77,7 +77,7 @@ describe("account heading permission matrix", () => {
     await expect(listHeadings(businessA.id, user(actor), dependencies)).resolves.toHaveLength(2);
     await expect(renameHeading(businessA.id, headingA.id, `Renamed by ${actor}`, user(actor), dependencies)).resolves.toMatchObject({ id: headingA.id });
     await expect(setHeadingActive(businessA.id, headingA.id, false, user(actor), dependencies)).resolves.toMatchObject({ isActive: false });
-    await expect(importHeadings(businessA.id, headings, user(actor), dependencies)).resolves.toMatchObject({ updated: 2 });
+    await expect(importHeadings(businessA.id, headings, user(actor), dependencies)).resolves.toMatchObject({ updated: 0, unchanged: 2 });
   });
 
   it("requires read_finance to list and edit_finance to write", async () => {

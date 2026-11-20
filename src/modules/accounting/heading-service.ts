@@ -43,6 +43,7 @@ export interface AccountHeading {
 export interface HeadingImportResult {
   inserted: number;
   updated: number;
+  unchanged: number;
   missing: number;
   headings: AccountHeading[];
 }
@@ -237,10 +238,11 @@ export async function listHeadings(businessId: BusinessId, actor: OnboardingActo
  * Applies the template import rules (upsert by position, missing positions deactivated).
  * Callers run it inside a heading repository transaction and write their own audit event.
  */
-export async function applyHeadingImport(headings: HeadingRepository, businessId: BusinessId, incoming: TemplateHeadingInput[], now: string): Promise<{ inserted: number; updated: number; missing: number }> {
+export async function applyHeadingImport(headings: HeadingRepository, businessId: BusinessId, incoming: TemplateHeadingInput[], now: string): Promise<{ inserted: number; updated: number; unchanged: number; missing: number }> {
   const stored = new Map((await headings.listByBusinessId(businessId)).map((heading) => [heading.position, heading]));
   let inserted = 0;
   let updated = 0;
+  let unchanged = 0;
   let missing = 0;
   for (const item of incoming) {
     const existing = stored.get(item.position);
@@ -260,19 +262,25 @@ export async function applyHeadingImport(headings: HeadingRepository, businessId
       continue;
     }
     const customised = existing.displayName !== defaultDisplayName(existing.templateValue, existing.position);
-    await headings.update({
+    const next: AccountHeading = {
       ...existing,
       ...fields,
       displayName: customised ? existing.displayName : defaultDisplayName(item.templateValue, item.position),
       isActive: item.blockedReason === null && existing.isActive,
-    }, businessId);
+    };
+    // Only a heading whose stored fields change is rewritten and counted as updated.
+    if ((Object.keys(next) as (keyof AccountHeading)[]).every((key) => key === "updatedAt" || next[key] === existing[key])) {
+      unchanged += 1;
+      continue;
+    }
+    await headings.update(next, businessId);
     updated += 1;
   }
   for (const absent of stored.values()) {
     await headings.update({ ...absent, isActive: false, blockedReason: "missing_from_template", updatedAt: now }, businessId);
     missing += 1;
   }
-  return { inserted, updated, missing };
+  return { inserted, updated, unchanged, missing };
 }
 
 export async function importHeadings(businessId: BusinessId, input: TemplateHeadingInput[], actor: OnboardingActor, dependencies: HeadingDependencies = {}): Promise<HeadingImportResult> {
@@ -284,9 +292,9 @@ export async function importHeadings(businessId: BusinessId, input: TemplateHead
   const now = new Date().toISOString();
   try {
     return await headings.transaction(async () => {
-      const { inserted, updated, missing } = await applyHeadingImport(headings, businessId, incoming, now);
-      await tenancy.transaction((transaction) => transaction.appendAuditEvent({ businessId, actorId, type: "account_heading_imported", entityId: businessId, metadata: { inserted, updated, missing } }));
-      return { inserted, updated, missing, headings: await headings.listByBusinessId(businessId) };
+      const { inserted, updated, unchanged, missing } = await applyHeadingImport(headings, businessId, incoming, now);
+      await tenancy.transaction((transaction) => transaction.appendAuditEvent({ businessId, actorId, type: "account_heading_imported", entityId: businessId, metadata: { inserted, updated, unchanged, missing } }));
+      return { inserted, updated, unchanged, missing, headings: await headings.listByBusinessId(businessId) };
     });
   } catch (error) {
     throw mapBoundaryError(error);

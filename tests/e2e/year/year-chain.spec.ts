@@ -130,4 +130,15 @@ test("uncoded statement lines block the workbook until they are coded in the tra
   await expect(page).toHaveURL(/\/invoices\?locale=en&status=unpaid$/, firstCompile);
   await expect(page.locator(".invoice-row")).toHaveCount(1);
   await expect(page.locator(".invoice-row .status-badge")).toHaveText("Not paid");
+
+  // An earlier year does not owe an invoice dated after its end: the counts follow the closing notes.
+  const current = (await api<{ id: string; status: string }[]>(page, `${base}/financial-years`, "GET", undefined)).find((item) => item.status === "open")!;
+  await api(page, `${base}/financial-years/${current.id}`, "PATCH", { status: "closed" });
+  const earlier = await api<{ id: string }>(page, `${base}/financial-years`, "POST", { startDate: "2020-01-01", endDate: "2020-12-31" });
+  await page.goto(`/business/${businessId}/year?locale=en`);
+  await expect(page.getByLabel("Financial year")).toHaveValue(earlier.id, firstCompile);
+  await expect(totals.getByRole("link", { name: "Invoices not paid yet: 0" })).toBeVisible();
+  await expect(totals).toContainText("Paid with your own money: 0");
+  await page.getByLabel("Financial year").selectOption(current.id);
+  await expect(totals.getByRole("link", { name: "Invoices not paid yet: 1" })).toBeVisible();
 });

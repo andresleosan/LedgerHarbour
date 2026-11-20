@@ -214,5 +214,13 @@ test("owner records income, drawings, bank charges and transfers without an invo
   await anadir.getByRole("radio", { name: "Moví dinero entre mis cuentas" }).check();
   await expect(anadir.getByLabel("Desde", { exact: true })).toBeVisible();
   await expect(anadir).toContainText("Los dos lados de un traspaso llevan el mismo código");
+  // With no description, a transfer is stored with the word of the screen's language.
+  await anadir.getByLabel("Desde", { exact: true }).selectOption({ label: "Barclays" });
+  await anadir.getByLabel("Hacia", { exact: true }).selectOption({ label: "Petty cash" });
+  await anadir.getByLabel("Importe (£)").fill("5");
+  await anadir.getByLabel("Código", { exact: true }).selectOption({ label: "Loans" });
+  await anadir.getByRole("button", { name: "Guardar traspaso" }).click();
+  await expect(anadir.getByRole("status")).toContainText("Traspaso guardado.");
+  await expect(lista.locator("strong", { hasText: /^Traspaso$/ })).toHaveCount(2);
   await expectNoHorizontalOverflow(page);
 });

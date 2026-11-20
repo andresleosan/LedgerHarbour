@@ -61,7 +61,7 @@ describe("template HTTP contract", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.inserted).toBeGreaterThan(0);
-    expect(Object.keys(body).sort()).toEqual(["defects", "inserted", "missing", "sheets", "updated"]);
+    expect(Object.keys(body).sort()).toEqual(["defects", "inserted", "missing", "sheets", "unchanged", "updated"]);
     expect(enforceAuthenticatedRateLimit).toHaveBeenCalledWith("upload", owner.providerUserId, expect.any(Headers));
     expect(objects.size).toBe(1);
 

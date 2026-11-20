@@ -43,7 +43,7 @@ export function summarizeYear(input: YearSummaryInput): YearSummary {
   };
 }
 
-/** The year's summary over every account, for members with `read_finance`. */
+/** The year's summary over the accounts the export writes, for members with `read_finance`. */
 export async function getYearSummary(businessId: BusinessId, yearId: string, actor: OnboardingActor, dependencies: MoneyDependencies = {}): Promise<YearSummary> {
   const tenancy = dependencies.tenancyRepository ?? defaultOnboardingRepository;
   const money = dependencies.money ?? resolveDefaultMoneyRepository();
@@ -57,6 +57,10 @@ export async function getYearSummary(businessId: BusinessId, yearId: string, act
   const year = typeof yearId === "string" ? await money.findYear(yearId, businessId) : null;
   if (!year) throw new MoneyError(MONEY_ERROR_CODES.FINANCIAL_YEAR_NOT_FOUND);
   const openings = await money.listOpenings(businessId, year.id);
-  const accounts = (await money.listAccounts(businessId)).map((account) => ({ id: account.id, openingBalance: openings.get(account.id) ?? "0.00" }));
-  return summarizeYear({ accounts, movements: await money.listMovements(businessId, year.id) });
+  const movements = await money.listMovements(businessId, year.id);
+  // The export's rule: an inactive account appears only when it has movements this year.
+  const withMovements = new Set(movements.map((m) => m.moneyAccountId));
+  const accounts = (await money.listAccounts(businessId)).filter((a) => a.isActive || withMovements.has(a.id))
+    .map((account) => ({ id: account.id, openingBalance: openings.get(account.id) ?? "0.00" }));
+  return summarizeYear({ accounts, movements });
 }

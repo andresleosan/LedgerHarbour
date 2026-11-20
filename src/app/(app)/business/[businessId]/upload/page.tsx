@@ -8,7 +8,7 @@ import { useUrlLocale } from "@/ui/useUrlLocale";
 
 type SafeDocument = { id: string; originalFileName: string; status: string };
 type UploadState = "queued" | "uploading" | "reading" | "done" | "failed";
-type UploadItem = { key: number; file: File; previewUrl: string | null; state: UploadState; documentId?: string; errorCode?: string };
+type UploadItem = { key: number; file: File; previewUrl: string | null; state: UploadState; documentId?: string; invoiceId?: string; errorCode?: string };
 
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const ACCEPTED_FILES = ".pdf,.jpg,.jpeg,.png,.heic,.tif,.tiff,application/pdf,image/jpeg,image/png,image/heic,image/tiff";
@@ -83,7 +83,11 @@ export default function UploadPage({ params }: { params: Promise<{ businessId: s
         update(key, { state: "failed", errorCode: code === "RATE_LIMITED" ? code : "OCR_PROCESSING_FAILED" });
         return;
       }
-      update(key, { state: "done" });
+      // The job does not carry the invoice it produced; the document list does.
+      const listed = await fetch(`/api/businesses/${businessId}/documents`).then((response) => (response.ok ? response.json() : null)).catch(() => null) as
+        { documents?: { id: string; invoiceId: string | null }[] } | null;
+      const invoiceId = listed?.documents?.find((listedDocument) => listedDocument.id === document.id)?.invoiceId ?? undefined;
+      update(key, { state: "done", invoiceId });
     } catch {
       update(key, { state: "failed", errorCode: "UPLOAD_FAILED" });
     }
@@ -144,7 +148,7 @@ export default function UploadPage({ params }: { params: Promise<{ businessId: s
                     {item.documentId && (
                       <p className="upload-links">
                         <Link href={`/api/documents/${item.documentId}/download`}>{copy.download.replace("{name}", item.file.name)}</Link>
-                        {item.state === "done" && <Link href={hrefFor(`/business/${businessId}/invoices`)}>{copy.reviewLink}</Link>}
+                        {item.state === "done" && <Link href={hrefFor(`/business/${businessId}/invoices${item.invoiceId ? `/${item.invoiceId}` : ""}`)}>{copy.reviewLink}</Link>}
                       </p>
                     )}
                   </div>

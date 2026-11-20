@@ -54,7 +54,7 @@ describe("template import service", () => {
 
     const result = await importTemplate(business.id, upload, owner, dependencies);
 
-    expect(result).toEqual({ inserted: profile.headings.length, updated: 0, missing: 0, sheets: profile.sheets, defects: profile.defects });
+    expect(result).toEqual({ inserted: profile.headings.length, updated: 0, unchanged: 0, missing: 0, sheets: profile.sheets, defects: profile.defects });
     expect([...objects.keys()]).toEqual([expect.stringMatching(new RegExp(`^business/${business.id}/template/[0-9a-f-]{36}$`))]);
     expect((await listHeadings(business.id, owner, dependencies)).map((item) => item.templateValue)).toEqual(profile.headings.map((item) => item.templateValue));
 
@@ -65,7 +65,7 @@ describe("template import service", () => {
     const event = (await tenancy.listAuditEvents(business.id)).find((item) => item.type === "account_template_imported");
     const defectCounts: Record<string, number> = {};
     for (const defect of profile.defects) defectCounts[defect.code] = (defectCounts[defect.code] ?? 0) + 1;
-    expect(event?.metadata).toEqual({ inserted: profile.headings.length, updated: 0, missing: 0, defects: defectCounts, sheets: profile.sheets.length });
+    expect(event?.metadata).toEqual({ inserted: profile.headings.length, updated: 0, unchanged: 0, missing: 0, defects: defectCounts, sheets: profile.sheets.length });
     expect(JSON.stringify(event)).not.toContain("Accounts 2026");
   });
 
@@ -83,7 +83,8 @@ describe("template import service", () => {
 
     const result = await importTemplate(business.id, await file("Accounts 2027.xlsx", "application/octet-stream"), owner, dependencies);
 
-    expect(result).toMatchObject({ inserted: 0, updated: before.length, missing: 0 });
+    // The same headings again: nothing stored changes, so none counts as updated.
+    expect(result).toMatchObject({ inserted: 0, updated: 0, unchanged: before.length, missing: 0 });
     const after = await listHeadings(business.id, owner, dependencies);
     expect(after.map((item) => item.id)).toEqual(before.map((item) => item.id));
     expect(after[0].displayName).toBe("Turnover");

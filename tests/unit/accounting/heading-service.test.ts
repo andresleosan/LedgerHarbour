@@ -86,6 +86,20 @@ describe("account heading service", () => {
     expect(importEvents[1]).toMatchObject({ entityId: business.id, metadata: { inserted: 0, updated: 2, missing: 1 } });
   });
 
+  it("counts a re-imported heading as updated only when a stored field changes", async () => {
+    const { tenancy, business, dependencies } = await context();
+    await importHeadings(business.id, [heading(1, "Sales"), heading(2, "Rent"), heading(3, "Fuel")], owner, dependencies);
+    const before = await listHeadings(business.id, owner, dependencies);
+
+    const result = await importHeadings(business.id, [heading(1, "Sales"), heading(2, "Rent and rates"), heading(3, "Fuel")], owner, dependencies);
+
+    expect(result).toMatchObject({ inserted: 0, updated: 1, unchanged: 2, missing: 0 });
+    const after = await listHeadings(business.id, owner, dependencies);
+    expect(after.find((item) => item.position === 1)).toEqual(before.find((item) => item.position === 1));
+    const importEvents = (await tenancy.listAuditEvents(business.id)).filter((event) => event.type === "account_heading_imported");
+    expect(importEvents[1].metadata).toEqual({ inserted: 0, updated: 1, unchanged: 2, missing: 0 });
+  });
+
   it("deactivates a heading that becomes blocked and keeps a user deactivation across re-import", async () => {
     const { business, dependencies } = await context();
     await importHeadings(business.id, [heading(1, "Sales"), heading(2, "Rent")], owner, dependencies);

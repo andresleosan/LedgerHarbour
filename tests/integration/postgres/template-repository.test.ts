@@ -114,14 +114,14 @@ describe("PostgreSQL business template repository", () => {
       expect(first.inserted).toBe(headingIds.length);
       const [firstKey] = objects.keys();
 
-      await expect(importTemplate(businessA.id, { name: "Accounts v2.xlsx", mimeType: XLSX, data }, owner, dependencies)).resolves.toMatchObject({ inserted: 0, updated: headingIds.length });
+      await expect(importTemplate(businessA.id, { name: "Accounts v2.xlsx", mimeType: XLSX, data }, owner, dependencies)).resolves.toMatchObject({ inserted: 0, updated: 0, unchanged: headingIds.length });
       expect((await listHeadings(businessA.id, owner, dependencies)).map((item) => item.id)).toEqual(headingIds);
       expect(objects.has(firstKey)).toBe(false);
       await expect(getTemplate(businessA.id, owner, dependencies)).resolves.toMatchObject({ fileName: "Accounts v2.xlsx", sheets: first.sheets, defects: first.defects });
 
       const audit = await db.execute<{ metadata: Record<string, unknown> }>(`SELECT metadata FROM audit_events WHERE action = 'account_template_imported' ORDER BY created_at`);
       expect(audit.rows).toHaveLength(2);
-      expect(audit.rows[1].metadata).toMatchObject({ inserted: 0, updated: headingIds.length, missing: 0, sheets: first.sheets.length });
+      expect(audit.rows[1].metadata).toMatchObject({ inserted: 0, updated: 0, unchanged: headingIds.length, missing: 0, sheets: first.sheets.length });
 
       tenancy.transaction = async () => { throw new Error("audit failed"); };
       await expect(importTemplate(businessA.id, { name: "Broken.xlsx", mimeType: XLSX, data }, owner, dependencies)).rejects.toMatchObject({ code: TEMPLATE_ERROR_CODES.TEMPLATE_REPOSITORY_CONFLICT });

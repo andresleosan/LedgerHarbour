@@ -157,7 +157,7 @@ export default function MovementsPage({ params }: { params: Promise<{ businessId
     const pence = typedPence(target.amount)!;
     const transfer = target.kind === "transfer";
     const body = transfer
-      ? { fromAccountId: target.accountId, toAccountId: target.toAccountId, date: target.date, amount: formatPence(pence), headingId: target.headingId, narrative: target.narrative.trim() }
+      ? { fromAccountId: target.accountId, toAccountId: target.toAccountId, date: target.date, amount: formatPence(pence), headingId: target.headingId, narrative: target.narrative.trim() || copy.origins.transfer }
       : { accountId: target.accountId, date: target.date, narrative: target.narrative.trim(), headingId: target.headingId, amount: formatPence(target.kind === "in" ? pence : -pence) };
     const id = prefix === "edit" ? (transfer ? edit?.transferGroupId : edit?.movementId) : undefined;
     const url = `${api}/${transfer ? "transfers" : "movements"}${id ? `/${id}` : ""}`;

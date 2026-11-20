@@ -72,6 +72,8 @@ export default function InvoiceReviewPage({ params }: { params: Promise<{ busine
   const [suggested, setSuggested] = useState(false);
   const [codingError, setCodingError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The initial load keeps the error code, so its message follows a later language change.
+  const [loadErrorCode, setLoadErrorCode] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [kind, setKind] = useState<Kind>("invoice");
@@ -98,8 +100,8 @@ export default function InvoiceReviewPage({ params }: { params: Promise<{ busine
     ]).then(async ([response, headingsResponse, accountsResponse, yearsResponse]) => {
       const next = await response.json() as ReviewPayload;
       if (!active) return;
-      if (!response.ok) { setError(messageForError(next.error?.code, copy)); return; }
-      if (!headingsResponse.ok) { setError(copy.reviewError); return; }
+      if (!response.ok) { setLoadErrorCode(next.error?.code ?? "REVIEW_FAILED"); return; }
+      if (!headingsResponse.ok) { setLoadErrorCode("REVIEW_FAILED"); return; }
       const loadedHeadings = await headingsResponse.json() as AccountHeading[];
       if (!active) return;
       // Without accounts or an open year the business account option is offered disabled; the other two still work.
@@ -119,7 +121,7 @@ export default function InvoiceReviewPage({ params }: { params: Promise<{ busine
         setLines([{ headingId: next.suggestedHeadingId, amount: "" }]);
         setSuggested(true);
       }
-    }).catch(() => { if (active) setError(messageForError("NETWORK_ERROR", copy)); });
+    }).catch(() => { if (active) setLoadErrorCode("NETWORK_ERROR"); });
     return () => { active = false; };
   }, [invoiceId, businessId]);
 
@@ -294,7 +296,7 @@ export default function InvoiceReviewPage({ params }: { params: Promise<{ busine
     <main className="operational-page review-page">
       <div className="page-shell review-shell">
         <Link className="page-back" href={hrefFor(`/business/${businessId}/invoices`)}>LedgerHarbour / {copy.listTitle}</Link>
-        {error && <p className="page-error" role="alert" aria-live="assertive">{error}</p>}{status && <p className="page-feedback" role="status" aria-live="polite">{status}</p>}
+        {(error || loadErrorCode) && <p className="page-error" role="alert" aria-live="assertive">{error ?? messageForError(loadErrorCode!, copy)}</p>}{status && <p className="page-feedback" role="status" aria-live="polite">{status}</p>}
         <div className="review-grid">
           <section className="page-card review-preview" aria-labelledby="document-title"><h1 className="page-title" id="document-title">{copy.documentPreview}</h1><p>{payload?.document.originalFileName ?? copy.reviewError}</p>{payload && <a className="tertiary-button" href={payload.documentDownloadUrl}>{copy.downloadDocument}</a>}</section>
           <section className="page-card" aria-labelledby="fields-title"><h2 className="page-title" id="fields-title">{copy.extractedFields}</h2>{voided && <p className="review-banner">{copy.voidedBanner}</p>}<div className="review-fields">

@@ -1,8 +1,6 @@
 {
   "landing": {
     "languageLabel": "Idioma",
-    "localeEnglish": "English",
-    "localeSpanish": "Espanol",
     "nav": {
       "howItWorks": "Como funciona",
       "capabilities": "Capacidades",
@@ -52,7 +50,6 @@
   },
   "auth": {
     "brand": "LedgerHarbour",
-    "brandMark": "LH",
     "asideNote": "Una visión más estable de las finanzas de tu negocio, diseñada para decisiones que puedas respaldar.",
     "languageLabel": "Idioma",
     "localeEnglish": "English",
@@ -123,10 +120,7 @@
     "identityError": "Debes iniciar sesión.",
     "downloadError": "No pudimos descargar el documento.",
     "duplicateError": "Este documento ya se ha subido.",
-    "storageError": "No pudimos guardar el documento. Inténtalo de nuevo.",
-    "languageLabel": "Idioma",
-    "localeEnglish": "English",
-    "localeSpanish": "Espanol"
+    "storageError": "No pudimos guardar el documento. Inténtalo de nuevo."
   },
   "documentList": {
     "eyebrow": "Documentos cargados",
@@ -154,15 +148,6 @@
     "actionError": "No funcionó. Inténtalo de nuevo."
   },
   "invoices": {
-    "notFound": "No se encontró la factura.",
-    "accessDenied": "No tienes acceso a este negocio.",
-    "inactiveBusiness": "Este negocio está inactivo.",
-    "invalidDraft": "El borrador de factura no es válido.",
-    "invalidState": "La factura no está en un estado revisable.",
-    "jobQueued": "El procesamiento OCR de la factura se ha encolado.",
-    "jobConflict": "Ya existe un trabajo OCR para este documento.",
-    "processingFailed": "No pudimos procesar la solicitud OCR.",
-    "reviewRequired": "Esta factura necesita revisión antes de aprobarse.",
     "approved": "Factura aprobada.",
     "title": "Revisión de factura",
     "listTitle": "Facturas",
@@ -183,7 +168,6 @@
     "saving": "Guardando...",
     "saved": "Corrección guardada.",
     "approve": "Aprobar factura",
-    "approveConfirm": "¿Aprobar esta factura? Las facturas aprobadas no se pueden editar.",
     "approvalRequired": "Completa los campos obligatorios antes de aprobar.",
     "supplier": "Proveedor",
     "invoiceNumber": "Número de factura",
@@ -193,11 +177,7 @@
     "taxAmount": "Impuesto",
     "total": "Total",
     "currency": "Moneda",
-    "category": "Categoría",
     "notes": "Notas",
-    "languageLabel": "Idioma",
-    "localeEnglish": "English",
-    "localeSpanish": "Espanol",
     "reviewError": "No pudimos cargar o guardar esta revisión de factura.",
     "approvedEditError": "Las facturas aprobadas no se pueden editar.",
     "approvalRequired": "Completa los campos obligatorios y corrige los valores de baja confianza antes de aprobar.",
@@ -282,17 +262,13 @@
     "inactive": "Inactiva",
     "empty": "No hay categorías configuradas.",
     "confirmDeactivate": "¿Desactivar esta categoría? Las referencias históricas de facturas no cambiarán.",
-    "saved": "Categoría guardada.",
     "error": "No pudimos actualizar las categorías.",
     "conflictError": "Ya existe una categoría con ese nombre o cambió en otro lugar.",
     "invalidError": "Introduce un nombre de categoría válido.",
     "accessError": "No tienes permiso para gestionar categorías.",
     "inactiveError": "Este negocio está inactivo.",
     "notFoundError": "La categoría ya no está disponible.",
-    "networkError": "No pudimos actualizar las categorías. Inténtalo de nuevo.",
-    "languageLabel": "Idioma",
-    "localeEnglish": "English",
-    "localeSpanish": "Espanol"
+    "networkError": "No pudimos actualizar las categorías. Inténtalo de nuevo."
   },
   "currencies": {
     "brand": "LedgerHarbour",
@@ -310,17 +286,13 @@
     "inactive": "Inactiva",
     "empty": "No hay monedas configuradas.",
     "confirmDeactivate": "¿Desactivar esta moneda? Los valores existentes de facturas no cambiarán.",
-    "saved": "Moneda guardada.",
     "error": "No pudimos actualizar las monedas.",
     "conflictError": "Ya existe una moneda con esos datos o cambió en otro lugar.",
     "invalidError": "Introduce datos de moneda válidos.",
     "accessError": "No tienes permiso para gestionar monedas.",
     "inactiveError": "Este negocio está inactivo.",
     "notFoundError": "La moneda ya no está disponible.",
-    "networkError": "No pudimos actualizar las monedas. Inténtalo de nuevo.",
-    "languageLabel": "Idioma",
-    "localeEnglish": "English",
-    "localeSpanish": "Espanol"
+    "networkError": "No pudimos actualizar las monedas. Inténtalo de nuevo."
   },
   "workbookSettings": {
     "brand": "LedgerHarbour",
@@ -339,6 +311,7 @@
     "sheetsRead": { "one": "1 hoja de cuenta leída:", "other": "{count} hojas de cuenta leídas:" },
     "sheetRoom": "{name}: caben {rows} filas",
     "headingCounts": "Partidas: {inserted} nuevas, {updated} actualizadas, {missing} ya no están en la plantilla.",
+    "headingCountsUnchanged": "Partidas: {inserted} nuevas, {updated} actualizadas, {unchanged} sin cambios, {missing} ya no están en la plantilla.",
     "tooLargeError": "Este archivo es demasiado grande. La plantilla debe ocupar 10 MB como máximo.",
     "notWorkbookError": "Este archivo no es un libro de Excel (.xlsx).",
     "notTemplateError": "Esto no parece la plantilla de cuentas de tu contable. Comprueba que elegiste el archivo correcto.",
@@ -679,7 +652,6 @@
     "invalidTransition": "Esta solicitud ya no se puede cambiar.",
     "invalidRole": "Este rol de membresía no está disponible.",
     "hiddenRequest": "Esta solicitud ya no está disponible.",
-    "requestConflict": "Ya existe una solicitud o membresía para este negocio.",
     "historyUnavailable": "Estado de solicitud no disponible.",
     "languageLabel": "Idioma",
     "localeEnglish": "English",
@@ -803,7 +775,6 @@
     "localeEnglish": "English",
     "localeSpanish": "Español",
     "navigationLabel": "Espacio de plataforma",
-    "backToWorkspace": "Workspace",
     "signOut": "Cerrar sesión",
     "workspaceLabel": "Espacio de plataforma",
     "dashboard": "Resumen",
@@ -813,7 +784,6 @@
     "eyebrow": "Panel de control global",
     "title": "Administración de plataforma",
     "description": "Revisa solicitudes de ciclo, acceso y fechas de servicio en todos los espacios.",
-    "total": "Total",
     "pending": "Pendiente",
     "active": "Activo",
     "suspended": "Suspendido",
@@ -856,14 +826,10 @@
     "confirm": "Confirmar",
     "saving": "Guardando...",
     "saved": "Acción guardada.",
-    "loadError": "No se pudieron cargar los datos de plataforma.",
     "actionError": "No se pudo completar la acción.",
-    "requiredReason": "Se requiere un motivo para esta acción.",
-    "requiredExpiration": "Elige una fecha de vencimiento del servicio.",
     "businessSectionDescription": "Ciclo del negocio, solicitante, propietario y cobertura de servicio.",
     "projectSectionDescription": "Solicitudes de proyectos y estado de acceso en negocios activos.",
     "administratorSectionDescription": "Vista global del acceso de administradores de negocio.",
-    "pendingQueue": "Cola pendiente",
-    "audit": "Auditoría"
+    "pendingQueue": "Cola pendiente"
   }
 }

@@ -129,7 +129,7 @@ test("owner uploads the accountant template, sees what to tell the accountant an
 
   await pickTemplate(page, template, true);
   await expect(templateSection.getByRole("status")).toContainText("Template read.");
-  await expect(templateSection).toContainText("Headings: 0 added, 16 updated, 0 no longer in the template.");
+  await expect(templateSection).toContainText("Headings: 0 added, 0 updated, 16 unchanged, 0 no longer in the template.");
   await expect(row("Shop sales")).toBeVisible();
 
   await expectNoHorizontalOverflow(page);
