@@ -432,3 +432,19 @@ None of these blocks building. Each has the default the app uses until answered.
 | 8 | What are the start and end dates of the financial year? | Calendar year. | LH-015 |
 
 Answers are recorded here, under the question, with the date and who answered.
+
+### Answers
+
+2026-11-20, the operator: the accountant will not be asked for now; the operator delegated the
+decisions to the most convenient option for the project. Recorded as follows.
+
+| # | Resolution | Kind |
+| --- | --- | --- |
+| 1 | Keep the default: fill the template as it is, never repair it, report its defects (the settings screen and the control report already do). | Decided by delegation |
+| 2 | Keep the default: unpaid invoices are not written to the workbook and go to the closing annex, so the accountant sees them whichever basis they use. | Decided by delegation |
+| 3 | Keep the default (not GST-registered: gross amount, one row) until the owner says otherwise. If the business is registered, a GST heading and a split row are needed: new task. | Fact of the business, default kept |
+| 4 | Keep the default: placeholders stay inactive until the owner names and activates them in Settings. | Decided by delegation |
+| 5 | The owner types each account's opening balance in Settings → Money accounts and year; trial-balance openings stay with the accountant (the control report says so). | Fact entered in the app |
+| 6 | Keep the default: the owner picks the heading on the first transfer; the app proposes it afterwards. | Decided by delegation |
+| 7 | Keep the default: a cash sheet is supported and private payments are listed in the annex. | Decided by delegation |
+| 8 | The owner sets the year's dates in Settings (calendar year by default). | Fact entered in the app |

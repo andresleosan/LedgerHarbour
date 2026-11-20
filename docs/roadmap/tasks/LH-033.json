@@ -1,7 +1,7 @@
 {
   "id": "LH-033",
   "titulo": "Abrir en Excel un libro exportado de prueba",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "operador",
   "criterio": [
     "El archivo de prueba abre en Excel sin aviso de reparación.",
@@ -11,12 +11,12 @@
   "depende": [],
   "comprueba": [],
   "recursos": [],
-  "hecho": "",
-  "falta": "Si Excel avisa de reparación, mirar primero los atributos spans de las filas: se conservan tal cual y una celda nueva puede quedar fuera de ellos (no ocurre con la plantilla real).",
-  "bloqueo": "Abrir en Excel el archivo de prueba que indica `.claude/avanzar-privado.md` (plantilla real con filas inventadas) y decir si abre sin aviso de reparación y si las filas y fechas se ven bien.",
+  "hecho": "El operador abrió en Excel el libro exportado de prueba (plantilla real con filas inventadas): abre bien.",
+  "falta": "",
+  "bloqueo": "",
   "siguiente": "",
   "evidencia": [
-    "Creada el 2026-11-19 al cerrar LH-024: en la VPS no hay Excel ni LibreOffice."
+    "2026-11-20: respuesta del operador en la sesión: «LH-033 abre bien»."
   ],
   "actualizado": "2026-11-20"
 }

@@ -15,6 +15,10 @@ El dueño de un negocio fotografía sus facturas con el móvil y la app le devue
 - Ponerse al día: `git fetch origin && git merge --ff-only origin/main`. Si hay commits propios y `main` avanzó: `git merge origin/main`.
 - Runtime: el Node de `engines` en `package.json` (hoy 26.12.1). En la VPS, cada comando empieza con `export PATH="$HOME/.nvm/versions/node/v26.12.1/bin:$PATH"`.
 
+## Vista previa
+
+Desde el 20-nov-2026 (LH-030) la vista previa del tailnet (`https://optimyze-vps-de-prod.tail29c816.ts.net:9470`) sirve la rama `avanzar` desde el worktree `/root/LedgerHarbour-preview`, en el contenedor `ledgerharbour-app` con Node 26 y el entorno de pruebas (datos en memoria, lector de facturas falso, acceso con cualquier correo; administrador `admin@ledgerharbour.test`). Su configuración está en `/root/LedgerHarbour/deploy/compose.yaml`, fuera del repositorio. Actualizarla a un commit nuevo o reiniciarla sigue sin estar autorizado al bucle: va a la cola.
+
 ## Comandos
 
 Todos desde la copia de avance.

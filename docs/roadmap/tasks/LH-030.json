@@ -1,7 +1,7 @@
 {
   "id": "LH-030",
   "titulo": "Vista previa privada con el código nuevo",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "operador",
   "criterio": [
     "La vista previa del tailnet sirve la rama `avanzar` con el Node que fija el proyecto.",
@@ -10,10 +10,17 @@
   "depende": [],
   "comprueba": [],
   "recursos": [],
-  "hecho": "",
-  "falta": "Comprobar en un móvil real que «Hacer foto» abre la cámara trasera (LH-016 solo pudo comprobar el atributo).",
-  "bloqueo": "Autorizar al bucle a reiniciar el contenedor de la vista previa con Node 26 apuntando a la copia de avance.",
+  "hecho": "La vista previa del tailnet (puerto 9470) sirve la rama avanzar con Node 26.12.1, desde su propio worktree /root/LedgerHarbour-preview, con el entorno de pruebas (memoria, lector falso, acceso de prueba). Se arregló de paso su certificado caducado.",
+  "falta": "",
+  "bloqueo": "",
   "siguiente": "",
-  "evidencia": [],
-  "actualizado": "2026-11-19"
+  "evidencia": [
+    "2026-11-20: autorizada por el operador en la sesión («LH-030 autorizo»).",
+    "deploy/compose.yaml (fuera del repositorio, copia en compose.yaml.bak-20261120): imagen node:26.12.1-bookworm-slim, volumen /root/LedgerHarbour-preview, variables del entorno de pruebas sin el aumento de límites de Playwright y con WATCHPACK_POLLING.",
+    "Worktree aparte para no chocar con los builds y pruebas de la copia de avance (`.next`).",
+    "Caddy montaba /opt/optimyze/caddy/certs, que ya no existe: servía un certificado caducado el 21-oct-2026. Ahora monta solo el .crt y el .key vigentes de /root (válidos hasta el 20-dic-2026), de solo lectura.",
+    "Comprobado: HTTPS con certificado válido; /login 200; rutas nuevas responden 401 sin sesión; con Playwright por la tailnet a 390 px: iniciar sesión, crear negocio, aprobarlo como administrador (200) y abrir «Your year»; el botón «Take photo» existe.",
+    "No comprobado: un móvil real; lo hace el operador."
+  ],
+  "actualizado": "2026-11-20"
 }

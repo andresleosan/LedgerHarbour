@@ -1,18 +1,22 @@
 {
   "id": "LH-028",
   "titulo": "Respuestas del contable sobre su plantilla",
-  "estado": "pendiente",
-  "responsable": "operador y contable",
+  "estado": "hecho",
+  "responsable": "operador",
   "criterio": [
     "Cada respuesta queda anotada en el spec de LH-012 y, si cambia el resultado, en la ficha afectada."
   ],
   "depende": [],
   "comprueba": [],
   "recursos": [],
-  "hecho": "",
+  "hecho": "El operador delegó las ocho preguntas en la opción más conveniente para el proyecto. Cinco se resuelven manteniendo el valor por defecto; dos (saldos iniciales y fechas del ejercicio) los introduce el dueño en Ajustes; el registro en GST se mantiene en «no registrado» hasta que el dueño diga otra cosa.",
   "falta": "",
-  "bloqueo": "Preguntar al contable: si acepta una plantilla reparada o hay que usar la suya tal cual; si las facturas sin pagar a fin de año entran como acreedores; si el negocio está registrado en GST; qué cuenta va detrás de cada rótulo sin nombre; cuáles son los saldos iniciales; qué rótulo llevan los traspasos entre cuentas propias; si se paga en efectivo o con dinero privado; y las fechas del ejercicio. La tabla completa está al final del spec de LH-012.",
+  "bloqueo": "",
   "siguiente": "",
-  "evidencia": [],
-  "actualizado": "2026-11-19"
+  "evidencia": [
+    "2026-11-20: el operador en la sesión: «resolver según lo más conveniente para el proyecto».",
+    "Resoluciones anotadas en la tabla «Answers» del spec de LH-012.",
+    "Si el negocio está registrado en GST hace falta una tarea nueva (rótulo de GST y fila separada)."
+  ],
+  "actualizado": "2026-11-20"
 }
