@@ -3,5 +3,5 @@
 
 | Tarea | Quién | Qué hace falta | Desbloquea |
 | --- | --- | --- | --- |
-| LH-029 · Publicar y activar en producción lo construido | operador | Habilitar acceso a la configuración de Firebase Auth e identificar el entorno de producción y el respaldo restaurable de PostgreSQL. | 1 |
+| LH-029 · Publicar y activar en producción lo construido | operador | Identificar el archivo privado de entorno de producción y el respaldo restaurable del PostgreSQL objetivo. | 1 |
 | LH-027 · Lectura de facturas en la VPS con Tesseract | operador | Indicar qué factura fotografiada real se autoriza para la validación privada. | 0 |
