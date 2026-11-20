@@ -9,10 +9,11 @@ import {
   type AccountHeading,
   type HeadingRepository,
 } from "./heading-service";
+import { isApplicationError } from "./application-error";
 import type { BusinessId } from "../tenancy/types";
 
 function preserveOrMap(error: unknown): never {
-  if (error instanceof HeadingError) throw error;
+  if (isApplicationError(error)) throw error;
   throw new HeadingError(HEADING_ERROR_CODES.HEADING_REPOSITORY_CONFLICT);
 }
 

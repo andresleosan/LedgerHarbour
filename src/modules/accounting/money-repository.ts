@@ -114,6 +114,8 @@ export class MoneyError extends Error {
 
 export interface MoneyRepository {
   transaction<T>(operation: () => Promise<T>): Promise<T>;
+  /** Inside a transaction: holds the business's years until it ends, so year checks and writes cannot interleave. */
+  lockYears(businessId: BusinessId): Promise<void>;
   createYear(year: FinancialYear): Promise<FinancialYear>;
   updateYear(year: FinancialYear, businessId: BusinessId): Promise<FinancialYear>;
   findYear(id: string, businessId: BusinessId): Promise<FinancialYear | null>;
@@ -175,6 +177,9 @@ class MemoryMoneyRepository implements InMemoryMoneyRepository {
       release();
     }
   }
+
+  /** Nothing to take: transactions of the memory twin already run one at a time. */
+  async lockYears(): Promise<void> {}
 
   private assertYearConstraints(year: FinancialYear): void {
     if (year.endDate <= year.startDate) throw conflict();

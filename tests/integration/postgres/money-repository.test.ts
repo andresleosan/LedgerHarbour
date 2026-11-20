@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { createTestDatabase } from "../../../src/db/test-database";
+import { databaseForOperation } from "../../../src/db/transaction-scope";
 import type { AuthIdentity } from "../../../src/modules/auth/auth-provider";
 import { importHeadings, listHeadings, type TemplateHeadingInput } from "../../../src/modules/accounting/heading-service";
-import { MONEY_ERROR_CODES, type FinancialYear, type MoneyAccount, type Movement } from "../../../src/modules/accounting/money-repository";
+import { createMoneyRepository, MONEY_ERROR_CODES, type FinancialYear, type MoneyAccount, type MoneyRepository, type Movement } from "../../../src/modules/accounting/money-repository";
 import {
+  closeFinancialYear,
   createFinancialYear,
   createMoneyAccount,
   createMovement,
@@ -14,11 +16,17 @@ import {
   removeInvoiceMovements,
   replaceInvoiceMovements,
   setOpeningBalance,
+  updateFinancialYearDates,
   type MovementWriteContext,
 } from "../../../src/modules/accounting/money-service";
+import { createPostgresCurrencyRepository } from "../../../src/modules/accounting/postgres-currency-repository";
 import { createPostgresHeadingRepository } from "../../../src/modules/accounting/postgres-heading-repository";
 import { createPostgresMoneyRepository } from "../../../src/modules/accounting/postgres-money-repository";
 import { createPostgresTemplateRepository } from "../../../src/modules/accounting/postgres-template-repository";
+import { STATEMENT_IMPORT_ERROR_CODES, StatementImportError } from "../../../src/modules/accounting/statement-import-service";
+import { HEADING_ERROR_CODES } from "../../../src/modules/accounting/heading-service";
+import { TEMPLATE_ERROR_CODES } from "../../../src/modules/accounting/template-service";
+import { INVOICE_ERROR_CODES, InvoiceError } from "../../../src/modules/invoices/invoice-service";
 import { formatPence, parsePounds, sumPence } from "../../../src/modules/accounting/money";
 import type { AccountSheet } from "../../../src/modules/workbook/template-profile";
 import { createPostgresOnboardingRepository } from "../../../src/modules/tenancy/postgres-tenancy-repository";
@@ -200,6 +208,99 @@ describe("PostgreSQL money repository", () => {
       await expect(money.updateYear({ ...b.year, status: "closed" }, a.business.id)).rejects.toMatchObject({ code: MONEY_ERROR_CODES.FINANCIAL_YEAR_NOT_FOUND });
       await expect(money.listMovements(a.business.id, b.year.id)).resolves.toEqual([]);
       expect(await money.listOpenings(a.business.id, b.year.id)).toEqual(new Map());
+    } finally {
+      await close();
+    }
+  }, 30_000);
+});
+
+describe("Financial year locking in PostgreSQL", () => {
+  it("holds a per-business advisory lock until the transaction ends", async () => {
+    const { db, close, money, a } = await setup();
+    try {
+      const advisoryLocks = async () => Number((await (databaseForOperation(db) as typeof db).execute<{ count: string }>("SELECT count(*) AS count FROM pg_locks WHERE locktype = 'advisory' AND pid = pg_backend_pid()")).rows[0]?.count);
+      const held = await money.transaction(async () => {
+        await money.lockYears(a.business.id);
+        return advisoryLocks();
+      });
+      expect(held).toBe(1);
+      await expect(advisoryLocks()).resolves.toBe(0);
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
+  // PGlite has one connection and runs one transaction at a time, so these two updates are
+  // serialised by PGlite itself: true concurrency is not exercised here, only the outcome.
+  it("lets exactly one of two simultaneous date changes through and never stores overlapping years", async () => {
+    const { close, money, dependencies, a } = await setup();
+    try {
+      await closeFinancialYear(a.business.id, a.year.id, a.owner, dependencies);
+      const later = await createFinancialYear(a.business.id, { startDate: "2027-10-01", endDate: "2028-09-30" }, a.owner, dependencies);
+      const outcomes = await Promise.allSettled([
+        updateFinancialYearDates(a.business.id, a.year.id, { endDate: "2027-08-31" }, a.owner, dependencies),
+        updateFinancialYearDates(a.business.id, later.id, { startDate: "2027-06-01" }, a.owner, dependencies),
+      ]);
+      expect(outcomes.filter((outcome) => outcome.status === "fulfilled")).toHaveLength(1);
+      expect(outcomes.find((outcome) => outcome.status === "rejected")).toMatchObject({ reason: { code: MONEY_ERROR_CODES.FINANCIAL_YEAR_OVERLAP } });
+      const [first, second] = await money.listYears(a.business.id);
+      expect(first!.endDate < second!.startDate).toBe(true);
+    } finally {
+      await close();
+    }
+  }, 30_000);
+});
+
+describe("Application errors inside a transaction", () => {
+  const closedYear = (businessId: BusinessId): FinancialYear => ({
+    id: "year-rolled-back", businessId, startDate: "2030-01-01", endDate: "2030-12-31", status: "closed",
+    createdAt: "2026-01-01T00:00:00.000Z", updatedAt: "2026-01-01T00:00:00.000Z",
+  });
+
+  it("arrive unchanged and roll back the same way in memory and in PostgreSQL", async () => {
+    const { db, close, a } = await setup();
+    try {
+      const modes: [string, MoneyRepository][] = [["memory", createMoneyRepository()], ["postgres", createPostgresMoneyRepository(db)]];
+      for (const [mode, money] of modes) {
+        const refused = new StatementImportError(STATEMENT_IMPORT_ERROR_CODES.STATEMENT_HAS_ERRORS, [{ line: 2, reason: "INVALID_DATE" }]);
+        await expect(money.transaction(async () => {
+          await money.createYear(closedYear(a.business.id));
+          throw refused;
+        }), mode).rejects.toBe(refused);
+        expect(await money.findYear("year-rolled-back", a.business.id), mode).toBeNull();
+      }
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
+  it("arrive unchanged through the heading, template and currency repositories too", async () => {
+    const { db, close } = await setup();
+    try {
+      const foreign = new InvoiceError(INVOICE_ERROR_CODES.REPOSITORY_CONFLICT);
+      await expect(createPostgresHeadingRepository(db).transaction(async () => { throw foreign; })).rejects.toBe(foreign);
+      await expect(createPostgresTemplateRepository(db).transaction(async () => { throw foreign; })).rejects.toBe(foreign);
+      await expect(createPostgresCurrencyRepository(db).transaction(async () => { throw foreign; })).rejects.toBe(foreign);
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
+  it("still map driver failures and untyped errors to the repository conflict in PostgreSQL", async () => {
+    const { db, close, a } = await setup();
+    try {
+      const money = createPostgresMoneyRepository(db);
+      await expect(money.transaction(async () => {
+        await databaseForOperation(db).execute("SELECT 1/0");
+      })).rejects.toMatchObject({ name: "MoneyError", code: MONEY_ERROR_CODES.MONEY_REPOSITORY_CONFLICT });
+      await expect(money.transaction(async () => {
+        await money.createYear({ ...closedYear(a.business.id), startDate: a.year.startDate });
+      })).rejects.toMatchObject({ code: MONEY_ERROR_CODES.MONEY_REPOSITORY_CONFLICT });
+      await expect(money.transaction(async () => { throw new Error("untyped"); })).rejects.toMatchObject({ code: MONEY_ERROR_CODES.MONEY_REPOSITORY_CONFLICT });
+      await expect(createPostgresHeadingRepository(db).transaction(async () => { await databaseForOperation(db).execute("SELECT 1/0"); }))
+        .rejects.toMatchObject({ code: HEADING_ERROR_CODES.HEADING_REPOSITORY_CONFLICT });
+      await expect(createPostgresTemplateRepository(db).transaction(async () => { await databaseForOperation(db).execute("SELECT 1/0"); }))
+        .rejects.toMatchObject({ code: TEMPLATE_ERROR_CODES.TEMPLATE_REPOSITORY_CONFLICT });
     } finally {
       await close();
     }

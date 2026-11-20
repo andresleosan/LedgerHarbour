@@ -199,11 +199,9 @@ export async function importStatement(businessId: BusinessId, input: StatementIm
     const parsed = parse(input);
     if (!parsed.mapping) throw new StatementImportError(STATEMENT_IMPORT_ERROR_CODES.COLUMNS_REQUIRED);
     if (parsed.needsDateFormat) throw new StatementImportError(STATEMENT_IMPORT_ERROR_CODES.DATE_FORMAT_REQUIRED);
-    // The money repositories turn any other error thrown inside a transaction into a conflict,
-    // so a refused file leaves the transaction as a value, before anything is written.
-    const outcome = await context.money.transaction(async () => {
+    return context.money.transaction(async () => {
       const { account, rows, errors, counts } = await analyse(context, input, parsed);
-      if (errors.length > 0) return { refused: errors };
+      if (errors.length > 0) throw new StatementImportError(STATEMENT_IMPORT_ERROR_CODES.STATEMENT_HAS_ERRORS, errors);
       const fresh = rows.filter((row) => row.outcome === "new");
       await createMovementsInTransaction(context, fresh.map((row) => ({
         accountId: account.id,
@@ -222,8 +220,6 @@ export async function importStatement(businessId: BusinessId, input: StatementIm
       });
       return { imported: fresh.length, counts };
     });
-    if ("refused" in outcome) throw new StatementImportError(STATEMENT_IMPORT_ERROR_CODES.STATEMENT_HAS_ERRORS, outcome.refused);
-    return outcome;
   });
 }
 

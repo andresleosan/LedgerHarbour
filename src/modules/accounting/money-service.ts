@@ -180,6 +180,7 @@ export async function createFinancialYear(businessId: BusinessId, input: { start
   const now = new Date().toISOString();
   const year: FinancialYear = { id: randomUUID(), businessId: context.businessId, ...dates, status: "open", createdAt: now, updatedAt: now };
   return write(context, async () => {
+    await context.money.lockYears(context.businessId);
     await assertNoOverlap(context.money, year);
     const saved = await context.money.createYear(year);
     return { result: saved, audit: [{ type: "financial_year_created", entityId: saved.id }] };
@@ -195,6 +196,7 @@ async function changeYear(
 ): Promise<FinancialYear> {
   const context = await authorize(businessId, actor, dependencies, "edit_finance");
   return write(context, async () => {
+    await context.money.lockYears(context.businessId);
     const current = typeof yearId === "string" ? await context.money.findYear(yearId, context.businessId) : null;
     if (!current) throw new MoneyError(MONEY_ERROR_CODES.FINANCIAL_YEAR_NOT_FOUND);
     const changed = await change(current, context.money);

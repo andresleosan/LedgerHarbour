@@ -134,14 +134,35 @@ function mapBusiness(row: typeof businesses.$inferSelect, createdBy: UserId): Bu
   };
 }
 
+/** Each audit action, by family, and the entity it is about. Exact actions come before prefixes. */
+const AUDIT_ENTITY_TYPES: readonly (readonly [action: string, entityType: string])[] = [
+  ["ownership_transferred", "membership"],
+  ["project_created", "project"],
+  ["statement_imported", "statement_import"],
+  ["statement_movement_", "movement"],
+  ["business_", "business"],
+  ["join_request_", "join_request"],
+  ["membership_", "membership"],
+  ["category_", "category"],
+  ["invoice_", "invoice"],
+  ["account_heading_", "account_heading"],
+  ["account_template_", "account_template"],
+  ["financial_year_", "financial_year"],
+  ["money_account_", "money_account"],
+  ["movement_", "movement"],
+  ["transfer_", "transfer"],
+  ["workbook_", "workbook_export"],
+  ["annex_", "annex"],
+];
+
+/** The stored entity type of an audit action, or null when it has no mapping (it then falls back to the action). */
+export function auditEntityType(type: string): string | null {
+  const match = AUDIT_ENTITY_TYPES.find(([action]) => action.endsWith("_") ? type.startsWith(action) : type === action);
+  return match ? match[1] : null;
+}
+
 function entityType(type: string): string {
-  if (type.startsWith("business_")) return "business";
-  if (type.startsWith("join_request_")) return "join_request";
-  if (type.startsWith("membership_")) return "membership";
-  if (type.startsWith("category_")) return "category";
-  if (type.startsWith("invoice_")) return "invoice";
-  if (type.startsWith("account_heading_")) return "account_heading";
-  return type;
+  return auditEntityType(type) ?? type;
 }
 
 function createRepository(db: Database, transactionCount: { value: number }): OnboardingRepository {

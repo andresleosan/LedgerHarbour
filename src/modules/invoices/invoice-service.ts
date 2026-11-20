@@ -543,28 +543,6 @@ export async function asInvoiceError<T>(operation: () => Promise<T>): Promise<T>
   }
 }
 
-/**
- * Runs `operation` inside a money transaction and rethrows its own error: the PostgreSQL money
- * repository would otherwise turn any non-money error into a money conflict. Taken before the
- * invoice and tenancy locks, the same order as the money service, so the memory locks never cross.
- */
-export async function inMoneyTransaction<T>(money: MoneyRepository, operation: () => Promise<T>): Promise<T> {
-  const failure: { error?: unknown; failed?: true } = {};
-  try {
-    return await money.transaction(async () => {
-      try {
-        return await operation();
-      } catch (error) {
-        failure.error = error;
-        failure.failed = true;
-        throw error;
-      }
-    });
-  } catch (error) {
-    throw failure.failed ? failure.error : error;
-  }
-}
-
 /** The tenancy repository of an open transaction, whose nested transactions run inline (the memory lock is not reentrant). */
 function inlineTenancy(tenancy: OnboardingRepository): OnboardingRepository {
   return new Proxy(tenancy, {
@@ -661,7 +639,8 @@ export async function approveInvoice(invoiceId: InvoiceId, actor: OnboardingActo
     }
   };
 
-  return inMoneyTransaction(resolved.money, () => {
+  // The money transaction is taken before the invoice and tenancy locks, the same order as the money service, so the memory locks never cross.
+  return resolved.money.transaction(() => {
     if (resolved.transaction) return resolved.transaction(approveInTransaction);
     return resolved.invoices.transaction(async () => {
       return resolved.tenancyRepository.transaction((transaction) => approveInTransaction(transaction));

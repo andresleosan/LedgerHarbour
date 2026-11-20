@@ -10,10 +10,11 @@ import {
   type StoredTemplateProfile,
   type TemplateRepository,
 } from "./template-service";
+import { isApplicationError } from "./application-error";
 import type { BusinessId, UserId } from "../tenancy/types";
 
 function preserveOrMap(error: unknown): never {
-  if (error instanceof TemplateError) throw error;
+  if (isApplicationError(error)) throw error;
   throw new TemplateError(TEMPLATE_ERROR_CODES.TEMPLATE_REPOSITORY_CONFLICT);
 }
 

@@ -48,7 +48,7 @@ El gate valida estructura, formatos, hosts permitidos, consistencia y campos obl
 - En staging, el runner requiere `ALLOW_STAGING_MIGRATION=true`; la ejecución aprobada de `0007_rate_limit_windows` en `ledgerharbour-staging` se hizo mediante SQL Editor después de verificar backup/restore y queda registrada en `tasks.md`. Cualquier migración adicional debe seguir el procedimiento aprobado por operaciones.
 - Aplica migraciones en orden y verifica `ledgerharbour_schema_migrations`, tablas requeridas y conteos esperados.
 - Si una verificacion falla, detiene la activacion, conserva los logs sin secretos y ejecuta el rollback aprobado solo despues de confirmar el impacto y el backup.
-- La migracion de plataforma es `0002_platform_control_plane`; los cambios posteriores de ciclo, membresias y proyectos deben respetar sus rollback versionados.
+- La migracion de plataforma es `0002_platform_control_plane`; los cambios posteriores de ciclo, membresias, proyectos y finanzas (`0008_account_headings` a `0012_invoice_payments`, solo ejecutadas en PGlite) deben respetar sus rollback versionados.
 - No uses `DROP`, `TRUNCATE` ni cambios destructivos como rollback improvisado. Una migracion destructiva requiere confirmacion explicita adicional.
 
 ## Controles recurrentes

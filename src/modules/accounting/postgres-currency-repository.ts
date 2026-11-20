@@ -9,6 +9,7 @@ import {
   type BusinessCurrency,
   type CurrencyRepository,
 } from "./currency-service";
+import { isApplicationError } from "./application-error";
 import type { BusinessId } from "../tenancy/types";
 
 function id<T extends string>(value: string): T {
@@ -35,6 +36,7 @@ function mapDatabaseError(error: unknown): CurrencyError | null {
 }
 
 function preserveOrMap(error: unknown): never {
+  if (isApplicationError(error)) throw error;
   const mapped = mapDatabaseError(error);
   if (mapped) throw mapped;
   throw new CurrencyError(CURRENCY_ERROR_CODES.CURRENCY_REPOSITORY_CONFLICT);

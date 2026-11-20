@@ -7,7 +7,6 @@ import { resolveDefaultMoneyRepository } from "../accounting/money-repository";
 import { resolveDefaultHeadingRepository } from "../accounting/heading-service";
 import {
   getInvoice,
-  inMoneyTransaction,
   INVOICE_ERROR_CODES,
   InvoiceError,
   normalizePayment,
@@ -83,7 +82,8 @@ async function changeApproved(
   if (current.voidedAt) return current;
   // `change` saves with updateIfUnchanged, so a concurrent change since this read is a conflict.
   const inTransaction = (transactionTenancy: OnboardingRepository) => change(current, resolved, transactionTenancy, actorId);
-  return inMoneyTransaction(resolved.money, () => {
+  // Money first, then invoice and tenancy: the lock order of the money service.
+  return resolved.money.transaction(() => {
     if (resolved.transaction) return resolved.transaction(inTransaction);
     return resolved.invoices.transaction(() => resolved.tenancyRepository.transaction(inTransaction));
   });

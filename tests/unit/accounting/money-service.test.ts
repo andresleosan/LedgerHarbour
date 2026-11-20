@@ -126,6 +126,33 @@ describe("financial years", () => {
   });
 });
 
+describe("financial year locking", () => {
+  it("locks the business's years before every overlap check, inside the transaction", async () => {
+    const fixture = await context();
+    const calls: string[] = [];
+    const money = new Proxy(fixture.money, {
+      get(target, property) {
+        const value = Reflect.get(target, property, target) as unknown;
+        if (typeof value !== "function") return value;
+        return (...args: unknown[]) => {
+          calls.push(String(property));
+          return (value as (...input: unknown[]) => unknown).apply(target, args);
+        };
+      },
+    });
+    const dependencies = { ...fixture.dependencies, money };
+    const first = await createFinancialYear(fixture.business.id, { startDate: "2026-01-01", endDate: "2026-12-31" }, owner, dependencies);
+    expect(calls).toEqual(["transaction", "lockYears", "listYears", "createYear"]);
+    calls.length = 0;
+    await updateFinancialYearDates(fixture.business.id, first.id, { endDate: "2026-12-30" }, owner, dependencies);
+    expect(calls).toEqual(["transaction", "lockYears", "findYear", "listMovements", "listYears", "updateYear"]);
+    await closeFinancialYear(fixture.business.id, first.id, owner, dependencies);
+    calls.length = 0;
+    await reopenFinancialYear(fixture.business.id, first.id, owner, dependencies);
+    expect(calls).toEqual(["transaction", "lockYears", "findYear", "listYears", "updateYear"]);
+  });
+});
+
 describe("money accounts", () => {
   it("requires a template and one of its sheets", async () => {
     const without = await context({ template: false });

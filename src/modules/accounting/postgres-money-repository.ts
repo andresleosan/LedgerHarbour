@@ -1,4 +1,4 @@
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, isNull, sql } from "drizzle-orm";
 
 import type { Database } from "../../db/client";
 import { databaseForOperation, transactionWithDatabase } from "../../db/transaction-scope";
@@ -11,10 +11,11 @@ import {
   type MoneyRepository,
   type Movement,
 } from "./money-repository";
+import { isApplicationError } from "./application-error";
 import type { BusinessId, UserId } from "../tenancy/types";
 
 function preserveOrMap(error: unknown): never {
-  if (error instanceof MoneyError) throw error;
+  if (isApplicationError(error)) throw error;
   throw new MoneyError(MONEY_ERROR_CODES.MONEY_REPOSITORY_CONFLICT);
 }
 
@@ -108,6 +109,11 @@ export function createPostgresMoneyRepository(database: Database): MoneyReposito
         return preserveOrMap(error);
       }
     },
+
+    /** A per-business advisory lock, released at commit or rollback; it also covers a business with no years yet. */
+    lockYears: guarded(async (db, businessId: BusinessId) => {
+      await db.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`financial_years:${businessId}`}, 0))`);
+    }, database),
 
     createYear: guarded(async (db, year: FinancialYear) => mapYear(one(await db.insert(financialYears).values({
       ...year,
