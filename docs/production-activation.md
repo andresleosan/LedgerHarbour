@@ -4,6 +4,8 @@ La aplicacion no debe tratarse como produccion hasta completar todos los pasos d
 
 Este archivo es un runbook de acciones requeridas para el operador; no autoriza cambios ni sustituye la evidencia actual. La revision read-only disponible esta en [LH-005](provider-alerts-limits-checklist.md) y sus estados pueden cambiar.
 
+El destino de publicación de LH-029 es Cloudflare Pages y un túnel privado a la app y Tesseract en la VPS. El [plan de LH-029](roadmap/work/LH-029/cloudflare.md) establece el orden de activación. Los estados de Vercel de este documento son históricos.
+
 ## Activacion unica
 
 ### Contrato obligatorio

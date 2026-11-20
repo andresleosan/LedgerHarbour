@@ -19,6 +19,9 @@ function firstHeaderValue(requestHeaders: Headers, name: string): string | null 
 }
 
 function requestAddress(requestHeaders: Headers): string {
+  if (process.env.LEDGERHARBOUR_TRUSTED_PROXY === "cloudflare-pages") {
+    return requestHeaders.get("x-ledgerharbour-client-ip")?.trim() || "edge-unknown";
+  }
   const vercelAddress = firstHeaderValue(requestHeaders, "x-vercel-forwarded-for");
   if (process.env.NODE_ENV === "production") return vercelAddress ?? "edge-unknown";
   if (vercelAddress) return vercelAddress;

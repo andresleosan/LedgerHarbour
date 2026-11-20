@@ -1,20 +1,39 @@
 {
   "id": "LH-029",
   "titulo": "Publicar y activar en producción lo construido",
-  "estado": "pendiente",
+  "estado": "parcial",
   "responsable": "operador",
   "criterio": [
-    "Los commits de la rama `avanzar` están en `origin/main` con el CI en verde.",
-    "Las migraciones nuevas están aplicadas en la base de producción.",
-    "El recorrido real, de la foto al libro exportado, se comprobó en producción."
+    "Los commits de la rama avanzar están en origin/main con CI verde y ledgerharbour.pages.dev sirve la app a través del Worker privado y Cloudflare Tunnel.",
+    "Las migraciones del PostgreSQL de producción están aplicadas y verificadas tras confirmar el respaldo.",
+    "En el dominio de Cloudflare, una cuenta Firebase autorizada verifica el recorrido desde la foto leída por Tesseract en la VPS hasta el libro exportado."
   ],
   "depende": [],
   "comprueba": [],
-  "recursos": [],
-  "hecho": "",
-  "falta": "Hay cinco migraciones por aplicar: 0008 a 0012. Antes de activar la subida de plantilla en producción, comprobar el límite de memoria de las funciones (el lector pide unos 160 MB y la exportación unos 300 MB con el libro real). Antes de aplicar las migraciones 0008 a 0012 en una base real, correr `corepack pnpm db:native-check` contra un PostgreSQL desechable (TEST_DATABASE_URL): esa puerta nunca ha corrido para estas migraciones. El bloqueo que impide ejercicios solapados solo se ha probado en PGlite, que no ejecuta transacciones a la vez: conviene probarlo en el PostgreSQL desechable de esa misma comprobación.",
-  "bloqueo": "Revisar la rama `avanzar`, publicarla (push o PR a `main`, que despliega en producción) y aplicar las migraciones nuevas. O autorizar al bucle a hacerlo y decir hasta dónde.",
-  "siguiente": "",
-  "evidencia": [],
+  "recursos": [
+    "docs/roadmap/work/LH-029/**",
+    "docs/production-activation.md",
+    "docs/STACK.md",
+    "src/modules/security/auth-rate-limit.ts",
+    "src/modules/security/authenticated-rate-limit.ts",
+    "vercel.json"
+  ],
+  "hecho": "Registrados el proyecto Pages y el dominio ledgerharbour.pages.dev, creado el túnel y desplegado el Worker privado con un único servicio VPC de origen. Probados el proxy y el ajuste de rate limiting. Migraciones verificadas en PostgreSQL desechable.",
+  "falta": "Publicar el PR y comprobar su CI. Obtener acceso a la configuración de Firebase Auth, conectar el origen autorizado y confirmar el entorno y respaldo restaurable de PostgreSQL. Aplicar 0008 a 0012, completar Pages y probar el recorrido de la foto al Excel en producción.",
+  "bloqueo": "Habilitar acceso a la configuración de Firebase Auth e identificar el entorno de producción y el respaldo restaurable de PostgreSQL.",
+  "siguiente": "Completar el acceso a Firebase y comprobar la base y el entorno aprobados. Levantar el origen en loopback, conectar el túnel y publicar Pages tras las verificaciones.",
+  "evidencia": [
+    "2026-11-20 · ddc1f99 · corepack pnpm db:native-check en PostgreSQL 16.15 desechable, por socket Unix privado: 5 de 5 pruebas pasaron. Aplicó y verificó 0001–0012 en una base vacía y revirtió y reaplicó 0012.",
+    "2026-11-20 · ddc1f99 · Dos cambios simultáneos de fechas por el servicio de ejercicios y conexiones independientes. pg_locks y pg_blocking_pids confirmaron la espera por el bloqueo. Tras confirmar la primera transacción, la segunda devolvió FINANCIAL_YEAR_OVERLAP y los ejercicios guardados no se solaparon. El clúster temporal se detuvo y se eliminó.",
+    "2026-11-20 · GitHub: origin/main en 0311fc8 con CI en verde (Actions 40817704500). El mismo commit muestra un despliegue fallido en Vercel. La consulta de metadatos de Vercel terminó con error, por lo que la causa sigue pendiente de comprobar.",
+    "2026-11-20 · 0807eda, candidato local con 49 commits sobre origin/main. El Dockerfile incluye Node 26.12.1 y Tesseract, según el destino del plan LH-027. Vercel anuncia compatibilidad con Node 26; sigue pendiente verificar la configuración y la memoria del entorno que se active.",
+    "2026-11-20 · Decisión del operador: Cloudflare sustituye a Vercel para el despliegue. Firebase se mantiene para el acceso y el OCR Tesseract sigue en la VPS para conservar la lectura sin cobro por factura.",
+    "2026-11-20 · 0807eda · Node 26.12.1 con configuración sintética de CI: lint, tsc --noEmit, vitest run --no-file-parallelism (1252 pasadas, 7 omitidas) y build correctos.",
+    "2026-11-20 · docker compose config --format json con entorno sintético: servicio único, proyecto separado, puerto del origen en 127.0.0.1 y modos de producción forzados. Sin puerto, la validación falla. No se arrancaron contenedores.",
+    "2026-11-20 · Operador autorizó LH-029, los cambios de dominio y eligió ledgerharbour.pages.dev.",
+    "2026-11-20 · Wrangler confirmó el proyecto Pages y el subdominio, el túnel dedicado y el servicio VPC HTTP para el origen local. El Worker privado pasó el dry-run y se desplegó sin routes, workers.dev ni URLs de preview.",
+    "2026-11-20 · Firebase Identity Toolkit devolvió HTTP 403 al leer la configuración de dominios. La actualización queda pendiente.",
+    "2026-11-20 · Pruebas de proxy de Pages y Worker: 3 pasadas. Pruebas de rate limiting: 12 pasadas, con dos regresiones reproducidas antes del cambio. Wrangler empaquetó Pages Functions. Lint, tsc, suite Vitest secuencial y build correctos con configuración sintética."
+  ],
   "actualizado": "2026-11-20"
 }

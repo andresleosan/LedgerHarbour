@@ -19,6 +19,10 @@ El dueño de un negocio fotografía sus facturas con el móvil y la app le devue
 
 Desde el 20-nov-2026 (LH-030) la vista previa del tailnet (`https://optimyze-vps-de-prod.tail29c816.ts.net:9470`) sirve la rama `avanzar` desde el worktree `/root/LedgerHarbour-preview`, en el contenedor `ledgerharbour-app` con Node 26 y el entorno de pruebas (datos en memoria, lector de facturas falso, acceso con cualquier correo; administrador `admin@ledgerharbour.test`). Su configuración está en `/root/LedgerHarbour/deploy/compose.yaml`, fuera del repositorio. Actualizarla a un commit nuevo o reiniciarla sigue sin estar autorizado al bucle: va a la cola.
 
+## Producción
+
+Desde el 20-nov-2026 el destino de LH-029 es Cloudflare Pages en `ledgerharbour.pages.dev` con un túnel privado a la app en la VPS. Tesseract sigue en la imagen y Firebase sigue gestionando el acceso. Consulta el [plan de activación](work/LH-029/cloudflare.md). Revisa la integración Git de Vercel antes de fusionar a `main`.
+
 ## Comandos
 
 Todos desde la copia de avance.
@@ -62,8 +66,8 @@ Los archivos de la adopción (`docs/roadmap/` y la nota final de `tasks.md`) son
 
 ## No autorizado: va a la cola
 
-- `git push` de cualquier rama, pull requests y cambios en `main`. Un push a `main` despliega en producción.
-- Migraciones en la base de datos real, y cualquier cambio en Vercel, Neon, Firebase, R2 o Google Cloud.
+- `git push` de cualquier rama, pull requests y cambios en `main`. Mientras la integración Git de Vercel siga activa, un push a `main` puede iniciar un despliegue allí.
+- Migraciones en la base de datos real, y cualquier cambio operativo en Cloudflare, Vercel, Neon, Firebase o Google Cloud.
 - Facturación y cualquier gasto nuevo.
 - Tocar `/root/LedgerHarbour`, los contenedores de la vista previa o la red de la VPS.
 - Enviar facturas reales, la plantilla del contable o datos de un cliente a un servicio externo, incluida la lectura real de facturas.

@@ -18,7 +18,7 @@ Prototipo local/no comercial. El objetivo de la siguiente fase es una prueba des
 
 ## Arquitectura de prototipo desplegable
 
-- Hosting: Vercel Hobby para el prototipo. La app con OCR local se empaqueta para la VPS existente (LH-027).
+- Hosting: app en la VPS existente, con Cloudflare Pages como entrada HTTPS y Cloudflare Tunnel para llegar al origen privado (LH-029). Vercel Hobby fue el hosting del prototipo.
 - PostgreSQL objetivo: Neon Free; adapter PostgreSQL y migraciones versionadas. Existe una base Neon operativa con `0001` a `0006` verificadas read-only; el backup productivo y la retencion operativa siguen `operator-controlled`.
 - Auth: Firebase Authentication; adapter email/password + Google implementado, activacion operator-controlled pendiente.
 - Storage privado: Cloudflare R2 Standard.
@@ -36,7 +36,7 @@ read-only de [docs/provider-alerts-limits-checklist.md](provider-alerts-limits-c
 |---|---|---|---|---|
 | Firebase | Adapter de autenticacion email/password + Google. | Contrato y documentacion local. | Activacion `operator-controlled`. | Boundary de identidad y estado externo `unverified`. |
 | Neon | Adapter PostgreSQL y migraciones versionadas. | PGlite y verificacion read-only de Neon. | Backup y retencion requieren control operativo. | Conexion y migracion verificadas; backup `operator-controlled`. |
-| Vercel | Hosting objetivo. | Deployment Production `Ready` y verificacion browser. | Despliegue `operator-controlled`. | Cuenta y plan actuales `unverified`. |
+| Cloudflare Tunnel | Entrada HTTPS al origen en la VPS. | Compose de producción validado localmente y plan en LH-029. | Dominio, origen y túnel pendientes de activación. | Verificación del dominio en Firebase y recorrido en navegador pendientes. |
 | Cloudflare R2 | Adapter de storage privado. | Bucket observado read-only; acceso publico deshabilitado; alerta mensual de `$1` y token bucket-scoped verificados. | Activacion `operator-controlled`. | Plan `R2 Paid`; uso y facturacion futura dependen del operador. |
 | Neon rate limiting | Tabla `rate_limit_windows` y `UPSERT` atómico con claves HMAC. | Migración `0007_rate_limit_windows`, adapter, pruebas locales y verificación remota de tabla/índice en `ledgerharbour-staging`. | Producción requiere despliegue explícitamente aprobado; `RATE_LIMIT_KEY_SECRET` y `RATE_LIMIT_MODE=postgres` ya están cargados en Vercel Production. | Cuota Free compartida con la persistencia; limpiar ventanas antiguas como mantenimiento. |
 | Google Document AI | Adapter Invoice Parser. | Processor habilitado en `us`; IAM API User observado. | Activacion runtime y billing requieren control del operador. | Cuotas visibles; alerta de billing `blocked` sin cuenta vinculada. |
