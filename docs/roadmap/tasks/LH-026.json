@@ -1,7 +1,7 @@
 {
   "id": "LH-026",
   "titulo": "Anexo de cierre para el contable",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "Lista de facturas sin pagar a fin de ejercicio (proveedor, fecha, importe) y de compras de inmovilizado (artículo, fecha, coste).",
@@ -16,10 +16,17 @@
     "src/modules/workbook/**",
     "src/app/api/businesses/[businessId]/export/**"
   ],
-  "hecho": "",
+  "hecho": "Anexo de cierre descargable aparte del libro (CSV): facturas sin pagar a fin de ejercicio, facturas pagadas con dinero propio, compras y cobros de inmovilizado, con totales por moneda. Las notas de abono salen en negativo.",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Piezas ya hechas: listUnpaidInvoices y listPrivatelyPaidInvoices (facturas) y los movimientos por rótulo del grupo de activos.",
-  "evidencia": [],
+  "siguiente": "",
+  "evidencia": [
+    "Commits b318dff y a1e329d.",
+    "annex-csv 12, annex-service 9, annex-permissions 10; pasadas. Nunca suma monedas distintas; celdas de texto protegidas contra fórmulas.",
+    "Arreglado en el lote: una nota de abono sin pagar salía como deuda positiva.",
+    "e2e year-chain.spec descarga el CSV y comprueba la marca BOM y las cuatro secciones.",
+    "No comprobado: abrir el CSV en una hoja de cálculo real; reglas probadas en memoria, no contra PostgreSQL.",
+    "Verificación de lote 5 sobre b4b3eba: lint 0, tsc 0, build 0; vitest --no-file-parallelism 1202 pasadas y 1 fallida por una expectativa desfasada (corregida en 27c4c16; el archivo pasa); e2e por carpetas: movimientos, ejercicio y ajustes 5; documentos y critical-path 9; facturas 6; navegación y ejercicio 3. Seis de facturas y navegación fallaron en una pasada de 11,6 min con la máquina saturada y pasaron al repetirlas. pnpm audit --audit-level high: salida 0 (2 bajas, 7 moderadas)."
+  ],
   "actualizado": "2026-11-20"
 }

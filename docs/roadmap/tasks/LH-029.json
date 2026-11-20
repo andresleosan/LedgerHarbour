@@ -12,7 +12,7 @@
   "comprueba": [],
   "recursos": [],
   "hecho": "",
-  "falta": "Hay cinco migraciones por aplicar: 0008 a 0012. Antes de activar la subida de plantilla en producción, comprobar el límite de memoria de las funciones (el lector pide unos 160 MB y la exportación unos 300 MB con el libro real).",
+  "falta": "Hay cinco migraciones por aplicar: 0008 a 0012. Antes de activar la subida de plantilla en producción, comprobar el límite de memoria de las funciones (el lector pide unos 160 MB y la exportación unos 300 MB con el libro real). Antes de aplicar las migraciones 0008 a 0012 en una base real, correr `corepack pnpm db:native-check` contra un PostgreSQL desechable (TEST_DATABASE_URL): esa puerta nunca ha corrido para estas migraciones.",
   "bloqueo": "Revisar la rama `avanzar`, publicarla (push o PR a `main`, que despliega en producción) y aplicar las migraciones nuevas. O autorizar al bucle a hacerlo y decir hasta dónde.",
   "siguiente": "",
   "evidencia": [],

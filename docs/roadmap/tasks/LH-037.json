@@ -1,0 +1,31 @@
+{
+  "id": "LH-037",
+  "titulo": "Detalles de uso antes de la primera prueba real",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Un importe leído con más de dos decimales va a revisión en vez de guardarse.",
+    "Tras leer una factura, el enlace lleva a su revisión.",
+    "«Facturas sin pagar» del ejercicio cuenta solo las de ese ejercicio y anteriores; el resumen y la exportación tratan igual las cuentas inactivas.",
+    "Un traspaso sin concepto se guarda con el texto del idioma de la pantalla; reimportar la plantilla cuenta solo los rótulos que cambian.",
+    "Los errores de la pantalla de revisión siguen el idioma elegido y no quedan textos sin uso."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/invoices/**",
+    "src/modules/accounting/**",
+    "src/app/(app)/business/[businessId]/**",
+    "src/app/api/**",
+    "src/i18n/messages/**",
+    "tests/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Empezar por el importe con más de dos decimales: es dinero.",
+  "evidencia": [
+    "Creada el 2026-11-20 al repasar MEJORAS: ocho detalles pequeños que verá quien use la app."
+  ],
+  "actualizado": "2026-11-20"
+}

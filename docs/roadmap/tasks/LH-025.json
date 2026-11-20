@@ -1,7 +1,7 @@
 {
   "id": "LH-025",
   "titulo": "Resumen del ejercicio en la app",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "Pantalla con totales por código y por cuenta, saldo de cada cuenta, y cuántos movimientos faltan por codificar y cuántas facturas por pagar.",
@@ -19,10 +19,17 @@
     "tests/unit/accounting/summary",
     "src/i18n/messages/**"
   ],
-  "hecho": "",
-  "falta": "Incluir en esta pantalla el botón de descarga del libro y el informe de control de LH-024 en palabras llanas (GET …/export y …/export/report); la suma está en year-summary.ts.",
+  "hecho": "Pantalla «Ejercicio»: botón para descargar el libro relleno o, si está bloqueado, una frase por motivo con su enlace; avisos para el contable; saldos por cuenta; totales por código agrupados; movimientos por codificar y facturas sin pagar; enlace al anexo de cierre. Inglés y español.",
+  "falta": "",
   "bloqueo": "",
-  "siguiente": "Pantalla nueva con el resumen (year-summary.ts), el botón de descarga del libro, el informe de control de LH-024 y el número de facturas sin pagar (GET …/invoices/unpaid).",
-  "evidencia": [],
+  "siguiente": "",
+  "evidencia": [
+    "Commits 2e4610a y b4b3eba.",
+    "year-summary-matches-export.test: los totales por código y por cuenta son idénticos entre el resumen, el informe de exportación y el .xlsx descargado y releído.",
+    "year-summary-permissions 3; e2e year.spec y year-chain.spec pasadas a 390 px y 1280 px: bloqueo por movimientos sin código, codificar en la bandeja, descarga del libro y del anexo.",
+    "El panel general sigue sin importes: tenant-isolation.spec pasada.",
+    "No comprobado en navegador: la vista sin permiso (403); cubierta en la prueba de ruta.",
+    "Verificación de lote 5 sobre b4b3eba: lint 0, tsc 0, build 0; vitest --no-file-parallelism 1202 pasadas y 1 fallida por una expectativa desfasada (corregida en 27c4c16; el archivo pasa); e2e por carpetas: movimientos, ejercicio y ajustes 5; documentos y critical-path 9; facturas 6; navegación y ejercicio 3. Seis de facturas y navegación fallaron en una pasada de 11,6 min con la máquina saturada y pasaron al repetirlas. pnpm audit --audit-level high: salida 0 (2 bajas, 7 moderadas)."
+  ],
   "actualizado": "2026-11-20"
 }

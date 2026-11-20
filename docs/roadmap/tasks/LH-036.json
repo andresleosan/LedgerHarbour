@@ -1,0 +1,29 @@
+{
+  "id": "LH-036",
+  "titulo": "Mismo comportamiento en memoria y en PostgreSQL",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Un error propio lanzado dentro de una transacción de dinero llega igual en memoria y en PostgreSQL, con prueba en PGlite.",
+    "Dos cambios simultáneos de fechas de ejercicio no pueden dejar ejercicios solapados.",
+    "Los eventos de auditoría nuevos guardan un tipo de entidad propio.",
+    "La prueba de esquema nativo no depende del orden de colación y los documentos nombran las migraciones 0008 a 0012."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/accounting/postgres-money-repository.ts",
+    "src/modules/accounting/money-service.ts",
+    "src/modules/tenancy/postgres-tenancy-repository.ts",
+    "tests/integration/postgres/**",
+    "docs/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Reproducir en PGlite: un error que no es MoneyError dentro de money.transaction sale como conflicto.",
+  "evidencia": [
+    "Creada el 2026-11-20 al repasar MEJORAS: LH-023 y LH-021 tuvieron que rodear esa diferencia cada uno por su cuenta."
+  ],
+  "actualizado": "2026-11-20"
+}

@@ -1,7 +1,7 @@
 {
   "id": "LH-023",
   "titulo": "Importar el extracto del banco",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "Se sube el CSV del banco y cada línea se convierte en un movimiento de esa cuenta.",
@@ -22,10 +22,18 @@
     "tests/unit/bank-import/**",
     "src/i18n/messages/**"
   ],
-  "hecho": "",
+  "hecho": "Pantalla «Importar extracto del banco»: se sube el CSV, la app muestra las columnas que entendió (corregibles) y cuántas líneas son nuevas, ya importadas o ya registradas; importa todo o nada; las líneas sin código quedan en la bandeja «por codificar» con sugerencia por concepto.",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Formato del CSV: pedir un extracto de ejemplo sin datos reales o construir uno sintético con sus columnas.",
-  "evidencia": [],
-  "actualizado": "2026-11-19"
+  "siguiente": "",
+  "evidencia": [
+    "Commits 976b2ae y 1ddf270.",
+    "statement-csv 56, statement-import-service 13, statement-import-permissions 7, statement-import-postgres 1; e2e statement-import.spec y year-chain.spec pasadas.",
+    "No duplica: la misma línea no se importa dos veces (huella por cuenta, fecha, importe, concepto y repetición) y una línea que casa con un movimiento existente de igual importe a 5 días o menos no se crea.",
+    "La prueba de PostgreSQL destapó y corrigió un fallo real: un archivo rechazado devolvía un conflicto genérico.",
+    "Aviso de seguridad atendido en 1ddf270: una celda de importe enorme tardaba 23 s; ahora se rechaza a partir de 64 caracteres.",
+    "Decisión: sin migración; la huella va en source_ref. Ventana de 5 días: valor por defecto del spec.",
+    "Verificación de lote 5 sobre b4b3eba: lint 0, tsc 0, build 0; vitest --no-file-parallelism 1202 pasadas y 1 fallida por una expectativa desfasada (corregida en 27c4c16; el archivo pasa); e2e por carpetas: movimientos, ejercicio y ajustes 5; documentos y critical-path 9; facturas 6; navegación y ejercicio 3. Seis de facturas y navegación fallaron en una pasada de 11,6 min con la máquina saturada y pasaron al repetirlas. pnpm audit --audit-level high: salida 0 (2 bajas, 7 moderadas)."
+  ],
+  "actualizado": "2026-11-20"
 }

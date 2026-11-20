@@ -1,0 +1,28 @@
+{
+  "id": "LH-038",
+  "titulo": "Pruebas de navegador para la lectura fallida y el duplicado real",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "El entorno de pruebas puede provocar una lectura fallida sin que exista ese interruptor en producción.",
+    "«Leer de nuevo» y «Rellenar a mano» se ejercitan en el navegador.",
+    "La prueba de subida usa el 409 real del duplicado."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/invoices/fake-ocr-provider.ts",
+    "src/modules/invoices/ocr-provider-factory.ts",
+    "scripts/playwright-server.ts",
+    "tests/e2e/**",
+    "tests/unit/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Mirar cómo fuerza los fallos tests/integration/invoices/ocr-workflow.test.ts y cómo admite la puerta de consola un 4xx esperado.",
+  "evidencia": [
+    "Creada el 2026-11-20 al repasar MEJORAS: dos botones de LH-019 solo están probados a nivel de servidor."
+  ],
+  "actualizado": "2026-11-20"
+}

@@ -2,6 +2,10 @@
 
 Una línea por cierre, la más reciente arriba: fecha, tarea, qué cambió para quien usa la app y progreso antes → después.
 
+- 2026-11-20 · Repaso de mejoras: cuatro fichas nuevas (LH-035 a LH-038) · 18 de 27.
+- 2026-11-20 · LH-025 · Pantalla «Ejercicio»: descargar el libro del contable relleno, ver por qué no se puede si falta algo, saldos y totales · 17 de 23 → 18 de 23.
+- 2026-11-20 · LH-023 · Se puede subir el extracto del banco en CSV sin duplicar lo ya registrado; lo que no tiene código espera en una bandeja · 16 de 23 → 17 de 23.
+- 2026-11-20 · LH-026 · Anexo de cierre para el contable: facturas sin pagar, pagadas con dinero propio y compras de inmovilizado · 15 de 23 → 16 de 23.
 - 2026-11-20 · LH-022 · Pantalla «Movimientos»: ingresos, retiros, comisiones y traspasos sin factura, con saldos por cuenta · 14 de 23 → 15 de 23.
 - 2026-11-20 · LH-021 · Al aprobar una factura se dice cómo se pagó y eso crea su movimiento; se puede cambiar el pago o anular la factura · 13 de 23 → 14 de 23.
 - 2026-11-20 · LH-034 · En Ajustes se crean el ejercicio y las cuentas de banco y caja con su saldo inicial · 12 de 23 → 13 de 23.

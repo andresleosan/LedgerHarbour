@@ -1,0 +1,31 @@
+{
+  "id": "LH-035",
+  "titulo": "Cerrar permisos y límites en las rutas de facturas y movimientos",
+  "estado": "pendiente",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Guardar un borrador de factura exige el permiso de finanzas, con prueba que falla antes.",
+    "La ruta antigua PATCH /api/invoices/{id} limita el tamaño del cuerpo y rechaza una petición sin campos.",
+    "Rellenar a mano una factura y pedir el informe de control tienen límite de peticiones.",
+    "createMovement rechaza un identificador de traspaso que venga de fuera."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/invoices/invoice-service.ts",
+    "src/app/api/invoices/**",
+    "src/app/api/documents/**",
+    "src/app/api/businesses/[businessId]/financial-years/**",
+    "src/modules/accounting/money-service.ts",
+    "tests/security/**",
+    "tests/integration/**"
+  ],
+  "hecho": "",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Escribir primero las pruebas de seguridad que fallan.",
+  "evidencia": [
+    "Creada el 2026-11-20 al repasar MEJORAS: cuatro huecos pequeños de permisos y límites; ninguno explotable hoy porque los tres roles tienen el permiso de finanzas."
+  ],
+  "actualizado": "2026-11-20"
+}
