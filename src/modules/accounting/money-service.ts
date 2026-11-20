@@ -412,8 +412,10 @@ async function findManualMovement(context: MovementWriteContext, movementId: str
 export async function createMovement(businessId: BusinessId, input: ManualMovementInput, actor: OnboardingActor, dependencies: MoneyDependencies = {}): Promise<Movement> {
   const context = await authorize(businessId, actor, dependencies, "edit_finance");
   if ((input?.origin ?? "manual") !== "manual") throw new MoneyError(MONEY_ERROR_CODES.MOVEMENT_ORIGIN_NOT_EDITABLE);
+  // Only the documented fields: a transfer group, statement reference or invoice link is never taken from a caller.
+  const { accountId, date, narrative, headingId, amount: value } = input ?? ({} as ManualMovementInput);
   try {
-    return await context.money.transaction(async () => (await createMovementsInTransaction(context, [{ ...input, origin: "manual" }]))[0]);
+    return await context.money.transaction(async () => (await createMovementsInTransaction(context, [{ accountId, date, narrative, headingId, amount: value, origin: "manual" }]))[0]);
   } catch (error) {
     throw mapBoundaryError(error);
   }
@@ -421,7 +423,8 @@ export async function createMovement(businessId: BusinessId, input: ManualMoveme
 
 export async function updateMovement(businessId: BusinessId, movementId: string, changes: MovementChanges, actor: OnboardingActor, dependencies: MoneyDependencies = {}): Promise<Movement> {
   const context = await authorize(businessId, actor, dependencies, "edit_finance");
-  if (typeof changes !== "object" || changes === null || Object.keys(changes).length === 0) throw new MoneyError(MONEY_ERROR_CODES.INVALID_MOVEMENT);
+  const editable = ["accountId", "date", "narrative", "headingId", "amount"];
+  if (typeof changes !== "object" || changes === null || !Object.keys(changes).some((key) => editable.includes(key))) throw new MoneyError(MONEY_ERROR_CODES.INVALID_MOVEMENT);
   try {
     return await context.money.transaction(async () => {
       const current = await findManualMovement(context, movementId);

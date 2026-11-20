@@ -6,7 +6,8 @@ import { approveInvoice, getInvoiceReview, updateInvoiceDraft } from "../../../.
 import { InvoiceError, invoiceErrorStatus, INVOICE_KINDS, MAX_CODING_LINES } from "../../../../../modules/invoices/invoice-service";
 import type { InvoiceId } from "../../../../../modules/invoices/ocr-provider";
 import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
-import { MAX_REVIEW_PATCH_BYTES, paymentSchema } from "../../../../../modules/invoices/review-validation";
+import { readBoundedInvoiceJson } from "../../../../../modules/invoices/invoice-route-support";
+import { paymentSchema } from "../../../../../modules/invoices/review-validation";
 
 type RouteContext = { params: Promise<{ invoiceId: string }> };
 const REVIEW_FIELD_MAX_LENGTH = 2000;
@@ -33,37 +34,6 @@ function noStore(response: NextResponse): NextResponse {
 
 async function actor() { return getCurrentIdentity(); }
 
-async function parseReviewBody(request: Request): Promise<unknown> {
-  const contentLength = request.headers.get("content-length");
-  if (contentLength && Number.isFinite(Number(contentLength)) && Number(contentLength) > MAX_REVIEW_PATCH_BYTES) {
-    throw new Error("review body too large");
-  }
-  if (!request.body) return request.json();
-
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    while (true) {
-      const result = await reader.read();
-      if (result.done) break;
-      total += result.value.byteLength;
-      if (total > MAX_REVIEW_PATCH_BYTES) throw new Error("review body too large");
-      chunks.push(result.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    bytes.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return JSON.parse(new TextDecoder().decode(bytes));
-}
-
 export async function GET(_request: Request, context: RouteContext) {
   const identity = await actor();
   if (!identity) return noStore(NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 }));
@@ -83,7 +53,7 @@ export async function PATCH(request: Request, context: RouteContext) {
   const identity = await actor();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   let body: unknown;
-  try { body = await parseReviewBody(request); } catch { return NextResponse.json({ error: { code: "INVALID_INVOICE_REVIEW", message: "The invoice review request is invalid." } }, { status: 400 }); }
+  try { body = await readBoundedInvoiceJson(request); } catch { return NextResponse.json({ error: { code: "INVALID_INVOICE_REVIEW", message: "The invoice review request is invalid." } }, { status: 400 }); }
   const parsed = patch.safeParse(body);
   if (!parsed.success) return NextResponse.json({ error: { code: "INVALID_INVOICE_REVIEW", message: "The invoice review request is invalid." } }, { status: 400 });
   try {

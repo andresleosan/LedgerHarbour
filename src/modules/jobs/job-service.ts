@@ -1,5 +1,6 @@
 import { defaultOnboardingRepository, resolveOnboardingActor, type OnboardingActor, type OnboardingRepository } from "../tenancy/business-service";
 import { BusinessLifecycleError, LIFECYCLE_ERROR_CODES, requireBusinessOperational } from "../tenancy/business-lifecycle-service";
+import { requireCapability } from "../permissions/authorize";
 import { createTenantContext } from "../tenancy/tenant-context";
 import type { UserId } from "../tenancy/types";
 import type { DocumentRepository } from "../documents/document-service";
@@ -285,6 +286,12 @@ export async function createManualInvoice(documentId: DocumentId, actor: Onboard
     throw new JobError(JOB_ERROR_CODES.INVALID_JOB_REQUEST);
   }
   const document = await validateDocumentAccess(documentId, actorId, input);
+  const membership = await createTenantContext(deps.tenancyRepository).getMembership(actorId, document.businessId);
+  try {
+    requireCapability(membership!, "edit_finance");
+  } catch {
+    throw new JobError(JOB_ERROR_CODES.BUSINESS_ACCESS_DENIED);
+  }
   const invoices = input.invoices ?? resolveDefaultInvoiceRepository();
   // The PostgreSQL tenancy transaction only passes through the error types it knows.
   let rejection: JobError | undefined;

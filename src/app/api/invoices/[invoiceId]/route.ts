@@ -10,6 +10,7 @@ import {
   updateInvoice,
 } from "../../../../modules/invoices/invoice-service";
 import type { InvoiceId } from "../../../../modules/invoices/ocr-provider";
+import { readBoundedInvoiceJson } from "../../../../modules/invoices/invoice-route-support";
 import { getPersistenceContext } from "../../../../modules/persistence/repository-factory";
 import { paymentSchema } from "../../../../modules/invoices/review-validation";
 
@@ -60,12 +61,17 @@ export async function PATCH(request: Request, context: RouteContext) {
   if (!actor) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
   let body: unknown;
   try {
-    body = await request.json();
+    body = await readBoundedInvoiceJson(request);
   } catch {
     return NextResponse.json({ error: { code: "INVALID_INVOICE_UPDATE", message: "The invoice update is invalid." } }, { status: 400 });
   }
   const parsed = patchSchema.safeParse(body);
-  if (!parsed.success || (parsed.data.action === undefined && Object.keys(parsed.data).length === 0)) {
+  if (!parsed.success) {
+    return NextResponse.json({ error: { code: "INVALID_INVOICE_UPDATE", message: "The invoice update is invalid." } }, { status: 400 });
+  }
+  // Without an action, at least one field must change: a payment alone, or nothing, only bumps `updatedAt`.
+  const { action, payment, ...fields } = parsed.data;
+  if (action === undefined && Object.keys(fields).length === 0) {
     return NextResponse.json({ error: { code: "INVALID_INVOICE_UPDATE", message: "The invoice update is invalid." } }, { status: 400 });
   }
   try {
@@ -80,10 +86,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       headings: persistence.headingRepository,
       money: persistence.moneyRepository,
     };
-    if (parsed.data.action === "approve") return NextResponse.json(await approveInvoice(invoiceId as InvoiceId, actor, dependencies, parsed.data.payment));
-    const fields = { ...parsed.data };
-    delete fields.action;
-    delete fields.payment;
+    if (action === "approve") return NextResponse.json(await approveInvoice(invoiceId as InvoiceId, actor, dependencies, payment));
     return NextResponse.json(await updateInvoice(invoiceId as InvoiceId, actor, fields, dependencies));
   } catch (error) {
     return errorResponse(error);

@@ -289,12 +289,18 @@ function mapBoundaryError(error: unknown): InvoiceError {
 
 async function requireInvoiceAccess(invoice: Invoice, actorId: UserId, input: InvoiceDependencies): Promise<void> {
   const resolved = dependencies(input);
+  let membership;
   try {
-    const membership = await createTenantContext(resolved.tenancyRepository).getMembership(actorId, invoice.businessId);
+    membership = await createTenantContext(resolved.tenancyRepository).getMembership(actorId, invoice.businessId);
     if (membership?.status !== "active" || !membership.isActive) throw new AuthorizationError("BUSINESS_ACCESS_DENIED", "Business access denied");
     await requireBusinessOperational(resolved.tenancyRepository, invoice.businessId);
   } catch (error) {
     throw mapBoundaryError(error);
+  }
+  try {
+    requireCapability(membership!, "read_finance");
+  } catch {
+    throw new InvoiceError(INVOICE_ERROR_CODES.INSUFFICIENT_CAPABILITY);
   }
 }
 
@@ -424,6 +430,12 @@ export async function updateInvoice(
   const resolved = dependencies(input);
   const actorId = await resolveOnboardingActor(resolved.tenancyRepository, actor);
   const current = await getInvoice(invoiceId, actorId, input);
+  const membership = await createTenantContext(resolved.tenancyRepository).getMembership(actorId, current.businessId);
+  try {
+    requireCapability(membership!, "edit_finance");
+  } catch {
+    throw new InvoiceError(INVOICE_ERROR_CODES.INSUFFICIENT_CAPABILITY);
+  }
   if (current.reviewState === "approved") throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_STATE);
   const { kind, ...fieldPatch } = patch;
   if (kind !== undefined && !INVOICE_KINDS.includes(kind)) throw new InvoiceError(INVOICE_ERROR_CODES.INVALID_INVOICE);

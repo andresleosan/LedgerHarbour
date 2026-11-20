@@ -5,6 +5,7 @@ import { getCurrentIdentity } from "../../../../../modules/auth/session";
 import { asJobError, createManualInvoice, JobError, JOB_ERROR_CODES } from "../../../../../modules/jobs/job-service";
 import type { DocumentId } from "../../../../../modules/invoices/ocr-provider";
 import { getPersistenceContext } from "../../../../../modules/persistence/repository-factory";
+import { authenticatedRateLimitResponse } from "../../../../../modules/security/authenticated-rate-limit";
 
 type RouteContext = { params: Promise<{ documentId: string }> };
 const requestSchema = z.object({}).strict();
@@ -25,6 +26,9 @@ function errorResponse(unknownError: unknown): NextResponse {
 export async function POST(request: Request, context: RouteContext) {
   const identity = await getCurrentIdentity();
   if (!identity) return NextResponse.json({ error: { code: "IDENTITY_REQUIRED", message: "Sign in is required." } }, { status: 401 });
+  // Filling a failed reading in by hand is the last step of the OCR flow: it shares the process budget.
+  const limited = await authenticatedRateLimitResponse("ocr-process", request, identity);
+  if (limited) return limited;
 
   let body: unknown;
   try {

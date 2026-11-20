@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST as processRoute } from "../../../src/app/api/documents/[documentId]/process/route";
 import { GET as invoiceGetRoute, PATCH as invoicePatchRoute } from "../../../src/app/api/invoices/[invoiceId]/route";
@@ -19,6 +19,7 @@ import {
   type InMemoryInvoiceRepository,
 } from "../../../src/modules/invoices/invoice-service";
 import { resolveInvoiceCodingRepository } from "../../../src/modules/invoices/invoice-coding-repository";
+import { MAX_REVIEW_PATCH_BYTES } from "../../../src/modules/invoices/review-validation";
 import { createOcrWorker } from "../../../src/modules/jobs/ocr-worker";
 import { resetRateLimitersForTests } from "../../../src/modules/security/rate-limit";
 import {
@@ -568,6 +569,33 @@ describe("OCR workflow boundaries", () => {
     });
     expect(invalidPatch.status).toBe(400);
     await expect(invalidPatch.json()).resolves.toMatchObject({ error: { code: "INVALID_INVOICE_UPDATE", message: expect.any(String) } });
+  });
+
+  it("bounds the plain invoice PATCH body and refuses an update with nothing to change", async () => {
+    const routeState = await setupDefaultRouteState("route-bounded-patch-document");
+    await setCurrentIdentity(identityFor("route-member"));
+    expect((await processRoute(new Request("http://localhost", { method: "POST", body: "{}" }), { params: Promise.resolve({ documentId: routeState.documentId }) })).status).toBe(202);
+    const defaultInvoices = globalRepository<InMemoryInvoiceRepository>("ledgerharbour.task8.inMemoryInvoiceRepository");
+    const invoice = (await defaultInvoices.listByBusinessId(routeState.businessId as typeof ownerBusiness.id))[0];
+    const params = { params: Promise.resolve({ invoiceId: invoice.id }) };
+    const invalid = { error: { code: "INVALID_INVOICE_UPDATE", message: "The invoice update is invalid." } };
+
+    const paymentOnly = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ payment: { status: "unpaid" } }) }), params);
+    expect(paymentOnly.status).toBe(400);
+    await expect(paymentOnly.json()).resolves.toEqual(invalid);
+
+    const json = vi.fn(async () => { throw new Error("body should not be parsed"); });
+    const declaredTooLarge = { headers: new Headers({ "content-length": String(MAX_REVIEW_PATCH_BYTES + 1) }), body: null, json } as unknown as Request;
+    const declared = await invoicePatchRoute(declaredTooLarge, params);
+    expect(declared.status).toBe(400);
+    await expect(declared.json()).resolves.toEqual(invalid);
+    expect(json).not.toHaveBeenCalled();
+
+    const streamed = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ notes: "n".repeat(MAX_REVIEW_PATCH_BYTES) }) }), params);
+    expect(streamed.status).toBe(400);
+    await expect(streamed.json()).resolves.toEqual(invalid);
+
+    await expect(defaultInvoices.findById(invoice.id)).resolves.toEqual(invoice);
   });
 
   it("covers positive route contracts and exact 403, 404, 409, and 500 bodies", async () => {

@@ -278,6 +278,21 @@ describe("movements", () => {
     expect((await tenancy.listAuditEvents(business.id)).map((event) => event.type).filter((type) => type.startsWith("movement_"))).toEqual(["movement_created", "movement_updated", "movement_deleted"]);
   });
 
+  it("takes only the documented fields of a manual movement, so a direct call cannot forge a link", async () => {
+    const { business, dependencies, tenancy, manual, money } = await ledger();
+    const forged = { transferGroupId: "forged-transfer", sourceRef: "statement:forged", sourceInvoiceId: "forged-invoice" };
+
+    const created = await createMovement(business.id, manual(forged) as Parameters<typeof createMovement>[1], owner, dependencies);
+    expect(money.movements.get(created.id)).toMatchObject({ origin: "manual", transferGroupId: null, sourceRef: null, sourceInvoiceId: null });
+
+    const updated = await updateMovement(business.id, created.id, { narrative: "Corrected", ...forged } as Parameters<typeof updateMovement>[2], owner, dependencies);
+    expect(updated).toMatchObject({ narrative: "Corrected", transferGroupId: null, sourceRef: null, sourceInvoiceId: null });
+    const auditCount = (await tenancy.listAuditEvents(business.id)).length;
+    await expect(updateMovement(business.id, created.id, forged as Parameters<typeof updateMovement>[2], owner, dependencies)).rejects.toMatchObject({ code: codes.INVALID_MOVEMENT });
+    expect(money.movements.get(created.id)).toEqual(updated);
+    expect(await tenancy.listAuditEvents(business.id)).toHaveLength(auditCount);
+  });
+
   it("rolls the movement back when the audit write fails", async () => {
     const { business, dependencies, tenancy, manual, money } = await ledger();
     tenancy.appendAuditEvent = async () => { throw new Error("audit failed"); };

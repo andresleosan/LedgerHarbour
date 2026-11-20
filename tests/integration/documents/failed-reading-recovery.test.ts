@@ -130,6 +130,8 @@ describe("recovering from a failed invoice reading", () => {
       error: { code: "OCR_RETRIES_EXHAUSTED", message: "This document could not be read. Fill the invoice in by hand." },
     });
     expect(ocr.calls).toBe(3);
+    // Manual entry shares the OCR budget; the probes above spent most of it.
+    resetRateLimitersForTests();
 
     const strict = await manualInvoice(documentId, JSON.stringify({ supplier: "Injected" }));
     expect(strict.status).toBe(400);
@@ -161,6 +163,16 @@ describe("recovering from a failed invoice reading", () => {
     expect(again.status).toBe(409);
     await expect(again.json()).resolves.toMatchObject({ error: { code: "DOCUMENT_NOT_FAILED" } });
     expect([...invoices().invoices.values()].filter((candidate) => candidate.documentId === documentId)).toHaveLength(1);
+  });
+
+  it("limits manual entry with the OCR processing budget", async () => {
+    await setup();
+
+    for (let attempt = 1; attempt <= 5; attempt += 1) expect((await manualInvoice("missing-document")).status).toBe(404);
+    const limited = await manualInvoice("missing-document");
+
+    expect(limited.status).toBe(429);
+    await expect(limited.json()).resolves.toEqual({ error: { code: "RATE_LIMITED", message: "Too many requests." } });
   });
 
   it("only offers manual entry for a failed document", async () => {
