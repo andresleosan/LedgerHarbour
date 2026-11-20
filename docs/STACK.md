@@ -18,7 +18,7 @@ Prototipo local/no comercial. El objetivo de la siguiente fase es una prueba des
 
 ## Arquitectura de prototipo desplegable
 
-- Hosting: Vercel Hobby.
+- Hosting: Vercel Hobby para el prototipo. La app con OCR local se empaqueta para la VPS existente (LH-027).
 - PostgreSQL objetivo: Neon Free; adapter PostgreSQL y migraciones versionadas. Existe una base Neon operativa con `0001` a `0006` verificadas read-only; el backup productivo y la retencion operativa siguen `operator-controlled`.
 - Auth: Firebase Authentication; adapter email/password + Google implementado, activacion operator-controlled pendiente.
 - Storage privado: Cloudflare R2 Standard.
@@ -86,7 +86,7 @@ El storage de documentos dispone de `STORAGE_MODE=local|r2`. `local` es el valor
 - Rate limiting sigue siendo obligatorio antes de exposición pública; activar `RATE_LIMIT_MODE=postgres` en staging con la migración `0007_rate_limit_windows` aplicada y `RATE_LIMIT_KEY_SECRET` server-only.
 - Las migraciones productivas requieren backup verificado, rollback probado y confirmacion explicita.
 - R2/Firebase/Neon tienen adapters implementados y pruebas locales; Neon además tiene `0007_rate_limit_windows` aplicado y verificado en el branch `production` de staging. El runtime productivo no se considera activado hasta completar el despliegue aprobado en `docs/production-activation.md`. El OCR real requiere configuración runtime, IAM y alerta de billing verificada.
-- El production gate en `src/modules/config/production-gate.ts` exige `AUTH_MODE=firebase`, `OCR_PROVIDER=google-document-ai`, `PERSISTENCE_MODE=postgres`, `STORAGE_MODE=r2`, `RATE_LIMIT_MODE=postgres`, `DATABASE_URL`, `RATE_LIMIT_KEY_SECRET` y las demás variables privadas/públicas documentadas. Dev auth, fake OCR, memoria y storage local no son defaults de producción.
+- El production gate en `src/modules/config/production-gate.ts` exige `AUTH_MODE=firebase`, `OCR_PROVIDER=local-tesseract` en la VPS (o `google-document-ai` con su configuración específica), `PERSISTENCE_MODE=postgres`, `STORAGE_MODE=r2`, `RATE_LIMIT_MODE=postgres`, `DATABASE_URL`, `RATE_LIMIT_KEY_SECRET` y las demás variables privadas/públicas documentadas. Dev auth, fake OCR, memoria y storage local no son defaults de producción.
 - `corepack pnpm audit --json` queda en cero vulnerabilidades conocidas tras fijar `sharp@0.35.0` y `postcss@8.5.23` bajo Next; debe repetirse en cada release.
 - Este documento no autoriza despliegue, migraciones, billing, OCR pago ni gasto.
 

@@ -10,13 +10,13 @@ Este archivo es un runbook de acciones requeridas para el operador; no autoriza 
 
 Configura en el gestor de secretos del entorno, nunca en Git:
 
-- Modos exactos: `AUTH_MODE=firebase`, `OCR_PROVIDER=google-document-ai`, `PERSISTENCE_MODE=postgres`, `STORAGE_MODE=r2`, `RATE_LIMIT_MODE=postgres`.
+- Modos obligatorios: `AUTH_MODE=firebase`, `PERSISTENCE_MODE=postgres`, `STORAGE_MODE=r2`, `RATE_LIMIT_MODE=postgres`. En la VPS se usa `OCR_PROVIDER=local-tesseract` con la [imagen de LH-027](roadmap/work/LH-027/plan.md). El adaptador `google-document-ai` requiere su configuración específica.
 - Base: `DATABASE_URL`.
 - Firebase privado: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`.
 - Firebase publico: `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`, `NEXT_PUBLIC_FIREBASE_PROJECT_ID`, `NEXT_PUBLIC_FIREBASE_APP_ID`.
 - R2: `R2_ENDPOINT`, `R2_BUCKET_NAME`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
 - Rate limiting Neon: `RATE_LIMIT_KEY_SECRET`.
-- Document AI: `GOOGLE_CLOUD_PROJECT_ID`, `GOOGLE_CLOUD_LOCATION`, `GOOGLE_DOCUMENT_AI_PROCESSOR_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON`.
+- Document AI: `GOOGLE_CLOUD_PROJECT_ID`, `GOOGLE_CLOUD_LOCATION`, `GOOGLE_DOCUMENT_AI_PROCESSOR_ID`, `GOOGLE_SERVICE_ACCOUNT_JSON`. Solo se requieren al elegir Google Document AI.
 
 El gate valida estructura, formatos, hosts permitidos, consistencia y campos obligatorios sin imprimir valores de entorno. No puede probar offline que una credencial real sea autentica, que tenga IAM efectivo o que el token tenga cuota: esas comprobaciones se realizan manualmente durante la activacion controlada y se registran en el checklist read-only.
 
@@ -24,7 +24,7 @@ El gate valida estructura, formatos, hosts permitidos, consistencia y campos obl
 
 1. Revisa `docs/STACK.md`, el plan de costo vigente de cada proveedor y la aprobacion explicita del operador responsable. No actives billing por este documento.
 2. Crea o selecciona el proyecto Firebase y verifica Email/Password, Google, dominios autorizados y email verificado del administrador.
-3. Configura el processor Invoice Parser en Google Document AI, la region `us` o `eu`, la cuenta de servicio con `roles/documentai.apiUser` y una alerta de presupuesto. Confirma que el proyecto esta vinculado a una cuenta de billing con cuota disponible y que IAM y billing alert estan verificados antes de considerar OCR listo. El enlace actual esta `blocked` por cuota y no se autoriza desde este runbook.
+3. Para la VPS, construye la imagen de [LH-027](roadmap/work/LH-027/plan.md) y comprueba el OCR local con una factura aprobada para la prueba. Si el entorno elige Google Document AI, configura Invoice Parser, el rol del procesador y una alerta de presupuesto. Verifica facturación, cuota e IAM antes de activarlo.
 4. Crea el bucket R2 privado, limita las claves al bucket, verifica HTTPS y no habilites acceso publico.
 5. Genera `RATE_LIMIT_KEY_SECRET` en el gestor de secretos y confirma que la migración `0007_rate_limit_windows` está aplicada en el PostgreSQL objetivo. No agregues un servicio Redis para este modo.
 6. Verifica que el PostgreSQL objetivo tiene backup reciente y que la secuencia de migraciones esta completa. No ejecutes una migracion destructiva sin backup verificado y confirmacion explicita.
@@ -36,7 +36,7 @@ El gate valida estructura, formatos, hosts permitidos, consistencia y campos obl
 
 ### Estado operativo de los gates (2026-08-25)
 
-- **Google Document AI:** la comprobacion de 30 dias no mostro solicitudes de procesamiento de documentos; solo actividad administrativa de consola. El proyecto continua sin billing porque la cuenta alcanzo su limite de proyectos. Se envio una solicitud oficial por un cupo adicional y Google indico una revision tipica de unos dos dias habiles. El enlace, el presupuesto de proyecto de `US$1/mes` y cualquier OCR permanecen pendientes.
+- **OCR:** el runtime de la VPS usa la imagen con Tesseract. Si se elige Google Document AI en otro entorno, se aplican sus requisitos de facturación y alerta de presupuesto.
 - **Rate limiting Neon:** el runtime objetivo es `RATE_LIMIT_MODE=postgres`; la tabla dedicada usa HMAC de las claves y falla cerrado si falta PostgreSQL, el secreto o la migración.
 - **Upstash costo observado:** la tarjeta ingresada convirtió la base existente a Pay-as-you-go y la consola exige un presupuesto mínimo de `US$20`. Upstash no forma parte de la ruta Neon y no se debe aceptar ese mínimo para esta tarea.
 - **Vercel:** `RATE_LIMIT_KEY_SECRET` y `RATE_LIMIT_MODE=postgres` ya están configurados en Production; Preview conserva el modo anterior porque el secreto no se cargó allí. Las variables Upstash se conservan para rollback. Vercel aún requiere un nuevo despliegue y la activación productiva sigue pendiente de confirmación explícita del operador.
@@ -55,7 +55,7 @@ El gate valida estructura, formatos, hosts permitidos, consistencia y campos obl
 
 Las comprobaciones de esta seccion son controles de seguimiento y no ejecutan cambios por si mismas. Una revision recurrente debe dejar un registro redactado antes de etiquetar un control externo como `verified`; si no existe evidencia read-only suficiente, conserva el estado `unverified`. Ninguna revision autoriza cambios de credenciales, billing, solicitudes OCR ni remediacion; cada uno requiere aprobacion explicita del operador.
 
-- **Cuotas y alertas de proveedores:** revisa por separado cuota, alerta de billing/presupuesto y riesgo de gasto para Google Document AI y Cloudflare R2 siguiendo [LH-005](provider-alerts-limits-checklist.md). Neon Free debe revisarse por cuota de cómputo, almacenamiento y egress.
+- **Cuotas y alertas de proveedores:** revisa Cloudflare R2 y, cuando se utilice, Google Document AI según [LH-005](provider-alerts-limits-checklist.md). Neon Free debe revisarse por cuota de cómputo, almacenamiento y egress.
 - **Scopes de credenciales:** `DATABASE_URL` y `RATE_LIMIT_KEY_SECRET` permanecen server-only y no se imprimen en logs. Los controles históricos de Upstash permanecen como evidencia de la ruta descartada.
 - **PostgreSQL:** registra la existencia de un backup reciente y el estado de la secuencia de migraciones. No ejecutes migraciones ni rollback como parte de una revision recurrente; si se requiere una accion, aplica [Migraciones y rollback](#migraciones-y-rollback) con backup verificado y aprobacion explicita.
 - **Health checks protegidos:** revisa el estado del production gate solo mediante el procedimiento aprobado por el operador y sin exponer secretos, headers, tokens ni detalles internos. La configuracion o correccion del entorno sigue siendo `operator-controlled`.

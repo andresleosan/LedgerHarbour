@@ -7,6 +7,7 @@ export function createNextConfig(nodeEnv: string | undefined = process.env.NODE_
     ...(nodeEnv === "development" || nodeEnv === "test"
       ? { allowedDevOrigins: [PLAYWRIGHT_DEV_ORIGIN] }
       : {}),
+    ...(process.env.LEDGERHARBOUR_STANDALONE === "1" && { output: "standalone" }),
     experimental: {
       middlewareClientMaxBodySize: 12 * 1024 * 1024,
     },

@@ -1,21 +1,34 @@
 {
   "id": "LH-027",
-  "titulo": "Lectura real de facturas con Google Document AI",
-  "estado": "pendiente",
+  "titulo": "Lectura de facturas en la VPS con Tesseract",
+  "estado": "parcial",
   "responsable": "operador",
   "criterio": [
-    "Una factura real fotografiada se lee de principio a fin en el entorno que el operador autorice.",
-    "Queda anotado en qué formato devuelve el proveedor las fechas y los importes reales."
+    "El worker de la app lee facturas en la VPS con Tesseract, sin enviar la imagen a un proveedor de OCR.",
+    "Una factura real fotografiada se lee de principio a fin en una instancia con acceso restringido y validada por el operador.",
+    "Quedan comprobados los formatos de fecha y moneda y la concordancia de los importes, sin registrar datos de la factura."
   ],
   "depende": [],
   "comprueba": [
     "LH-017"
   ],
-  "recursos": [],
-  "hecho": "",
-  "falta": "",
-  "bloqueo": "Vincular la facturación al proyecto de Google Cloud, aceptar ese gasto y autorizar la primera lectura con una factura real.",
-  "siguiente": "",
-  "evidencia": [],
-  "actualizado": "2026-11-19"
+  "recursos": [
+    "Dockerfile",
+    "src/modules/invoices/local-ocr-provider.ts",
+    "src/modules/invoices/local-ocr-fields.ts",
+    "src/modules/invoices/ocr-provider-factory.ts",
+    "src/modules/config/production-gate.ts"
+  ],
+  "hecho": "Adaptador local integrado en el worker existente, imagen de la app construida y OCR nativo comprobado con los cinco formatos de subida. El parser normaliza los campos y los deja pendientes de revisión.",
+  "falta": "Verificar una factura fotografiada real autorizada, medir el consumo en la instancia de destino y comprobar el acceso de Firebase en su dominio antes de activarla.",
+  "bloqueo": "Autorizar la instancia restringida de la VPS e indicar qué factura real puede usarse para la validación.",
+  "siguiente": "Arrancar la imagen en la instancia autorizada, probar el acceso y procesar una factura real de principio a fin.",
+  "evidencia": [
+    "2026-11-20 · El operador eligió la VPS existente para evitar cargos por lectura de Document AI.",
+    "corepack pnpm exec vitest run --no-file-parallelism tests/unit/invoices/local-ocr-fields.test.ts tests/unit/invoices/ocr-provider-factory.test.ts tests/unit/config/production-gate.test.ts tests/integration/invoices/ocr-workflow.test.ts → 86 pruebas pasadas.",
+    "docker build --tag ledgerharbour-ocr-local:lh027 . → imagen standalone construida. Docker run efímero, sin red y con configuración sintética → arranque con UID 1000, login 200 y rechazo 401 de OCR sin sesión.",
+    "Docker run efímero sin red con Tesseract y facturas sintéticas → JPEG, PNG, HEIC, TIFF y PDF extraen número, fecha, total y moneda y quedan en revisión. TIFF y PDF de dos páginas, rechazo de PDF sobre el límite y limpieza temporal comprobados.",
+    "Verificación de lote: corepack pnpm lint, corepack pnpm exec tsc --noEmit, corepack pnpm exec vitest run --no-file-parallelism y corepack pnpm build correctos. Vitest: 1.252 pruebas pasadas y 7 omitidas."
+  ],
+  "actualizado": "2026-11-20"
 }

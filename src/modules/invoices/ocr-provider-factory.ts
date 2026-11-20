@@ -4,6 +4,7 @@ import {
   GoogleDocumentAiInvoiceProvider,
   type GoogleDocumentAiClient,
 } from "./google-document-ai-provider";
+import { LocalOcrProvider } from "./local-ocr-provider";
 import { FakeOcrProvider } from "./fake-ocr-provider";
 import type { OcrProvider } from "./ocr-provider";
 import { isDeterministicTestEnvironment } from "../auth/runtime-mode";
@@ -144,6 +145,7 @@ export function createOcrProvider(env: NodeJS.ProcessEnv = process.env): OcrProv
     if (!isDeterministicTestEnvironment(env)) throw new OcrConfigurationError();
     return new FakeOcrProvider();
   }
+  if (provider === "local-tesseract") return new LocalOcrProvider();
   if (provider === "google-document-ai") return createGoogleProvider(env);
 
   throw new OcrConfigurationError();
