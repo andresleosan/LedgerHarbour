@@ -8,7 +8,7 @@ import { changeInvoicePayment, voidInvoice } from "../../src/modules/invoices/in
 import { getInvoiceReview, updateInvoiceDraft } from "../../src/modules/invoices/invoice-review-service";
 import { createInvoiceRepository, getInvoice, getInvoiceCoding, getInvoiceWithCoding, updateInvoice } from "../../src/modules/invoices/invoice-service";
 import type { DocumentId, InvoiceId } from "../../src/modules/invoices/ocr-provider";
-import { createJobRepository, createManualInvoice } from "../../src/modules/jobs/job-service";
+import { createJobRepository, createManualInvoice, queueOcr } from "../../src/modules/jobs/job-service";
 import type { Capability } from "../../src/modules/permissions/capabilities";
 import { createInMemoryOnboardingRepository } from "../../src/modules/tenancy/business-service";
 import type { Membership, UserId } from "../../src/modules/tenancy/types";
@@ -60,6 +60,7 @@ async function fixture() {
     return created;
   };
   await document("failed-document", "failed");
+  await document("uploaded-document", "uploaded");
   const dependencies = { tenancyRepository: tenancy, documentRepository: documents, invoices, headings, codings, money };
   return { dependencies, jobs, invoices, draft: await invoice("draft", false), approved: await invoice("approved", true) };
 }
@@ -77,7 +78,7 @@ describe("invoice finance capabilities", () => {
     await expect(getInvoice(draft.id, owner, dependencies)).rejects.toMatchObject({ code: "INSUFFICIENT_CAPABILITY" });
     await expect(getInvoiceCoding(draft.id, owner, dependencies)).rejects.toMatchObject({ code: "INSUFFICIENT_CAPABILITY" });
     await expect(getInvoiceWithCoding(draft.id, owner, dependencies)).rejects.toMatchObject({ code: "INSUFFICIENT_CAPABILITY" });
-    await expect(getInvoiceReview(draft.id, owner, dependencies)).rejects.toMatchObject({ code: "INSUFFICIENT_CAPABILITY" });
+    await expect(getInvoiceReview(draft.id, owner, dependencies)).rejects.toMatchObject({ code: "INSUFFICIENT_CAPABILITY", message: "You do not have permission for this invoice." });
     expect(checked).toContain("read_finance");
   });
 
@@ -119,5 +120,17 @@ describe("invoice finance capabilities", () => {
 
     denied.clear();
     await expect(createManualInvoice("failed-document" as DocumentId, owner, { ...dependencies, jobs })).resolves.toEqual(expect.any(String));
+  });
+
+  it("requires edit_finance to start a reading", async () => {
+    const { dependencies, jobs } = await fixture();
+    denied.add("edit_finance");
+
+    await expect(queueOcr("uploaded-document" as DocumentId, owner, { ...dependencies, jobs })).rejects.toMatchObject({ code: "BUSINESS_ACCESS_DENIED" });
+    expect(checked).toContain("edit_finance");
+    await expect(jobs.findByDocumentId("uploaded-document" as DocumentId)).resolves.toBeNull();
+
+    denied.clear();
+    await expect(queueOcr("uploaded-document" as DocumentId, owner, { ...dependencies, jobs })).resolves.toMatchObject({ status: "queued" });
   });
 });

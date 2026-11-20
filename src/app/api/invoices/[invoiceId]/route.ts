@@ -70,8 +70,9 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json({ error: { code: "INVALID_INVOICE_UPDATE", message: "The invoice update is invalid." } }, { status: 400 });
   }
   // Without an action, at least one field must change: a payment alone, or nothing, only bumps `updatedAt`.
+  // With approve, fields would be ignored: the body is refused instead.
   const { action, payment, ...fields } = parsed.data;
-  if (action === undefined && Object.keys(fields).length === 0) {
+  if ((action === undefined) === (Object.keys(fields).length === 0)) {
     return NextResponse.json({ error: { code: "INVALID_INVOICE_UPDATE", message: "The invoice update is invalid." } }, { status: 400 });
   }
   try {

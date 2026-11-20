@@ -23,10 +23,10 @@ export function invoiceErrorResponse(error: unknown): NextResponse {
   return NextResponse.json({ error: { code: "INVOICE_REQUEST_FAILED", message: "The invoice request could not be completed." } }, { status: 500 });
 }
 
-/** The request body as JSON, or undefined when it is not JSON (the schema then refuses it). */
+/** The request body as JSON, or undefined when it is not JSON or too large (the schema then refuses it). */
 export async function readInvoiceJson(request: Request): Promise<unknown> {
   try {
-    return await request.json();
+    return await readBoundedInvoiceJson(request);
   } catch {
     return undefined;
   }

@@ -534,7 +534,8 @@ export async function createTransfer(businessId: BusinessId, input: TransferInpu
 }
 
 export async function updateTransfer(businessId: BusinessId, transferGroupId: string, changes: TransferChanges, actor: OnboardingActor, dependencies: MoneyDependencies = {}): Promise<Transfer> {
-  if (typeof changes !== "object" || changes === null || Object.keys(changes).length === 0) throw new MoneyError(MONEY_ERROR_CODES.INVALID_MOVEMENT);
+  const editable = ["fromAccountId", "toAccountId", "date", "amount", "headingId", "narrative"];
+  if (typeof changes !== "object" || changes === null || !Object.keys(changes).some((key) => editable.includes(key))) throw new MoneyError(MONEY_ERROR_CODES.INVALID_MOVEMENT);
   return transferWrite(businessId, actor, dependencies, async (context) => {
     const current = await findTransfer(context, transferGroupId);
     const rows = transferRows({

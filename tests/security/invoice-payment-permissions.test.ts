@@ -9,6 +9,7 @@ import { createInvoiceCodingRepository, type InvoiceCodingRepository } from "../
 import { changeInvoicePayment, listPrivatelyPaidInvoices, listUnpaidInvoices, voidInvoice } from "../../src/modules/invoices/invoice-payment-service";
 import { approveInvoice, createInvoiceRepository, resolveDefaultDocumentRepository, resolveDefaultInvoiceRepository, type InvoiceRepository } from "../../src/modules/invoices/invoice-service";
 import type { DocumentId, InvoiceId } from "../../src/modules/invoices/ocr-provider";
+import { MAX_REVIEW_PATCH_BYTES } from "../../src/modules/invoices/review-validation";
 import { getPersistenceContext, resetPersistenceContextForTests } from "../../src/modules/persistence/repository-factory";
 import { createInMemoryOnboardingRepository, defaultOnboardingRepository, type OnboardingActor, type OnboardingRepository } from "../../src/modules/tenancy/business-service";
 import type { UserId } from "../../src/modules/tenancy/types";
@@ -141,6 +142,16 @@ describe("invoice payment isolation through the route handlers", () => {
     }
     expect(await result(await reviewPatch(json("PATCH", { action: "approve", payment: { status: "later" } }), params(a.draft.id)))).toMatchObject({ status: 400, body: { error: { code: "INVALID_INVOICE_REVIEW" } } });
     expect(await result(await reviewPatch(json("PATCH", { action: "approve" }), params(a.draft.id)))).toMatchObject({ status: 409, body: { error: { code: "PAYMENT_REQUIRED" } } });
+    const declaredTooLarge = (body: unknown) => {
+      const read = vi.fn(async () => body);
+      return { read, request: { headers: new Headers({ "content-length": String(MAX_REVIEW_PATCH_BYTES + 1) }), body: null, json: read } as unknown as Request };
+    };
+    const largePayment = declaredTooLarge({ status: "paid_privately" });
+    expect((await paymentPatch(largePayment.request, params(a.approved.id))).status).toBe(400);
+    const largeVoid = declaredTooLarge({});
+    expect((await voidPost(largeVoid.request, params(a.approved.id))).status).toBe(400);
+    expect(largePayment.read).not.toHaveBeenCalled();
+    expect(largeVoid.read).not.toHaveBeenCalled();
     expect((await voidPost(json("POST", { reason: "x" }), params(a.approved.id))).status).toBe(400);
     expect((await voidPost(new Request("http://localhost/api", { method: "POST", body: "not json" }), params(a.approved.id))).status).toBe(400);
     expect(await stores.invoices.findById(a.approved.id)).toMatchObject({ paymentStatus: "unpaid" });

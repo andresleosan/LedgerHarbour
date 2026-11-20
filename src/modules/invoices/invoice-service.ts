@@ -60,7 +60,7 @@ const publicMessages: Record<InvoiceErrorCode, string> = {
   DOCUMENT_NOT_FOUND: "Document not found.",
   BUSINESS_ACCESS_DENIED: "Business access denied.",
   INACTIVE_BUSINESS: "This business is inactive.",
-  INSUFFICIENT_CAPABILITY: "You do not have permission to update this invoice.",
+  INSUFFICIENT_CAPABILITY: "You do not have permission for this invoice.",
   INVALID_INVOICE: "The invoice draft is not valid.",
   INVOICE_INVALID_FOR_APPROVAL: "The invoice draft is not valid for approval.",
   INVALID_INVOICE_STATE: "The invoice is not in a reviewable state.",

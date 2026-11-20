@@ -584,6 +584,10 @@ describe("OCR workflow boundaries", () => {
     expect(paymentOnly.status).toBe(400);
     await expect(paymentOnly.json()).resolves.toEqual(invalid);
 
+    const approveWithField = await invoicePatchRoute(new Request("http://localhost", { method: "PATCH", body: JSON.stringify({ action: "approve", payment: { status: "unpaid" }, supplier: "Ignored" }) }), params);
+    expect(approveWithField.status).toBe(400);
+    await expect(approveWithField.json()).resolves.toEqual(invalid);
+
     const json = vi.fn(async () => { throw new Error("body should not be parsed"); });
     const declaredTooLarge = { headers: new Headers({ "content-length": String(MAX_REVIEW_PATCH_BYTES + 1) }), body: null, json } as unknown as Request;
     const declared = await invoicePatchRoute(declaredTooLarge, params);

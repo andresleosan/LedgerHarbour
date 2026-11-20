@@ -239,6 +239,12 @@ export function createJobService(input: JobServiceDependencies = {}): JobService
         throw new JobError(JOB_ERROR_CODES.INVALID_JOB_REQUEST);
       }
       const document = await validateDocumentAccess(documentId, actorId, input);
+      const membership = await createTenantContext(deps.tenancyRepository).getMembership(actorId, document.businessId);
+      try {
+        requireCapability(membership!, "edit_finance");
+      } catch {
+        throw new JobError(JOB_ERROR_CODES.BUSINESS_ACCESS_DENIED);
+      }
       return deps.jobs.createOrReuse(() => {
         const now = new Date().toISOString();
         return {

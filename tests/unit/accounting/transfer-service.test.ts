@@ -132,6 +132,7 @@ describe("transfers between own accounts", () => {
     await expect(updateTransfer(business.id, created.transferGroupId, { toAccountId: cash.id }, owner, dependencies)).rejects.toMatchObject({ code: codes.INVALID_MOVEMENT });
     await expect(updateTransfer(business.id, created.transferGroupId, { date: "2027-05-01" }, owner, dependencies)).rejects.toMatchObject({ code: codes.MOVEMENT_OUTSIDE_OPEN_YEAR });
     await expect(updateTransfer(business.id, created.transferGroupId, {}, owner, dependencies)).rejects.toMatchObject({ code: codes.INVALID_MOVEMENT });
+    await expect(updateTransfer(business.id, created.transferGroupId, { transferGroupId: "forged" } as Parameters<typeof updateTransfer>[2], owner, dependencies)).rejects.toMatchObject({ code: codes.INVALID_MOVEMENT });
     await expect(updateTransfer(business.id, "missing", { amount: "1.00" }, owner, dependencies)).rejects.toMatchObject({ code: codes.MOVEMENT_NOT_FOUND });
     expect((await live()).map((item) => [item.moneyAccountId, item.amount, item.movementDate])).toEqual([[cash.id, "-99.99", "2026-06-02"], [bank.id, "99.99", "2026-06-02"]]);
     expect((await auditTypes(fixture)).filter((type) => type.startsWith("transfer_") || type === "movement_updated")).toEqual([
