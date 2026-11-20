@@ -4,7 +4,7 @@
   "estado": "parcial",
   "responsable": "operador",
   "criterio": [
-    "Los commits de la rama avanzar están en origin/main con CI verde y ledgerharbour.pages.dev sirve la app a través del Worker privado y Cloudflare Tunnel.",
+    "El código está integrado en origin/main con CI verde y ledgerharbour.pages.dev sirve las publicaciones automáticas a través del Worker privado y Cloudflare Tunnel.",
     "Las migraciones del PostgreSQL de producción están aplicadas y verificadas tras confirmar el respaldo.",
     "En el dominio de Cloudflare, una cuenta Firebase autorizada verifica el recorrido desde la foto leída por Tesseract en la VPS hasta el libro exportado."
   ],
@@ -16,12 +16,13 @@
     "docs/STACK.md",
     "src/modules/security/auth-rate-limit.ts",
     "src/modules/security/authenticated-rate-limit.ts",
-    "vercel.json"
+    "vercel.json",
+    "scripts/deploy/production.sh"
   ],
-  "hecho": "Registrados el proyecto Pages y el dominio ledgerharbour.pages.dev, creado el túnel y desplegado el Worker privado con un único servicio VPC de origen. Probados el proxy y el ajuste de rate limiting. Migraciones verificadas en PostgreSQL desechable. Rama publicada y PR #1 abierto en borrador. Imagen de la VPS construida y comprobada en un contenedor efímero. Firebase confirmó el dominio autorizado y la conservación de los dominios previos. El CI del PR #1 completó todas sus comprobaciones para 65b028d.",
-  "falta": "Integrar el PR #1. Verificar el entorno y respaldo restaurable de PostgreSQL, aplicar las migraciones 0008 a 0012, levantar el origen y conector de forma permanente, publicar Pages y comprobar la foto al Excel en producción.",
-  "bloqueo": "Identificar el archivo privado de entorno de producción y el respaldo restaurable del PostgreSQL objetivo.",
-  "siguiente": "Verificar el entorno y el respaldo de PostgreSQL, aplicar y comprobar las migraciones, y levantar el origen y el conector antes de publicar Pages.",
+  "hecho": "PR #1 integrado y CI de main en verde. Proyecto Pages, dominio autorizado en Firebase, túnel y Worker privado preparados. PostgreSQL 16.16 de producción creado desde cero en la VPS, con roles separados, migraciones 0001–0012 verificadas y respaldo inicial restaurado en una instancia aislada. La verificación de CI ya incluye la sintaxis del publicador de la VPS y las pruebas del proxy.",
+  "falta": "Completar el entorno de producción, activar el origen y el conector, publicar el proxy de Pages, programar el publicador en la VPS y verificar una publicación automática y el recorrido de la foto al Excel.",
+  "bloqueo": "Faltan las credenciales privadas de Firebase Admin y del bucket R2 de LedgerHarbour para arrancar el origen.",
+  "siguiente": "Completar el entorno privado de producción y comprobar el acceso a Firebase, PostgreSQL y R2 antes de activar el origen.",
   "evidencia": [
     "2026-11-20 · ddc1f99 · corepack pnpm db:native-check en PostgreSQL 16.15 desechable, por socket Unix privado: 5 de 5 pruebas pasaron. Aplicó y verificó 0001–0012 en una base vacía y revirtió y reaplicó 0012.",
     "2026-11-20 · ddc1f99 · Dos cambios simultáneos de fechas por el servicio de ejercicios y conexiones independientes. pg_locks y pg_blocking_pids confirmaron la espera por el bloqueo. Tras confirmar la primera transacción, la segunda devolvió FINANCIAL_YEAR_OVERLAP y los ejercicios guardados no se solaparon. El clúster temporal se detuvo y se eliminó.",
@@ -39,7 +40,12 @@
     "2026-11-20 · El conector temporal de la VPS registró la conexión después de forzar HTTP/2 y Cloudflare informó estado saludable. El proceso temporal terminó al concluir la comprobación.",
     "2026-11-20 · Con el proyecto LedgerHarbour indicado como consumidor de la petición, Firebase Authentication confirmó ledgerharbour.pages.dev en authorizedDomains y conservó todos los dominios anteriores.",
     "2026-11-20 · El dominio de Pages respondió HTTP 522 mientras el origen de producción seguía pendiente.",
-    "2026-11-20 · GitHub Actions 44681127620 completó en verde todas las comprobaciones del PR #1 para 65b028d."
+    "2026-11-20 · GitHub Actions 44681127620 completó en verde todas las comprobaciones del PR #1 para 65b028d.",
+    "2026-11-20 · PR #1 integrado en main en 0d2d565. GitHub Actions 44692464279 terminó en verde.",
+    "2026-11-20 · PostgreSQL 16.16 saludable en red interna, sin puerto publicado. Se aplicaron y comprobaron las migraciones 0001–0012 con el rol de migración. El rol de runtime consultó la base vacía con sus permisos limitados.",
+    "2026-11-20 · Respaldo inicial restaurado en una instancia aislada. Se comprobaron el registro de 12 migraciones y los permisos de runtime.",
+    "2026-11-20 · production.sh --check consultó el tip de main y confirmó el CI verde para ese commit. La imagen de la VPS contiene el cliente PostgreSQL y las tres pruebas del proxy pasaron.",
+    "2026-11-20 · La imagen de la VPS consultó el PostgreSQL real con el rol de runtime en una transacción de solo lectura. Ocho escenarios simulados pasaron, incluidos espera de CI, rechazo por migraciones o conexión, publicación, idempotencia y recuperación."
   ],
   "actualizado": "2026-11-20"
 }

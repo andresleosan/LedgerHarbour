@@ -2,6 +2,7 @@
 
 Una línea por cierre, la más reciente arriba: fecha, tarea, qué cambió para quien usa la app y progreso antes → después.
 
+- 2026-11-20 · LH-029 sigue parcial · PostgreSQL de producción nuevo en la VPS, con esquema verificado y respaldo restaurado. Preparada la publicación de CI a la VPS · 25 de 28 → 25 de 28.
 - 2026-11-20 · LH-028 · El operador delegó las preguntas del contable: se mantienen los valores por defecto y el dueño introduce saldos y fechas en Ajustes · 24 de 27 → 25 de 27.
 - 2026-11-20 · LH-030 · La vista previa privada del tailnet ya muestra todo lo nuevo, con Node 26 y certificado vigente · 23 de 27 → 24 de 27.
 - 2026-11-20 · LH-033 · El libro exportado abre bien en Excel, según el operador · 22 de 27 → 23 de 27.

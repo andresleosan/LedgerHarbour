@@ -54,6 +54,11 @@ jobs:
       - name: Typecheck
         run: corepack pnpm exec tsc --noEmit
 
+      - name: Production release checks
+        run: |
+          bash -n scripts/deploy/production.sh
+          node --test docs/roadmap/work/LH-029/cloudflare/proxy.test.mjs
+
       - name: Unit and integration tests
         run: corepack pnpm test
 

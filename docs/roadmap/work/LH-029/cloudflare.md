@@ -4,9 +4,17 @@ El navegador llega por HTTPS a `ledgerharbour.pages.dev`. Una función de Pages 
 
 ## Preparar el origen
 
-1. Identificar el commit, el dominio y un puerto de loopback libre para producción. El `vercel.json` de esta rama desactiva los despliegues automáticos de Vercel. Al publicar el PR, comprobar que GitHub no registra un despliegue nuevo en Vercel. El PR ejecuta la verificación de GitHub Actions.
-2. Construir y etiquetar la imagen con el commit de la rama verificada. Configurar `LEDGERHARBOUR_IMAGE`, `LEDGERHARBOUR_ORIGIN_PORT` y `LEDGERHARBOUR_RUNTIME_ENV` para [el Compose de producción](compose.production.yaml). Este último apunta al archivo de entorno privado del servicio, fuera del repositorio. Los modos de producción se fijan en Compose. La configuración y los datos de la vista previa viven en su propio proyecto.
-3. Identificar la base de destino y verificar un backup restaurable. Aplicar las migraciones `0008` a `0012` con el procedimiento aprobado y comprobar el registro de migraciones y el esquema según el [runbook de activación](../../../production-activation.md#migraciones-y-rollback). Arrancar el origen de producción y comprobarlo en loopback antes de enrutar el dominio.
+1. El entorno de producción usa un PostgreSQL nuevo en la VPS, sin datos heredados. La base vive en una red Docker interna, con un rol de runtime diferente del rol de migración. Aplicar las migraciones con el [runbook de activación](../../../production-activation.md#migraciones-y-rollback), comprobar el esquema y probar una restauración en una instancia aparte.
+2. Preparar el archivo privado de entorno con Firebase Admin, las credenciales del bucket privado de R2 y la conexión del rol de runtime. Mantener el archivo de entorno y el Compose de la red de PostgreSQL fuera del repositorio, ambos con permisos `0600`. El [Compose de producción](compose.production.yaml) fija los modos de Firebase, PostgreSQL, R2 y Tesseract y publica el origen únicamente en loopback.
+3. Verificar la imagen y `/login` en loopback con el entorno completo. Activar el túnel y publicar el proxy de Pages según el procedimiento siguiente.
+
+## Publicación automática desde main
+
+El proyecto Pages usa Direct Upload y sirve un proxy estable. Una vez publicado ese proxy, un push a `main` dispara CI y la VPS publica la aplicación en el mismo dominio al comprobar la ejecución exitosa de CI para ese commit. Los cambios al proxy de Pages o al Worker de origen se publican como cambios de infraestructura.
+
+- Ejecutar [production.sh](../../../../scripts/deploy/production.sh) en la VPS cada cinco minutos con el planificador del host, con la misma cuenta que administra el Compose de producción. Instalar una copia revisada del script en una ruta privada propiedad del operador. Proporcionar `LEDGERHARBOUR_RELEASE_STATE` (directorio privado `0700`), `LEDGERHARBOUR_RUNTIME_ENV`, `LEDGERHARBOUR_DB_COMPOSE` y `LEDGERHARBOUR_ORIGIN_PORT`. La consulta de GitHub usa el repositorio público. Guardar también una copia revisada de `compose.production.yaml` en el directorio privado de publicación con permisos `0600`. Las credenciales de runtime se mantienen en la VPS.
+- Registrar en `verified-migrations` dentro del directorio de publicación la salida de `git rev-parse <commit-verificado>:src/db/migrations` una vez verificadas las migraciones de ese commit en PostgreSQL. Los cambios en ese árbol requieren repetir la comprobación y actualizar la huella. Este publicador hace una consulta de solo lectura usando el rol de runtime.
+- `production.sh --check` consulta el commit candidato y su CI. En ejecución normal comprueba el esquema aprobado, construye una imagen etiquetada con el commit exacto, comprueba PostgreSQL con la imagen candidata y valida `/login` primero en loopback y luego en Pages. Si falla la comprobación, recupera la imagen anterior cuando existe y deja la incidencia en el registro del planificador.
 
 ## Enrutar y verificar
 
