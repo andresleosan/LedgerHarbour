@@ -19,16 +19,18 @@
     "src/modules/invoices/ocr-provider-factory.ts",
     "src/modules/config/production-gate.ts"
   ],
-  "hecho": "Adaptador local integrado en el worker existente, imagen de la app construida y OCR nativo comprobado con los cinco formatos de subida. El parser normaliza los campos y los deja pendientes de revisión.",
+  "hecho": "Adaptador local integrado en el worker existente, imagen de la app construida y OCR nativo comprobado con los cinco formatos de subida. El parser normaliza los campos y los deja pendientes de revisión. La instancia de validación quedó autorizada y la carga, lectura y revisión se probaron con una factura sintética en un contenedor aislado.",
   "falta": "Verificar una factura fotografiada real autorizada, medir el consumo en la instancia de destino y comprobar el acceso de Firebase en su dominio antes de activarla.",
-  "bloqueo": "Autorizar la instancia restringida de la VPS e indicar qué factura real puede usarse para la validación.",
-  "siguiente": "Arrancar la imagen en la instancia autorizada, probar el acceso y procesar una factura real de principio a fin.",
+  "bloqueo": "Indicar qué factura fotografiada real se autoriza para la validación privada.",
+  "siguiente": "Procesar la factura autorizada en el contenedor aislado y cotejar fecha, moneda e importes con el documento.",
   "evidencia": [
     "2026-11-20 · El operador eligió la VPS existente para evitar cargos por lectura de Document AI.",
     "corepack pnpm exec vitest run --no-file-parallelism tests/unit/invoices/local-ocr-fields.test.ts tests/unit/invoices/ocr-provider-factory.test.ts tests/unit/config/production-gate.test.ts tests/integration/invoices/ocr-workflow.test.ts → 86 pruebas pasadas.",
     "docker build --tag ledgerharbour-ocr-local:lh027 . → imagen standalone construida. Docker run efímero, sin red y con configuración sintética → arranque con UID 1000, login 200 y rechazo 401 de OCR sin sesión.",
     "Docker run efímero sin red con Tesseract y facturas sintéticas → JPEG, PNG, HEIC, TIFF y PDF extraen número, fecha, total y moneda y quedan en revisión. TIFF y PDF de dos páginas, rechazo de PDF sobre el límite y limpieza temporal comprobados.",
-    "Verificación de lote: corepack pnpm lint, corepack pnpm exec tsc --noEmit, corepack pnpm exec vitest run --no-file-parallelism y corepack pnpm build correctos. Vitest: 1.252 pruebas pasadas y 7 omitidas."
+    "Verificación de lote: corepack pnpm lint, corepack pnpm exec tsc --noEmit, corepack pnpm exec vitest run --no-file-parallelism y corepack pnpm build correctos. Vitest: 1.252 pruebas pasadas y 7 omitidas.",
+    "2026-11-20 · El operador autorizó la instancia privada de validación en la VPS.",
+    "Docker run efímero sin red, con OCR y almacenamiento local en tmpfs, sobre 4df8f61. Vitest: 1 de 1 prueba de las rutas de la app pasada. Carga 201, worker nativo 202 con trabajo completado, borrador privado 200 y acceso desde otra empresa 403. Fecha, moneda y total coincidieron con la factura sintética."
   ],
   "actualizado": "2026-11-20"
 }
