@@ -1,7 +1,7 @@
 {
   "id": "LH-038",
   "titulo": "Pruebas de navegador para la lectura fallida y el duplicado real",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "El entorno de pruebas puede provocar una lectura fallida sin que exista ese interruptor en producción.",
@@ -17,12 +17,15 @@
     "tests/e2e/**",
     "tests/unit/**"
   ],
-  "hecho": "",
+  "hecho": "El lector falso de pruebas falla cuando el nombre del archivo empieza por fail-reading-; producción no puede seleccionarlo. «Leer de nuevo» y «Rellenar a mano» se ejercitan en el navegador y la prueba de subida usa el 409 real del duplicado.",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Mirar cómo fuerza los fallos tests/integration/invoices/ocr-workflow.test.ts y cómo admite la puerta de consola un 4xx esperado.",
+  "siguiente": "",
   "evidencia": [
-    "Creada el 2026-11-20 al repasar MEJORAS: dos botones de LH-019 solo están probados a nivel de servidor."
+    "Creada el 2026-11-20 al repasar MEJORAS: dos botones de LH-019 solo están probados a nivel de servidor.",
+    "Commit de61341. fake-ocr-provider 6; e2e failed-reading.spec 2 y upload.spec 7 pasadas.",
+    "Los 502 y 409 esperados se envían desde Playwright y no desde Chromium para no disparar la puerta de consola; el servidor y sus respuestas son reales.",
+    "Verificación de lote 6 sobre f413c66: lint 0, tsc 0, build 0; vitest --no-file-parallelism 1247 pasadas y 7 omitidas (118 archivos); e2e por carpetas: documentos 10, facturas 7, ajustes y movimientos 4, ejercicio 2, critical-path y navegación 2. Las dos de ejercicio fallaron en una pasada conjunta (una con «Page crashed») y pasaron al repetirlas solas."
   ],
   "actualizado": "2026-11-20"
 }

@@ -2,6 +2,10 @@
 
 Una línea por cierre, la más reciente arriba: fecha, tarea, qué cambió para quien usa la app y progreso antes → después.
 
+- 2026-11-20 · LH-037 · Ocho detalles de uso: importes dudosos a revisión, enlace directo a la revisión, recuentos por ejercicio, textos en el idioma de la pantalla · 21 de 27 → 22 de 27.
+- 2026-11-20 · LH-036 · La app se comporta igual en pruebas y en PostgreSQL ante un error; los ejercicios no pueden solaparse por dos cambios a la vez · 20 de 27 → 21 de 27.
+- 2026-11-20 · LH-035 · Guardar, leer e iniciar la lectura de una factura exigen el permiso de finanzas; rutas con tope de tamaño · 19 de 27 → 20 de 27.
+- 2026-11-20 · LH-038 · «Leer de nuevo» y «Rellenar a mano» probados en navegador; nada visible para quien usa la app · 18 de 27 → 19 de 27.
 - 2026-11-20 · Repaso de mejoras: cuatro fichas nuevas (LH-035 a LH-038) · 18 de 27.
 - 2026-11-20 · LH-025 · Pantalla «Ejercicio»: descargar el libro del contable relleno, ver por qué no se puede si falta algo, saldos y totales · 17 de 23 → 18 de 23.
 - 2026-11-20 · LH-023 · Se puede subir el extracto del banco en CSV sin duplicar lo ya registrado; lo que no tiene código espera en una bandeja · 16 de 23 → 17 de 23.

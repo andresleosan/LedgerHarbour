@@ -1,7 +1,7 @@
 {
   "id": "LH-035",
   "titulo": "Cerrar permisos y límites en las rutas de facturas y movimientos",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "Guardar un borrador de factura exige el permiso de finanzas, con prueba que falla antes.",
@@ -20,12 +20,17 @@
     "tests/security/**",
     "tests/integration/**"
   ],
-  "hecho": "",
+  "hecho": "Guardar o leer una factura, rellenarla a mano e iniciar su lectura exigen el permiso de finanzas. Las rutas de facturas, pago y anulación limitan el tamaño de la petición y rechazan cambios vacíos o mezclados. Rellenar a mano tiene límite de peticiones. createMovement y updateTransfer solo aceptan sus campos.",
   "falta": "",
   "bloqueo": "",
-  "siguiente": "Escribir primero las pruebas de seguridad que fallan.",
+  "siguiente": "",
   "evidencia": [
-    "Creada el 2026-11-20 al repasar MEJORAS: cuatro huecos pequeños de permisos y límites; ninguno explotable hoy porque los tres roles tienen el permiso de finanzas."
+    "Creada el 2026-11-20 al repasar MEJORAS: cuatro huecos pequeños de permisos y límites; ninguno explotable hoy porque los tres roles tienen el permiso de finanzas.",
+    "Commits 1f29a60 y 04449f7. Cada arreglo tiene una prueba que se vio fallar antes (invoice-finance-permissions 6, ocr-workflow 28, transfer-service 20, money-service 41).",
+    "Decisión: el informe de control se deja sin límite de peticiones. La pantalla «Ejercicio» lo pide en cada carga y comparte cupo con las subidas (10 cada 5 minutos); con límite, un uso normal la bloquearía. Fuente: análisis del subagente, aceptado.",
+    "Subir un documento sigue exigiendo solo ser miembro activo: no existe un permiso de subida.",
+    "Los permisos nuevos solo se pueden probar simulando la denegación, porque los tres roles tienen el permiso de finanzas.",
+    "Verificación de lote 6 sobre f413c66: lint 0, tsc 0, build 0; vitest --no-file-parallelism 1247 pasadas y 7 omitidas (118 archivos); e2e por carpetas: documentos 10, facturas 7, ajustes y movimientos 4, ejercicio 2, critical-path y navegación 2. Las dos de ejercicio fallaron en una pasada conjunta (una con «Page crashed») y pasaron al repetirlas solas."
   ],
   "actualizado": "2026-11-20"
 }
