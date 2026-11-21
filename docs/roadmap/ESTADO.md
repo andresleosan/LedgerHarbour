@@ -2,6 +2,7 @@
 
 Una línea por cierre, la más reciente arriba: fecha, tarea, qué cambió para quien usa la app y progreso antes → después.
 
+- 2026-11-21 · LH-029 · La app está en producción en ledgerharbour.pages.dev: acceso con Google o correo, foto leída en la VPS, libro del contable descargable, y cada cambio en main se publica solo · 26 de 29 → 27 de 29.
 - 2026-11-21 · LH-029 sigue parcial · La app ya abre en ledgerharbour.pages.dev con Firebase, PostgreSQL y R2 reales; falta la publicación automática y una prueba con cuenta real · 26 de 29 → 26 de 29.
 - 2026-11-21 · Repaso de mejoras: una ficha nueva (LH-040), a la espera de más fotos autorizadas · 26 de 29.
 - 2026-11-21 · LH-027 · Las fotos de tickets reales ya rellenan fecha, total y moneda para revisar; antes llegaban vacías · 25 de 28 → 26 de 28.

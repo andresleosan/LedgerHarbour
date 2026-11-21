@@ -1,8 +1,8 @@
 {
   "id": "LH-029",
   "titulo": "Publicar y activar en producción lo construido",
-  "estado": "parcial",
-  "responsable": "operador",
+  "estado": "hecho",
+  "responsable": "desarrollo",
   "criterio": [
     "El código está integrado en origin/main con CI verde y ledgerharbour.pages.dev sirve las publicaciones automáticas a través del Worker privado y Cloudflare Tunnel.",
     "Las migraciones del PostgreSQL de producción están aplicadas y verificadas tras confirmar el respaldo.",
@@ -19,10 +19,10 @@
     "vercel.json",
     "scripts/deploy/production.sh"
   ],
-  "hecho": "PR #1 integrado y CI de main en verde. Proyecto Pages, dominio autorizado en Firebase, túnel y Worker privado preparados. PostgreSQL 16.16 de producción creado desde cero en la VPS, con roles separados, migraciones 0001–0012 verificadas y respaldo inicial restaurado en una instancia aislada. La verificación de CI ya incluye la sintaxis del publicador de la VPS y las pruebas del proxy. El 2026-11-21 quedó activo: origen en loopback con la imagen de 9ccfbf2, conector del túnel por HTTP/2 con reinicio automático y proxy publicado en Pages. ledgerharbour.pages.dev responde 200.",
-  "falta": "Desplegar el arreglo de monedas y comprobar el ciclo automático desde ese push a main.",
-  "bloqueo": "Autorizar el push a main del arreglo de monedas; el publicador lo desplegará solo.",
-  "siguiente": "Tras el push, seguir el publicador hasta «publicado y verificado» y repetir la lectura de una foto en un negocio nuevo sin abrir Ajustes > Monedas.",
+  "hecho": "PR #1 integrado y CI de main en verde. Proyecto Pages, dominio autorizado en Firebase, túnel y Worker privado preparados. PostgreSQL 16.16 de producción creado desde cero en la VPS, con roles separados, migraciones 0001–0012 verificadas y respaldo inicial restaurado en una instancia aislada. La verificación de CI ya incluye la sintaxis del publicador de la VPS y las pruebas del proxy. El 2026-11-21 quedó activo: origen en loopback con la imagen de 9ccfbf2, conector del túnel por HTTP/2 con reinicio automático y proxy publicado en Pages. ledgerharbour.pages.dev responde 200. Publicación automática comprobada con 7d9103a y recorrido completo verificado en producción con un negocio nuevo.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Nada en esta tarea. Cada push a main con CI verde se publica solo.",
   "evidencia": [
     "2026-11-20 · ddc1f99 · corepack pnpm db:native-check en PostgreSQL 16.15 desechable, por socket Unix privado: 5 de 5 pruebas pasaron. Aplicó y verificó 0001–0012 en una base vacía y revirtió y reaplicó 0012.",
     "2026-11-20 · ddc1f99 · Dos cambios simultáneos de fechas por el servicio de ejercicios y conexiones independientes. pg_locks y pg_blocking_pids confirmaron la espera por el bloqueo. Tras confirmar la primera transacción, la segunda devolvió FINANCIAL_YEAR_OVERLAP y los ejercicios guardados no se solaparon. El clúster temporal se detuvo y se eliminó.",
@@ -68,7 +68,10 @@
     "Fallo encontrado: la primera foto de un negocio nuevo terminaba en 502. Tesseract y R2 funcionaban; ejecutando el trabajo paso a paso contra producción, guardar la factura daba INVOICE_REPOSITORY_CONFLICT porque el repositorio de PostgreSQL exigía una fila de moneda y las estándar solo se siembran al abrir Ajustes > Monedas. La versión en memoria no lo exige, por eso las pruebas no lo veían.",
     "Arreglo con prueba primero: tests/integration/postgres/finance-repositories.test.ts fallaba con el mismo error; ahora una moneda estándar leída se crea con el mismo id determinista de la siembra perezosa y un código desconocido sigue rechazándose → 14 de 14. Verificación de lote: lint, tsc, Vitest 1.258 pasadas y 7 omitidas, build.",
     "Con las monedas sembradas en el negocio de prueba: foto leída en 0,6 s con número, fecha, total y moneda correctos; el dueño confirma los campos; plantilla sintética, ejercicio, cuenta y movimiento; factura aprobada como pagada; libro descargado (zip válido) con el saldo inicial, el pago de la factura y la venta en su hoja y las fórmulas conservadas; otra cuenta recibe 403 en la factura y en el documento.",
-    "Limpieza: administrador temporal desactivado y las tres cuentas de prueba deshabilitadas en Firebase. El negocio «PRUEBA LedgerHarbour 202611210335» queda en la base, marcado como prueba."
+    "Limpieza: administrador temporal desactivado y las tres cuentas de prueba deshabilitadas en Firebase. El negocio «PRUEBA LedgerHarbour 202611210335» queda en la base, marcado como prueba.",
+    "2026-11-21 · Push de 7d9103a por orden del operador. El primer CI falló en tests/e2e/platform/project-approval.spec.ts por tiempo (la tarjeta no apareció en 15 s; los reintentos chocaron con datos del primer intento). El mismo spec pasó en local sobre 7d9103a (1 de 1, 28 s). gh run rerun --failed → verde.",
+    "El publicador lo desplegó solo: «7d9103a publicado y verificado en https://ledgerharbour.pages.dev»; contenedor con la imagen de 7d9103a y /login 200.",
+    "Recorrido desde cero en un negocio nuevo, sin abrir Monedas: acceso, solicitud, aprobación 200, foto leída 202 con número, fecha, total y moneda correctos, plantilla sintética, ejercicio, factura aprobada, libro descargado (zip válido) y 403/403 para otra cuenta. Cuentas de prueba y administrador temporal desactivados de nuevo; quedan dos negocios «PRUEBA…» activos en la base."
   ],
   "actualizado": "2026-11-21"
 }
