@@ -21,7 +21,7 @@
   ],
   "hecho": "PR #1 integrado y CI de main en verde. Proyecto Pages, dominio autorizado en Firebase, túnel y Worker privado preparados. PostgreSQL 16.16 de producción creado desde cero en la VPS, con roles separados, migraciones 0001–0012 verificadas y respaldo inicial restaurado en una instancia aislada. La verificación de CI ya incluye la sintaxis del publicador de la VPS y las pruebas del proxy. El 2026-11-21 quedó activo: origen en loopback con la imagen de 9ccfbf2, conector del túnel por HTTP/2 con reinicio automático y proxy publicado en Pages. ledgerharbour.pages.dev responde 200.",
   "falta": "Programar el publicador automático en el host (esta sesión corre en un contenedor sin systemd) y recorrer con una cuenta real alta, inicio de sesión, foto y descarga del libro.",
-  "bloqueo": "Añadir https://ledgerharbour.pages.dev/__/auth/handler a los URI de redirección del cliente OAuth web de Google del proyecto ledgerharbour; autorizar el despliegue del arreglo de acceso.",
+  "bloqueo": "Entrar con Google en https://ledgerharbour.pages.dev con una cuenta real y decir si entra; y decidir dónde programar el publicador (timer del host o contenedor propio).",
   "siguiente": "Con la respuesta del operador, programar el publicador y verificar un ciclo automático desde un push a main.",
   "evidencia": [
     "2026-11-20 · ddc1f99 · corepack pnpm db:native-check en PostgreSQL 16.15 desechable, por socket Unix privado: 5 de 5 pruebas pasaron. Aplicó y verificó 0001–0012 en una base vacía y revirtió y reaplicó 0012.",
@@ -56,7 +56,10 @@
     "2026-11-21 · El operador no pudo entrar con Google. Firebase: ningún acceso en 3 horas. Causa: en pages.dev el SDK usaba authDomain firebaseapp.com y los navegadores con almacenamiento de terceros particionado pierden el resultado de la redirección. El arreglo de 80ca8c1 solo cubría vercel.app.",
     "Prueba primero: tests/unit/firebase-client.test.ts fallaba para pages.dev; tras incluirlo, 9 de 9. /__/auth/handler responde 200 en pages.dev a través del proxy.",
     "Google OAuth: redirect_uri de firebaseapp.com aceptado; el de pages.dev devuelve redirect_uri_mismatch (contrastado con un dominio no autorizado). Falta añadirlo en Google Cloud.",
-    "Verificación de lote: lint, tsc, Vitest 1.257 pasadas y 7 omitidas, build correctos."
+    "Verificación de lote: lint, tsc, Vitest 1.257 pasadas y 7 omitidas, build correctos.",
+    "2026-11-21 · El operador añadió el origen y el URI de redirección de pages.dev al cliente OAuth. Comprobado: Google acepta pages.dev y sigue rechazando un dominio de control.",
+    "Publicado b2de7b0 en main por orden expresa del operador. Imagen de b2de7b0, PostgreSQL de solo lectura correcto, contenedor de origen sustituido → /login 200 en loopback.",
+    "Chromium headless en producción: «Continue with Google» → pages.dev/__/auth/handler → accounts.google.com con redirect_uri de pages.dev, sin error ni excepciones. El inicio de sesión con una cuenta real queda para el operador."
   ],
   "actualizado": "2026-11-21"
 }
