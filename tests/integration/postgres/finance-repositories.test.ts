@@ -221,6 +221,25 @@ describe("PostgreSQL finance repositories", () => {
     }
   }, 30_000);
 
+  it("saves a read standard currency the business has not listed yet, and still refuses unknown codes", async () => {
+    const state = await fixture();
+    try {
+      await state.documentRepository.create(makeDocument({ businessId: state.businessId, uploaderId: state.ownerId }));
+      const saved = await state.invoiceRepository.create(makeInvoice({ businessId: state.businessId, currencyReference: "EUR" }));
+      expect(saved.currencyReference).toBe("EUR");
+      const rows = await state.db.select().from(currencies);
+      expect(rows.filter((row) => row.isoCode === "EUR")).toEqual([
+        expect.objectContaining({ id: `currency-${state.businessId}-EUR`, businessId: state.businessId, isStandard: true, isActive: true }),
+      ]);
+
+      await state.documentRepository.create(makeDocument({ id: "document-2", businessId: state.businessId, uploaderId: state.ownerId, privateObjectKey: "private/2", checksum: "checksum-2" }));
+      await expect(state.invoiceRepository.create(makeInvoice({ id: invoiceId("invoice-2"), documentId: documentId("document-2"), businessId: state.businessId, currencyReference: "XYZ" })))
+        .rejects.toMatchObject({ code: INVOICE_ERROR_CODES.REPOSITORY_CONFLICT });
+    } finally {
+      await state.close();
+    }
+  }, 30_000);
+
   it("rejects an invoice transaction and leaves no persisted row", async () => {
     const state = await fixture();
     try {

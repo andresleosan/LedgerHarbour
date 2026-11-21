@@ -3,6 +3,7 @@ import { and, eq, or } from "drizzle-orm";
 import type { Database } from "../../db/client";
 import { databaseForOperation, transactionWithDatabase } from "../../db/transaction-scope";
 import { categories, currencies, invoices } from "../../db/schema";
+import { standardCurrencySeeds } from "../../db/seed/default-categories";
 import {
   INVOICE_ERROR_CODES,
   InvoiceError,
@@ -81,10 +82,18 @@ function dateValue(value: string | null): string | null {
 
 async function currencyIdFor(database: Database, businessId: string, reference: string | null): Promise<string | null> {
   if (reference === null) return null;
-  const [row] = await database.select({ id: currencies.id }).from(currencies).where(and(
+  const find = () => database.select({ id: currencies.id }).from(currencies).where(and(
     eq(currencies.businessId, businessId),
     or(eq(currencies.id, reference), eq(currencies.isoCode, reference)),
   )).limit(1);
+  let [row] = await find();
+  // Standard currencies are otherwise only seeded when someone opens the currency settings, so a fresh
+  // business would refuse its first read invoice. Same deterministic id as that lazy seeding.
+  const seed = row ? undefined : standardCurrencySeeds.find((item) => item.isoCode === reference);
+  if (seed) {
+    await database.insert(currencies).values({ ...seed, id: `currency-${businessId}-${seed.isoCode}`, businessId, isActive: true }).onConflictDoNothing();
+    [row] = await find();
+  }
   if (!row) throw new InvoiceError(INVOICE_ERROR_CODES.REPOSITORY_CONFLICT);
   return row.id;
 }

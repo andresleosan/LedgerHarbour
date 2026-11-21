@@ -20,9 +20,9 @@
     "scripts/deploy/production.sh"
   ],
   "hecho": "PR #1 integrado y CI de main en verde. Proyecto Pages, dominio autorizado en Firebase, túnel y Worker privado preparados. PostgreSQL 16.16 de producción creado desde cero en la VPS, con roles separados, migraciones 0001–0012 verificadas y respaldo inicial restaurado en una instancia aislada. La verificación de CI ya incluye la sintaxis del publicador de la VPS y las pruebas del proxy. El 2026-11-21 quedó activo: origen en loopback con la imagen de 9ccfbf2, conector del túnel por HTTP/2 con reinicio automático y proxy publicado en Pages. ledgerharbour.pages.dev responde 200.",
-  "falta": "Comprobar un ciclo automático completo desde un push a main y recorrer con una cuenta real alta del negocio, aprobación, foto y descarga del libro.",
-  "bloqueo": "Crear tu negocio en https://ledgerharbour.pages.dev, aprobarlo en /platform y subir una foto de prueba; y autorizar un push a main para ver el despliegue automático.",
-  "siguiente": "Con el siguiente push a main, confirmar en los registros del publicador que despliega solo y que /login sigue en 200.",
+  "falta": "Desplegar el arreglo de monedas y comprobar el ciclo automático desde ese push a main.",
+  "bloqueo": "Autorizar el push a main del arreglo de monedas; el publicador lo desplegará solo.",
+  "siguiente": "Tras el push, seguir el publicador hasta «publicado y verificado» y repetir la lectura de una foto en un negocio nuevo sin abrir Ajustes > Monedas.",
   "evidencia": [
     "2026-11-20 · ddc1f99 · corepack pnpm db:native-check en PostgreSQL 16.15 desechable, por socket Unix privado: 5 de 5 pruebas pasaron. Aplicó y verificó 0001–0012 en una base vacía y revirtió y reaplicó 0012.",
     "2026-11-20 · ddc1f99 · Dos cambios simultáneos de fechas por el servicio de ejercicios y conexiones independientes. pg_locks y pg_blocking_pids confirmaron la espera por el bloqueo. Tras confirmar la primera transacción, la segunda devolvió FINANCIAL_YEAR_OVERLAP y los ejercicios guardados no se solaparon. El clúster temporal se detuvo y se eliminó.",
@@ -63,7 +63,12 @@
     "2026-11-21 · El operador entró con Google en producción: Firebase registra el acceso y la base tiene 1 usuario.",
     "No había administradores de plataforma. Con la confirmación del operador se dio el rol platform_admin a esa cuenta, tomando el correo de la base sin escribirlo: 1 fila creada, se vincula en su próximo acceso.",
     "El operador pidió despliegue automático en cada push a main. Esta sesión no tiene systemd, así que el publicador revisado corre en un contenedor ledgerharbour-publisher (docker 29.5 CLI, red del host, solo lectura salvo el directorio de publicación, reinicio automático) que ejecuta production.sh cada 5 minutos. production.sh --check dentro del contenedor → «esperando CI verde» para b2de7b0.",
-    "Primera vuelta del contenedor: se detuvo en la comprobación de permisos sin tocar nada, porque zsh leyó «$S:ro» como modificador y montó mal la carpeta. Recreado con las rutas entre llaves y el código de salida bien registrado → «b2de7b0 ya está en producción»; pages.dev /login 200."
+    "Primera vuelta del contenedor: se detuvo en la comprobación de permisos sin tocar nada, porque zsh leyó «$S:ro» como modificador y montó mal la carpeta. Recreado con las rutas entre llaves y el código de salida bien registrado → «b2de7b0 ya está en producción»; pages.dev /login 200.",
+    "2026-11-21 · Recorrido real en producción con datos sintéticos y tres cuentas de prueba (dueño, otro negocio, administrador temporal): acceso con correo, solicitud del negocio, aprobación 200.",
+    "Fallo encontrado: la primera foto de un negocio nuevo terminaba en 502. Tesseract y R2 funcionaban; ejecutando el trabajo paso a paso contra producción, guardar la factura daba INVOICE_REPOSITORY_CONFLICT porque el repositorio de PostgreSQL exigía una fila de moneda y las estándar solo se siembran al abrir Ajustes > Monedas. La versión en memoria no lo exige, por eso las pruebas no lo veían.",
+    "Arreglo con prueba primero: tests/integration/postgres/finance-repositories.test.ts fallaba con el mismo error; ahora una moneda estándar leída se crea con el mismo id determinista de la siembra perezosa y un código desconocido sigue rechazándose → 14 de 14. Verificación de lote: lint, tsc, Vitest 1.258 pasadas y 7 omitidas, build.",
+    "Con las monedas sembradas en el negocio de prueba: foto leída en 0,6 s con número, fecha, total y moneda correctos; el dueño confirma los campos; plantilla sintética, ejercicio, cuenta y movimiento; factura aprobada como pagada; libro descargado (zip válido) con el saldo inicial, el pago de la factura y la venta en su hoja y las fórmulas conservadas; otra cuenta recibe 403 en la factura y en el documento.",
+    "Limpieza: administrador temporal desactivado y las tres cuentas de prueba deshabilitadas en Firebase. El negocio «PRUEBA LedgerHarbour 202611210335» queda en la base, marcado como prueba."
   ],
   "actualizado": "2026-11-21"
 }
