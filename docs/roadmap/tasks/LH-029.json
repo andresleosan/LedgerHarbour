@@ -19,10 +19,10 @@
     "vercel.json",
     "scripts/deploy/production.sh"
   ],
-  "hecho": "PR #1 integrado y CI de main en verde. Proyecto Pages, dominio autorizado en Firebase, túnel y Worker privado preparados. PostgreSQL 16.16 de producción creado desde cero en la VPS, con roles separados, migraciones 0001–0012 verificadas y respaldo inicial restaurado en una instancia aislada. La verificación de CI ya incluye la sintaxis del publicador de la VPS y las pruebas del proxy.",
-  "falta": "Completar el entorno de producción, activar el origen y el conector, publicar el proxy de Pages, programar el publicador en la VPS y verificar una publicación automática y el recorrido de la foto al Excel.",
-  "bloqueo": "Faltan las credenciales privadas de Firebase Admin y del bucket R2 de LedgerHarbour para arrancar el origen.",
-  "siguiente": "Completar el entorno privado de producción y comprobar el acceso a Firebase, PostgreSQL y R2 antes de activar el origen.",
+  "hecho": "PR #1 integrado y CI de main en verde. Proyecto Pages, dominio autorizado en Firebase, túnel y Worker privado preparados. PostgreSQL 16.16 de producción creado desde cero en la VPS, con roles separados, migraciones 0001–0012 verificadas y respaldo inicial restaurado en una instancia aislada. La verificación de CI ya incluye la sintaxis del publicador de la VPS y las pruebas del proxy. El 2026-11-21 quedó activo: origen en loopback con la imagen de 9ccfbf2, conector del túnel por HTTP/2 con reinicio automático y proxy publicado en Pages. ledgerharbour.pages.dev responde 200.",
+  "falta": "Programar el publicador automático en el host (esta sesión corre en un contenedor sin systemd) y recorrer con una cuenta real alta, inicio de sesión, foto y descarga del libro.",
+  "bloqueo": "Iniciar sesión en https://ledgerharbour.pages.dev con una cuenta real y decir si entra; y decidir dónde programar el publicador (timer del host o contenedor propio).",
+  "siguiente": "Con la respuesta del operador, programar el publicador y verificar un ciclo automático desde un push a main.",
   "evidencia": [
     "2026-11-20 · ddc1f99 · corepack pnpm db:native-check en PostgreSQL 16.15 desechable, por socket Unix privado: 5 de 5 pruebas pasaron. Aplicó y verificó 0001–0012 en una base vacía y revirtió y reaplicó 0012.",
     "2026-11-20 · ddc1f99 · Dos cambios simultáneos de fechas por el servicio de ejercicios y conexiones independientes. pg_locks y pg_blocking_pids confirmaron la espera por el bloqueo. Tras confirmar la primera transacción, la segunda devolvió FINANCIAL_YEAR_OVERLAP y los ejercicios guardados no se solaparon. El clúster temporal se detuvo y se eliminó.",
@@ -45,7 +45,14 @@
     "2026-11-20 · PostgreSQL 16.16 saludable en red interna, sin puerto publicado. Se aplicaron y comprobaron las migraciones 0001–0012 con el rol de migración. El rol de runtime consultó la base vacía con sus permisos limitados.",
     "2026-11-20 · Respaldo inicial restaurado en una instancia aislada. Se comprobaron el registro de 12 migraciones y los permisos de runtime.",
     "2026-11-20 · production.sh --check consultó el tip de main y confirmó el CI verde para ese commit. La imagen de la VPS contiene el cliente PostgreSQL y las tres pruebas del proxy pasaron.",
-    "2026-11-20 · La imagen de la VPS consultó el PostgreSQL real con el rol de runtime en una transacción de solo lectura. Ocho escenarios simulados pasaron, incluidos espera de CI, rechazo por migraciones o conexión, publicación, idempotencia y recuperación."
+    "2026-11-20 · La imagen de la VPS consultó el PostgreSQL real con el rol de runtime en una transacción de solo lectura. Ocho escenarios simulados pasaron, incluidos espera de CI, rechazo por migraciones o conexión, publicación, idempotencia y recuperación.",
+    "2026-11-21 · El operador entregó la credencial de Firebase Admin y la llave de R2 a petición de la sesión. Entorno de producción completo (13 de 13), permisos 0600, sin imprimir valores.",
+    "Firebase Admin: listUsers(1) con la cuenta de servicio del proyecto → correcto. R2: PUT, GET y DELETE de un objeto de prueba con el cliente S3 de la app → correctos.",
+    "docker build de 9ccfbf2 con su etiqueta de revisión. La imagen consultó PostgreSQL con el rol de runtime en una transacción de solo lectura → correcto. Huella de migraciones igual a la verificada; sin migraciones nuevas.",
+    "docker compose up del origen con compose.production.yaml en 127.0.0.1:3199 → /login 200 en loopback.",
+    "Conector cloudflared 2026.11.1 en contenedor con red del host, solo lectura, sin capacidades y reinicio automático, por HTTP/2 → 4 conexiones registradas. El token del túnel vive en un archivo privado 0600.",
+    "Pages no tenía ningún despliegue (de ahí el 522). node --test proxy.test.mjs → 3 de 3. wrangler pages deploy --branch main del proxy → desplegado.",
+    "https://ledgerharbour.pages.dev → / 200 y /login 200, Cache-Control private, no-store. La URL directa del despliegue responde 404 por la comprobación de dominio. Chromium headless a 390 y 1280 px: acceso por correo y Google visibles, sin errores de consola. La ruta de pruebas de OCR responde 404 con AUTH_MODE=firebase (revisado en código)."
   ],
-  "actualizado": "2026-11-20"
+  "actualizado": "2026-11-21"
 }
