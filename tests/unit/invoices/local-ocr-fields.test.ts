@@ -41,6 +41,27 @@ describe("local OCR invoice fields", () => {
     });
   });
 
+  it("reads a photographed till receipt with OCR noise around the labels", () => {
+    const result = extractLocalOcrFields([
+      "Example Corner Shop\nDATE: 04/03/2026 st0\nTIME: 09:41 TILL: 2\nTotal Sold £5.10\nTotal £5.10\nAmount Gbp5.10\nTotal Gbp5.10",
+    ]);
+
+    expect(parseInvoice(result, "ocr")).toMatchObject({
+      invoiceDate: "2026-03-04",
+      total: "5.10",
+      currencyReference: "GBP",
+      reviewState: "needs_review",
+    });
+  });
+
+  it("finds a noisy total line only when it carries a currency and is not tax or a subtotal", () => {
+    const noisy = extractLocalOcrFields(["Sub total £40.00\nTotal VAT £8.00\nBe TOTAL - /, £48.00\nCard sale £48.00 ;"]);
+    expect(parseInvoice(noisy, "ocr")).toMatchObject({ total: "48.00", currencyReference: "GBP" });
+
+    const bare = extractLocalOcrFields(["xx TOTAL 3 items 12"]);
+    expect(parseInvoice(bare, "ocr")).toMatchObject({ total: null, currencyReference: null });
+  });
+
   it("leaves a blank scan in human review", () => {
     expect(parseInvoice(extractLocalOcrFields([" ", "\n"]), "ocr")).toMatchObject({
       invoiceNumber: null,

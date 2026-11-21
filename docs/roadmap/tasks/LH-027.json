@@ -1,8 +1,8 @@
 {
   "id": "LH-027",
   "titulo": "Lectura de facturas en la VPS con Tesseract",
-  "estado": "parcial",
-  "responsable": "operador",
+  "estado": "hecho",
+  "responsable": "desarrollo",
   "criterio": [
     "El worker de la app lee facturas en la VPS con Tesseract, sin enviar la imagen a un proveedor de OCR.",
     "Una factura real fotografiada se lee de principio a fin en una instancia con acceso restringido y validada por el operador.",
@@ -19,10 +19,10 @@
     "src/modules/invoices/ocr-provider-factory.ts",
     "src/modules/config/production-gate.ts"
   ],
-  "hecho": "Adaptador local integrado en el worker existente, imagen de la app construida y OCR nativo comprobado con los cinco formatos de subida. El parser normaliza los campos y los deja pendientes de revisión. La instancia de validación quedó autorizada y la carga, lectura y revisión se probaron con una factura sintética en un contenedor aislado.",
-  "falta": "Verificar una factura fotografiada real autorizada, medir el consumo en la instancia de destino y comprobar el acceso de Firebase en su dominio antes de activarla.",
-  "bloqueo": "Indicar qué factura fotografiada real se autoriza para la validación privada.",
-  "siguiente": "Procesar la factura autorizada en el contenedor aislado y cotejar fecha, moneda e importes con el documento.",
+  "hecho": "Adaptador local integrado en el worker, imagen con Tesseract y los cinco formatos comprobados. Dos recibos reales fotografiados, autorizados por el operador, se leyeron de principio a fin en un contenedor aislado sin red. El extractor ahora tolera el ruido de los recibos: fecha con basura detrás, el mismo total escrito con símbolo o con código y la palabra total con ruido delante.",
+  "falta": "Activarlo en producción y comprobar Firebase en su dominio, dentro de LH-029.",
+  "bloqueo": "",
+  "siguiente": "Nada en esta tarea; la activación va con LH-029.",
   "evidencia": [
     "2026-11-20 · El operador eligió la VPS existente para evitar cargos por lectura de Document AI.",
     "corepack pnpm exec vitest run --no-file-parallelism tests/unit/invoices/local-ocr-fields.test.ts tests/unit/invoices/ocr-provider-factory.test.ts tests/unit/config/production-gate.test.ts tests/integration/invoices/ocr-workflow.test.ts → 86 pruebas pasadas.",
@@ -31,7 +31,14 @@
     "Verificación de lote: corepack pnpm lint, corepack pnpm exec tsc --noEmit, corepack pnpm exec vitest run --no-file-parallelism y corepack pnpm build correctos. Vitest: 1.252 pruebas pasadas y 7 omitidas.",
     "2026-11-20 · El operador autorizó la instancia privada de validación en la VPS.",
     "Docker run efímero sin red, con OCR y almacenamiento local en tmpfs, sobre 4df8f61. Vitest: 1 de 1 prueba de las rutas de la app pasada. Carga 201, worker nativo 202 con trabajo completado, borrador privado 200 y acceso desde otra empresa 403. Fecha, moneda y total coincidieron con la factura sintética.",
-    "2026-11-20 · Búsqueda local: se encontró un comprobante exportado rotulado como muestra y capturas de interfaz. Docker run efímero, sin red: el comprobante completó carga, OCR y revisión, pero quedó sin campos estructurados. No aporta evidencia de fecha, moneda e importes de una factura fotografiada."
+    "2026-11-20 · Búsqueda local: se encontró un comprobante exportado rotulado como muestra y capturas de interfaz. Docker run efímero, sin red: el comprobante completó carga, OCR y revisión, pero quedó sin campos estructurados. No aporta evidencia de fecha, moneda e importes de una factura fotografiada.",
+    "2026-11-21 · Decisión: el operador autorizó dos recibos fotografiados para la prueba privada (relevo del 2026-11-20). Se procesaron ya, en local y sin red, porque LH-029 espera credenciales y la prueba no sale de la máquina. Fuente: relevo y perfil (nada se envía a un servicio externo).",
+    "Primera lectura real, imagen ledgerharbour-ocr-validation:lh027, docker run --network none --cpus 2 --memory 2g con tmpfs → carga 201, OCR 202, revisión 200, acceso de otra empresa 403, pero 0 campos reconocidos en los dos recibos.",
+    "Causa: Tesseract sí leía el texto; el extractor exigía que la fecha cerrara la línea y descartaba el total porque el recibo lo imprime dos veces con distinta grafía (símbolo y código). En el otro recibo la etiqueta del total llevaba ruido delante.",
+    "Arreglo con prueba primero: corepack pnpm exec vitest run --no-file-parallelism tests/unit/invoices/local-ocr-fields.test.ts tests/unit/invoices/invoice-parser.test.ts tests/unit/invoices/ocr-provider-factory.test.ts tests/integration/invoices/ocr-workflow.test.ts → 2 pruebas nuevas fallaban; tras el cambio 118 pasadas.",
+    "Segunda lectura real, mismo contenedor aislado con el extractor nuevo montado → recibo 1: fecha (día/mes/año), moneda y total coinciden con el documento. Recibo 2: moneda y total coinciden; la fecha queda vacía para revisión porque no lleva etiqueta y Tesseract lee mal un dígito. Ningún valor incorrecto. Unos 0,7 s por recibo y unos 400 MiB de pico del contenedor completo, con Vitest incluido. Valores guardados solo en el directorio privado.",
+    "Probado y descartado: ampliar la foto antes de Tesseract. Al 200 % la fecha del recibo 2 sale bien, pero ajustada a 2400 px empeoran los dos. Con dos muestras sería ajuste a ciegas; anotado en MEJORAS.",
+    "Verificación de lote: corepack pnpm lint, corepack pnpm exec tsc --noEmit, corepack pnpm exec vitest run --no-file-parallelism y corepack pnpm build correctos. Vitest: 1.256 pruebas pasadas y 7 omitidas."
   ],
-  "actualizado": "2026-11-20"
+  "actualizado": "2026-11-21"
 }
