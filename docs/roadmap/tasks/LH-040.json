@@ -1,0 +1,27 @@
+{
+  "id": "LH-040",
+  "titulo": "Leer mejor las fotos pequeñas de tickets",
+  "estado": "pendiente",
+  "responsable": "operador",
+  "criterio": [
+    "Con una muestra de tickets reales autorizados, la fecha sale bien en más tickets que hoy y ningún campo que antes salía bien sale mal.",
+    "El ajuste (ampliar, binarizar o leer una fecha sin etiqueta si es la única) queda probado con texto sintético y medido en el contenedor aislado, sin registrar datos de los tickets.",
+    "Todo lo leído sigue pasando por revisión humana."
+  ],
+  "depende": [],
+  "comprueba": [
+    "LH-027"
+  ],
+  "recursos": [
+    "src/modules/invoices/local-ocr-provider.ts",
+    "src/modules/invoices/local-ocr-fields.ts"
+  ],
+  "hecho": "",
+  "falta": "Conseguir la muestra, medir la línea de partida y ajustar el preprocesado con ella.",
+  "bloqueo": "Autorizar entre 5 y 10 fotos más de tickets o facturas reales y dejarlas en la carpeta privada de secretos.",
+  "siguiente": "Con la muestra, medir cuántas fechas y totales salen bien hoy y probar cada ajuste por separado.",
+  "evidencia": [
+    "2026-11-21 · Sale de MEJORAS tras LH-027: con fotos de 720 px un dígito de la fecha sale mal; al 200 % sale bien, pero ajustada a 2400 px empeora. Con dos muestras no se puede ajustar sin adivinar."
+  ],
+  "actualizado": "2026-11-21"
+}

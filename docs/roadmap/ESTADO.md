@@ -2,6 +2,7 @@
 
 Una línea por cierre, la más reciente arriba: fecha, tarea, qué cambió para quien usa la app y progreso antes → después.
 
+- 2026-11-21 · Repaso de mejoras: una ficha nueva (LH-040), a la espera de más fotos autorizadas · 26 de 29.
 - 2026-11-21 · LH-027 · Las fotos de tickets reales ya rellenan fecha, total y moneda para revisar; antes llegaban vacías · 25 de 28 → 26 de 28.
 - 2026-11-20 · LH-029 sigue parcial · PostgreSQL de producción nuevo en la VPS, con esquema verificado y respaldo restaurado. Preparada la publicación de CI a la VPS · 25 de 28 → 25 de 28.
 - 2026-11-20 · LH-028 · El operador delegó las preguntas del contable: se mantienen los valores por defecto y el dueño introduce saldos y fechas en Ajustes · 24 de 27 → 25 de 27.
