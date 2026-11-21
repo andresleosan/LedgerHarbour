@@ -52,18 +52,18 @@ describe("Firebase Google authentication", () => {
     expect(signInWithRedirect.mock.calls[0]?.[0]).toBe("auth");
   });
 
-  it("uses the production origin for Firebase redirect helpers", async () => {
-    vi.stubGlobal("window", { location: { hostname: "ledgerharbour.vercel.app" } });
-    getApps.mockReturnValueOnce([]);
+  it.each(["ledgerharbour.vercel.app", "ledgerharbour.pages.dev"])(
+    "uses the production origin %s for Firebase redirect helpers",
+    async (hostname) => {
+      vi.stubGlobal("window", { location: { hostname } });
+      getApps.mockReturnValueOnce([]);
 
-    await startFirebaseGoogleRedirect(config);
+      await startFirebaseGoogleRedirect(config);
 
-    expect(initializeApp).toHaveBeenCalledWith({
-      ...config,
-      authDomain: "ledgerharbour.vercel.app",
-    });
-    vi.unstubAllGlobals();
-  });
+      expect(initializeApp).toHaveBeenCalledWith({ ...config, authDomain: hostname });
+      vi.unstubAllGlobals();
+    },
+  );
 
   it("reads the Google result after returning from the redirect", async () => {
     const credential = { user: { email: "user@example.com" } };

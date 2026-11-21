@@ -17,8 +17,12 @@ import { AUTH_ERROR_CODES, AuthError } from "./auth-errors";
 
 export type { FirebaseClientConfig } from "./firebase-config";
 
+// Browsers that block third-party storage lose the redirect result when authDomain is another site,
+// so production hosts serve Firebase's /__/auth helpers themselves (next.config.ts rewrites).
+const sameOriginAuthHosts = new Set(["ledgerharbour.vercel.app", "ledgerharbour.pages.dev"]);
+
 function firebaseApp(config: FirebaseClientConfig): FirebaseApp {
-  const authConfig = typeof window !== "undefined" && window.location.hostname === "ledgerharbour.vercel.app"
+  const authConfig = typeof window !== "undefined" && sameOriginAuthHosts.has(window.location.hostname)
     ? { ...config, authDomain: window.location.hostname }
     : config;
   return getApps()[0] ?? initializeApp(authConfig);
