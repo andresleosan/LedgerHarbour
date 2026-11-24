@@ -9,6 +9,39 @@ import type { BusinessSummary } from "@/modules/tenancy/portfolio-service";
 import BusinessSwitcher from "@/ui/BusinessSwitcher";
 import LanguageSwitcher from "@/ui/LanguageSwitcher";
 
+const businessLinks = [
+  { key: "upload", path: "/upload" },
+  { key: "invoices", path: "/invoices" },
+  { key: "documents", path: "/documents" },
+  { key: "movements", path: "/movements" },
+  { key: "year", path: "/year" },
+  { key: "settings", path: "/settings/members" },
+] as const;
+
+const settingsLinks = [
+  { path: "members", en: "Members", es: "Miembros" },
+  { path: "accounts", en: "Accounts and year", es: "Cuentas y ejercicio" },
+  { path: "workbook", en: "Workbook", es: "Libro" },
+  { path: "categories", en: "Categories", es: "Categorías" },
+  { path: "currencies", en: "Currencies", es: "Monedas" },
+  { path: "danger-zone", en: "Danger zone", es: "Zona de peligro" },
+] as const;
+
+const icons = {
+  portfolio: "M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z",
+  admin: "M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z",
+  upload: "M12 16V4M7 9l5-5 5 5M4 20h16",
+  invoices: "M6 3h12v18l-3-2-3 2-3-2-3 2zM9 8h6M9 12h6",
+  documents: "M7 3h7l5 5v13H7zM14 3v5h5",
+  movements: "M7 7h13M16 3l4 4-4 4M17 17H4M8 13l-4 4 4 4",
+  year: "M4 6h16v15H4zM4 10h16M8 3v6M16 3v6",
+  settings: "M4 7h10M18 7h2M4 17h4M12 17h8M16 5v4M10 15v4",
+} as const;
+
+function NavIcon({ name }: { name: keyof typeof icons }) {
+  return <svg className="shell-nav-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false"><path d={icons[name]} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
 interface AppShellProps {
   children: ReactNode;
   identity: AuthIdentity;
@@ -57,6 +90,9 @@ export default function AppShell({ children, identity, businesses, locale, platf
          platform: "Administration",
       };
 
+  const businessPath = activeBusiness ? pathname.slice(`/business/${activeBusiness.id}`.length) : "";
+  const isCurrent = (path: string) => path === "/settings/members" ? businessPath.startsWith("/settings/") : businessPath === path || businessPath.startsWith(`${path}/`);
+
   return (
     <div className="app-shell">
       <style>{`
@@ -65,19 +101,19 @@ export default function AppShell({ children, identity, businesses, locale, platf
          body { margin: 0; background: #f7f8f5; color: #17313b; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
         a { color: inherit; }
         .app-shell { --lh-navy: #17313b; --lh-teal: #0b7772; --lh-teal-dark: #075b57; --lh-off-white: #f7f8f5; --lh-surface: #fff; --lh-border: #cbd9d5; --lh-muted: #49636b; --lh-coral: #d46d42; --lh-coral-focus: #8b452f; --lh-danger: #913f35; min-height: 100vh; background: radial-gradient(circle at 90% 0%, #e0f0e9 0, transparent 28%), var(--lh-off-white); }
-        .shell-header { display: grid; grid-template-columns: minmax(190px, 220px) 1fr auto; gap: 24px; align-items: center; width: min(100% - 40px, 1240px); margin: 0 auto; padding: 22px 0; border-bottom: 1px solid #d6e1dc; }
+        .shell-header { display: grid; grid-template-columns: 1fr auto; gap: 24px; align-items: center; width: min(100% - 40px, 1240px); margin: 0 auto; padding: 14px 0; border-bottom: 1px solid #d6e1dc; }
          .shell-brand { display: inline-flex; align-items: center; width: fit-content; color: #17313b; font-weight: 850; letter-spacing: .02em; text-decoration: none; }
          .shell-brand-logo { display: block; width: 142px; height: 95px; object-fit: contain; }
-        .shell-nav { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-        .shell-nav a, .shell-nav-disabled { min-height: 40px; display: inline-flex; align-items: center; border-radius: 9px; padding: 0 10px; color: #49636b; font-size: .86rem; font-weight: 750; text-decoration: none; }
-        .shell-nav a:hover, .shell-nav a[aria-current="page"] { background: #d9eeea; color: #075b57; }
-        .shell-nav-disabled { cursor: not-allowed; opacity: .6; }
+        .shell-nav { display: grid; gap: 2px; padding: 8px; border: 1px solid #d2e0da; border-radius: 16px; background: #fff; }
+        .shell-nav a, .shell-nav-disabled { min-height: 44px; display: flex; align-items: center; gap: 10px; border-radius: 10px; padding: 0 10px; color: #49636b; font-size: .88rem; font-weight: 750; text-decoration: none; }
+        .shell-nav a:hover { background: #edf7f3; color: #075b57; } .shell-nav a[aria-current="page"] { background: #d9eeea; color: #075b57; box-shadow: inset 3px 0 0 var(--lh-teal); } .shell-nav-icon { flex: none; } .shell-nav-short { display: none; }
+        .shell-nav-disabled { cursor: not-allowed; opacity: .6; } .settings-nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 18px; padding: 4px; border: 1px solid #d2e0da; border-radius: 12px; background: #fff; } .settings-nav a { min-height: 40px; display: inline-flex; align-items: center; border-radius: 9px; padding: 0 12px; color: #49636b; font-size: .84rem; font-weight: 750; text-decoration: none; white-space: nowrap; } .settings-nav a:hover { background: #edf7f3; } .settings-nav a[aria-current="page"] { background: var(--lh-navy); color: #fff; } .settings-nav a:focus-visible { outline: 3px solid var(--lh-coral-focus); outline-offset: 2px; }
          .shell-user { display: flex; align-items: center; justify-content: flex-end; gap: 14px; color: #49636b; font-size: .78rem; }
         .shell-user strong { display: block; color: #17313b; font-size: .84rem; }
         .sign-out { border: 1px solid #9bb7b0; border-radius: 8px; padding: 8px 10px; background: #fff; color: #315b60; cursor: pointer; font: inherit; font-size: .78rem; font-weight: 800; }
-        .shell-main { width: min(100% - 40px, 1240px); margin: 0 auto; padding: 26px 0 60px; }
-        .shell-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; align-items: start; }
-        .business-switcher { position: sticky; top: 18px; padding: 16px; border: 1px solid #d2e0da; border-radius: 16px; background: #fff; box-shadow: 0 12px 30px rgba(23,49,59,.06); }
+        .shell-body { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 28px; align-items: start; width: min(100% - 40px, 1240px); margin: 0 auto; padding: 26px 0 60px; } .shell-content, .shell-main { min-width: 0; }
+        .shell-aside { position: sticky; top: 18px; display: grid; gap: 14px; max-height: calc(100vh - 36px); overflow-y: auto; }
+        .business-switcher { padding: 16px; border: 1px solid #d2e0da; border-radius: 16px; background: #fff; box-shadow: 0 12px 30px rgba(23,49,59,.06); } .business-option a[aria-current="page"] { background: #edf7f3; box-shadow: inset 3px 0 0 var(--lh-teal); }
         .shell-label { margin: 0 0 10px; color: #55716f; font-size: .72rem; font-weight: 850; letter-spacing: .1em; text-transform: uppercase; }
         .business-list { display: grid; gap: 7px; }
         .business-option a, .business-option-disabled { display: block; padding: 10px; border-radius: 10px; text-decoration: none; }
@@ -234,9 +270,9 @@ export default function AppShell({ children, identity, businesses, locale, platf
          .danger-eyebrow { color: var(--lh-danger); }
          .danger-warning { padding: 15px; border-left: 4px solid #bb584b; background: #fff1eb; color: #6e382f; line-height: 1.55; }
          .danger-action { border-color: #bb584b; }
-         @media (max-width: 900px) { .shell-header { grid-template-columns: 1fr auto; } .shell-nav { grid-column: 1 / -1; grid-row: 2; } }
+         @media (max-width: 900px) { .shell-body { grid-template-columns: 200px minmax(0, 1fr); gap: 18px; } }
          @media (max-width: 900px) { .currency-create { grid-template-columns: 1fr 1fr; } .currency-create input:first-of-type { grid-column: span 2; } }
-          @media (max-width: 650px) { .shell-header, .shell-main { width: min(100% - 28px, 1240px); } .shell-header { gap: 12px; } .shell-brand-logo { width: 116px; height: 77px; } .shell-user span { display: none; } .shell-layout { grid-template-columns: 1fr; gap: 18px; } .business-switcher { position: static; order: 2; } .shell-content { order: 1; } .shell-nav { overflow-x: auto; flex-wrap: nowrap; } .shell-nav a, .shell-nav-disabled { white-space: nowrap; } .page-shell { width: 100%; } .invoice-hero { display: block; } .invoice-settings { margin-top: 18px; } .review-grid { grid-template-columns: 1fr; } .review-preview { min-height: auto; } .request-row, .settings-item { align-items: stretch; flex-direction: column; } .page-actions { width: 100%; } .page-actions button { flex: 1 1 100%; } .settings-create, .currency-create { grid-template-columns: 1fr; } .currency-create input:first-of-type { grid-column: auto; } .upload-drop { padding: 18px; } }
+          @media (max-width: 650px) { .shell-header, .shell-body { width: min(100% - 28px, 1240px); } .shell-header { gap: 12px; } .shell-brand-logo { width: 116px; height: 77px; } .shell-user span { display: none; } .shell-body { display: flex; flex-direction: column; align-items: stretch; gap: 18px; padding-bottom: calc(96px + env(safe-area-inset-bottom)); } .shell-aside { display: contents; max-height: none; } .business-switcher { order: 2; } .shell-content { order: 1; width: 100%; } .shell-nav { position: fixed; z-index: 20; left: 0; right: 0; bottom: 0; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 0; padding: 6px 4px calc(6px + env(safe-area-inset-bottom)); border: 0; border-top: 1px solid #d2e0da; border-radius: 0; box-shadow: 0 -8px 24px rgba(23,49,59,.08); } .shell-nav a { flex-direction: column; justify-content: center; gap: 3px; min-height: 54px; padding: 4px 2px; font-size: .6rem; letter-spacing: -.02em; line-height: 1.15; text-align: center; overflow-wrap: anywhere; } .shell-nav .shell-nav-long { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } .shell-nav .shell-nav-short { display: inline; } .shell-nav a[aria-current="page"] { box-shadow: inset 0 3px 0 var(--lh-teal); } .shell-nav-disabled, .shell-nav:has(a[href*="/business/"]) .shell-nav-portfolio { display: none; } .settings-nav a { min-height: 36px; padding: 0 10px; } .page-shell { width: 100%; } .invoice-hero { display: block; } .invoice-settings { margin-top: 18px; } .review-grid { grid-template-columns: 1fr; } .review-preview { min-height: auto; } .request-row, .settings-item { align-items: stretch; flex-direction: column; } .page-actions { width: 100%; } .page-actions button { flex: 1 1 100%; } .settings-create, .currency-create { grid-template-columns: 1fr; } .currency-create input:first-of-type { grid-column: auto; } .upload-drop { padding: 18px; } }
          .year-actions a { display: inline-flex; align-items: center; justify-content: center; text-align: center; text-decoration: none; }
          .year-sheets { margin-top: 14px; }
          .year-counts { margin-top: 14px; }
@@ -249,19 +285,28 @@ export default function AppShell({ children, identity, businesses, locale, platf
       `}</style>
       <header className="shell-header">
           <a className="shell-brand" href={hrefFor("/portfolio")} aria-label="LedgerHarbour"><img className="shell-brand-logo" src="/brand/ledgerharbour-logo.png" alt="LedgerHarbour" width={142} height={95} /></a>
-         <nav className="shell-nav" aria-label={copy.workspace}>
-            <a href={hrefFor("/portfolio")} aria-current={pathname === "/portfolio" ? "page" : undefined}>{copy.portfolio}</a>
-            {platformAdmin && <a href={hrefFor("/admin")} aria-current={pathname.startsWith("/admin") ? "page" : undefined}>{copy.platform}</a>}
-           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/upload`)}>{copy.upload}</a> : <span className="shell-nav-disabled">{copy.upload}</span>}
-           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/invoices`)}>{copy.invoices}</a> : <span className="shell-nav-disabled">{copy.invoices}</span>}
-           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/documents`)}>{copy.documents}</a> : <span className="shell-nav-disabled">{copy.documents}</span>}
-           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/movements`)}>{copy.movements}</a> : <span className="shell-nav-disabled">{copy.movements}</span>}
-           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/year`)}>{copy.year}</a> : <span className="shell-nav-disabled">{copy.year}</span>}
-           {activeBusiness ? <a href={hrefFor(`/business/${activeBusiness.id}/settings/members`)}>{copy.settings}</a> : <span className="shell-nav-disabled">{copy.settings}</span>}
-        </nav>
           <div className="shell-user"><LanguageSwitcher locale={activeLocale} /><span><strong>{identity.displayName}</strong>{identity.email}</span><form action={signOutAction} onSubmit={async (event) => { event.preventDefault(); try { await signOutFirebaseUser(firebaseConfig); } finally { await signOutAction(); } }}><button className="sign-out" type="submit">{copy.signOut}</button></form></div>
        </header>
-       <main className="shell-main"><div className="shell-layout"><BusinessSwitcher businesses={businesses} locale={activeLocale} /><div className="shell-content">{children}</div></div></main>
+       <div className="shell-body">
+         <aside className="shell-aside">
+           <BusinessSwitcher businesses={businesses} locale={activeLocale} activeBusinessId={businessIdFromPath} />
+           <nav className="shell-nav" aria-label={copy.workspace}>
+             <a className="shell-nav-portfolio" href={hrefFor("/portfolio")} aria-current={pathname === "/portfolio" ? "page" : undefined}><NavIcon name="portfolio" />{copy.portfolio}</a>
+             {platformAdmin && <a href={hrefFor("/admin")} aria-current={pathname.startsWith("/admin") ? "page" : undefined}><NavIcon name="admin" /><span className="shell-nav-long">{copy.platform}</span><span className="shell-nav-short" aria-hidden="true">Admin</span></a>}
+             {businessLinks.map(({ key, path }) => activeBusiness
+               ? <a key={key} href={hrefFor(`/business/${activeBusiness.id}${path}`)} aria-current={isCurrent(path) ? "page" : undefined}><NavIcon name={key} />{copy[key]}</a>
+               : <span key={key} className="shell-nav-disabled"><NavIcon name={key} />{copy[key]}</span>)}
+           </nav>
+         </aside>
+         <div className="shell-content">
+           {activeBusiness && pathname.includes("/settings/") && (
+             <nav className="settings-nav" aria-label={copy.settings}>
+               {settingsLinks.map(({ path, en, es }) => <a key={path} href={hrefFor(`/business/${activeBusiness.id}/settings/${path}`)} aria-current={pathname.endsWith(`/settings/${path}`) ? "page" : undefined}>{activeLocale === "es" ? es : en}</a>)}
+             </nav>
+           )}
+           <main className="shell-main">{children}</main>
+         </div>
+       </div>
     </div>
   );
 }

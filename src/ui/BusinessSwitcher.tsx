@@ -9,9 +9,10 @@ import StatusBadge from "@/ui/StatusBadge";
 interface BusinessSwitcherProps {
   businesses: readonly BusinessSummary[];
   locale: "en" | "es";
+  activeBusinessId?: string;
 }
 
-export default function BusinessSwitcher({ businesses, locale }: BusinessSwitcherProps) {
+export default function BusinessSwitcher({ businesses, locale, activeBusinessId }: BusinessSwitcherProps) {
   const searchParams = useSearchParams();
 
   const hrefFor = (businessId: string) => {
@@ -29,7 +30,7 @@ export default function BusinessSwitcher({ businesses, locale }: BusinessSwitche
         {businesses.map((business) => (
           <div className="business-option" key={business.id}>
             {business.isActive ? (
-              <Link href={hrefFor(business.id)} aria-label={business.name}>
+              <Link href={hrefFor(business.id)} aria-label={business.name} aria-current={business.id === activeBusinessId ? "page" : undefined}>
                 <span className="business-option-name">{business.name}</span>
                 <span className="business-option-meta">
                   {business.role.replace("_", " ")}

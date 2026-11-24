@@ -1,7 +1,7 @@
 {
   "id": "LH-039",
   "titulo": "Mejorar toda la interfaz con referencias de Mobbin",
-  "estado": "pendiente",
+  "estado": "hecho",
   "responsable": "desarrollo",
   "criterio": [
     "El inventario cubre acceso, onboarding, administración, navegación, facturas, movimientos, ajustes y cierre de ejercicio.",
@@ -18,12 +18,22 @@
     "src/ui/**",
     "tests/e2e/**"
   ],
-  "hecho": "",
-  "falta": "Inventariar la interfaz, consultar el MCP de Mobbin e implementar y verificar las mejoras.",
+  "hecho": "Navegación del negocio en menú lateral (escritorio) y barra de pestañas abajo (móvil), con la página y el negocio actuales marcados. Menú propio de ajustes. Pantallas de carga y de error en el espacio del negocio y en administración. El resumen tiene acción principal para subir fotos, cifras que llevan a su lista y un vacío que explica qué hacer. Inventario, referencias y decisiones en work/LH-039/plan.md.",
+  "falta": "",
   "bloqueo": "",
-  "siguiente": "Después de LH-029, inventariar las pantallas y buscar referencias de Mobbin para los flujos principales.",
+  "siguiente": "",
   "evidencia": [
-    "2026-11-20 · El operador pidió mejorar toda la interfaz con el MCP de Mobbin después del trabajo de despliegue."
+    "2026-11-20 · El operador pidió mejorar toda la interfaz con el MCP de Mobbin después del trabajo de despliegue.",
+    "2026-11-24 · Inventario: 32 capturas antes y 32 después (16 pantallas a 390 y 1280 px) con datos sintéticos; hojas de contacto revisadas. Fuera del repositorio, en la carpeta temporal de la sesión.",
+    "2026-11-24 · Mobbin: 12 búsquedas (navegación escritorio y móvil, subida de recibos, vacíos de lista, acceso, onboarding, administración, revisión de factura, cierre de ejercicio). Referencias y decisión por flujo en work/LH-039/plan.md. Fuente de decisión: perfil y opción más simple y reversible.",
+    "2026-11-24 · Decisión: un solo <nav aria-label=\"Workspace\"> fuera de <main>, recolocado por CSS, porque las pruebas existentes lo buscan por ese nombre y piden que <main> no repita «Documents».",
+    "2026-11-24 · Fallo propio arreglado durante el lote: el menú de ajustes ensanchaba la página a 375 px (607 px de ancho); lo detectó membership-administration.spec.",
+    "2026-11-24 · Prueba nueva tests/e2e/navigation/shell-layout.spec.ts (menú lateral a 1280 px, barra inferior a 390 px, página actual marcada, menú de ajustes, vacío del resumen, sin desplazamiento lateral): pasa.",
+    "2026-11-24 · Prueba unitaria nueva tests/unit/ui/route-states.test.ts (carga y error en inglés y español): pasa. Para poder probar componentes .tsx, vitest.config.ts compila JSX; ese archivo y tests/unit/ quedan fuera de «recursos».",
+    "2026-11-24 · Carga y error vistos en el shell real a 390 y 1280 px, inyectando el marcado del componente: sin desplazamiento lateral. Con datos en memoria la pantalla de carga no llega a pintarse sola porque la página está lista antes del primer envío; aparecerá con datos lentos.",
+    "2026-11-24 · Pruebas de navegador por carpetas con el shell nuevo (puerto 3101; navigation, movements, year, tenancy, documents-list, settings y auth repetidas tras los últimos retoques): navigation, movements, year, tenancy, documents, invoices/coding, settings, auth, auth-onboarding, platform, onboarding, smoke, branding, production y critical-path pasan. Las caídas sueltas de Chromium (swap lleno, carga hasta 12) y un fallo por repetir onboarding sobre el mismo servidor pasan al repetir cada archivo solo.",
+    "2026-11-24 · invoices/payment.spec.ts se cae siempre en el mismo paso (Chromium «Target crashed» al elegir el código). Falla igual sobre el código anterior a este lote, así que no lo causa LH-039; anotado en MEJORAS. El flujo de pago queda sin prueba de navegador con el shell nuevo.",
+    "2026-11-24 · Verificación de lote: lint y tsc correctos; Vitest 120 archivos pasados, 2 omitidos; 1260 pruebas pasadas, 7 omitidas; build correcto. Tras los últimos retoques (pestañas de ajustes en varias líneas en el móvil, menú lateral con altura máxima, negocio actual solo dentro de él): lint, tsc, pruebas unitarias de ui y app, y build correctos otra vez. La altura máxima del menú lateral con muchos negocios no tiene prueba propia."
   ],
-  "actualizado": "2026-11-20"
+  "actualizado": "2026-11-24"
 }
