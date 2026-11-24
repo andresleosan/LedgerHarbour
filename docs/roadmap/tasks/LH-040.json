@@ -37,7 +37,8 @@
     "2026-11-24 · Reales: las dos fotos autorizadas sacan la fecha bien (antes 1 de 2). Commons, 18 tickets de Europa y EE. UU.: fecha bien 0 → 3, mal 0 → 1 (un 18 leído como 16); un ticket con fecha de devolución aparte queda vacío. Solo unos 5 de los 18 traen año de 4 cifras: los de 2 cifras no se leen, ni antes ni ahora.",
     "2026-11-24 · Ampliar la página ya normalizada leía mal la fecha de una foto real; ampliar desde la foto y normalizar después la lee bien. Por eso la segunda lectura parte de la foto original.",
     "2026-11-24 · Coste: la segunda lectura solo corre en imágenes sin fecha etiquetada, nunca en PDF; si falla o se pasa de tiempo, queda la primera. Mediana 0,32 s → 0,95 s en sintéticos; máximo 12,7 s con una foto grande de Commons; pico de memoria igual que hoy (230 MB con fotos de 4096 px).",
-    "2026-11-24 · Pruebas: tests/unit/invoices/local-ocr-fields.test.ts (regla de fecha) y local-ocr-provider.test.ts (segunda lectura solo sin fecha etiquetada, nunca en PDF, y la primera lectura se mantiene si la segunda falla)."
+    "2026-11-24 · Pruebas: tests/unit/invoices/local-ocr-fields.test.ts (regla de fecha) y local-ocr-provider.test.ts (segunda lectura solo sin fecha etiquetada, nunca en PDF, y la primera lectura se mantiene si la segunda falla).",
+    "2026-11-24 · Push autorizado 53b4e03..1c07032. CI 45364385904 verde (1265 pruebas, 58 de 58 de navegador). El publicador dejó 1c07032 publicado y verificado en ledgerharbour.pages.dev a las 09:36Z."
   ],
   "actualizado": "2026-11-24"
 }
