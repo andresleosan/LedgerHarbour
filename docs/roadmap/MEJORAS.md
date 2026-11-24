@@ -8,3 +8,6 @@ Repasada el 2026-11-21: la mejora de fotos pequeñas pasó a LH-040.
 
 
 Repasada el 2026-11-24: la caída de payment.spec pasó a LH-041; lo demás se borró (la pantalla de error queda anotada en la evidencia de LH-039).
+
+- [LH-040] Probar el binarizado adaptativo (-lat) recortando antes el ticket del fondo · subió los importes leídos del 48,5 % al 58,8 % en CORD, pero el fondo de la foto mete ruido y pierde el total de las fotos reales · 2026-11-24
+- [CI] Subir actions/checkout y actions/setup-node a versiones que no usen Node 20 · GitHub avisa de que Node 20 está obsoleto en sus máquinas · 2026-11-24

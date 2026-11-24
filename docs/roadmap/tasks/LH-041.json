@@ -25,7 +25,7 @@
     "2026-11-24 · Sin módulo de diagnósticos también se cae. Con la configuración normal (sin vigilancia por sondeo) la VPS agota los vigilantes de archivos (ENOSPC) y la prueba falla antes, por otro motivo.",
     "2026-11-24 · CI 44871062296 (código base 294bd19, máquina de GitHub): 57 de 57 pruebas de navegador pasadas, payment.spec incluida.",
     "2026-11-24 · El modo producción exige servicios reales (production-gate), así que no se puede repetir con el build de producción y los servicios falsos.",
-    "2026-11-24 · El operador eligió publicar y cerrar con CI. Push 294bd19..5c91c5d a main; CI 45343063229 verde: 1260 pruebas pasadas y 7 omitidas, 58 de 58 de navegador con payment.spec incluida. Junto con CI 44871062296 son dos pasadas seguidas en CI, no tres: se acepta por decisión del operador."
+    "2026-11-24 · El operador eligió publicar y cerrar con CI. Push 294bd19..5c91c5d a main; CI 45343063229 verde: 1260 pruebas pasadas y 7 omitidas, 58 de 58 de navegador; playwright --list da 58 pruebas en 31 archivos con invoices/payment.spec.ts, sin omitidas. Junto con CI 44871062296 son dos pasadas seguidas en CI, no tres: se acepta por decisión del operador."
   ],
   "actualizado": "2026-11-24"
 }
