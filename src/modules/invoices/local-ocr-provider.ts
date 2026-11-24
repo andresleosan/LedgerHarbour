@@ -60,7 +60,8 @@ async function preparePages(inputFile: string, directory: string, mimeType: stri
       "-limit", "list-length", String(MAX_PAGES + 1),
       `${format}:${inputFile}${frame}`,
       "-auto-orient", "-resize", `${MAX_EDGE}x${MAX_EDGE}>`,
-      "-background", "white", "-alpha", "remove", "-colorspace", "gray", "-depth", "8",
+      // LH-040: stretching contrast read more totals right on degraded receipt photos and lost none; enlarging lost some.
+      "-background", "white", "-alpha", "remove", "-colorspace", "gray", "-normalize", "-depth", "8",
       join(directory, "page-%02d.pgm"),
     ], directory, deadline);
   }

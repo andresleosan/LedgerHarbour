@@ -1,8 +1,8 @@
 {
   "id": "LH-041",
   "titulo": "Arreglar la caída de Chromium en la prueba de pago de facturas",
-  "estado": "parcial",
-  "responsable": "operador",
+  "estado": "hecho",
+  "responsable": "desarrollo",
   "criterio": [
     "Se sabe por qué tests/e2e/invoices/payment.spec.ts se cae siempre al elegir el código de la factura.",
     "Si la causa está en la app, se arregla con prueba primero; si está en la prueba, se corrige la prueba.",
@@ -14,17 +14,18 @@
     "tests/e2e/invoices/**",
     "src/app/(app)/business/[businessId]/invoices/**"
   ],
-  "hecho": "Causa acotada: no es un fallo de la app. En la VPS Chromium se cae a mitad de la prueba larga de pago mientras el servidor de desarrollo recompila; el momento de la caída cambia con el tiempo de la prueba, no con la página. En CI la misma prueba pasa.",
-  "falta": "Ver la prueba pasar con el código de LH-039: en CI al publicar, o en la VPS con memoria libre.",
-  "bloqueo": "Decidir una de dos: publicar en main para que CI corra la prueba de pago con el shell nuevo, o liberar memoria en la VPS (swap de 8 GB lleno) para repetirla aquí.",
-  "siguiente": "Al publicar, mirar en CI que invoices/payment.spec.ts pasa.",
+  "hecho": "Causa acotada: no es un fallo de la app. En la VPS Chromium se cae a mitad de la prueba larga de pago mientras el servidor de desarrollo recompila; el momento de la caída cambia con el tiempo de la prueba, no con la página. En CI la misma prueba pasa. Con el código de LH-039 publicado, CI la pasa.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
   "evidencia": [
     "2026-11-24 · Se cae 3 de 3 veces en payment.spec.ts:52 (selectOption del código, «Target crashed»), también sobre el código anterior a LH-039. coding.spec.ts hace el mismo paso y pasa.",
     "2026-11-24 · Sonda con los mismos datos (plantilla, ejercicio, banco y caja) y el mismo paso de revisión: no se cae; memoria estable en 109 MB y unos 135 nodos.",
     "2026-11-24 · Copia instrumentada de payment.spec: se cae sin interacción 1–2 s después de cargar la revisión; con 15 s de espera antes, se cae antes, en la página de subida. Registro de Chromium: la caída sigue a ciclos de «[Fast Refresh] rebuilding»; sin señal ni error de Blink.",
     "2026-11-24 · Sin módulo de diagnósticos también se cae. Con la configuración normal (sin vigilancia por sondeo) la VPS agota los vigilantes de archivos (ENOSPC) y la prueba falla antes, por otro motivo.",
     "2026-11-24 · CI 44871062296 (código base 294bd19, máquina de GitHub): 57 de 57 pruebas de navegador pasadas, payment.spec incluida.",
-    "2026-11-24 · El modo producción exige servicios reales (production-gate), así que no se puede repetir con el build de producción y los servicios falsos."
+    "2026-11-24 · El modo producción exige servicios reales (production-gate), así que no se puede repetir con el build de producción y los servicios falsos.",
+    "2026-11-24 · El operador eligió publicar y cerrar con CI. Push 294bd19..5c91c5d a main; CI 45343063229 verde: 1260 pruebas pasadas y 7 omitidas, 58 de 58 de navegador con payment.spec incluida. Junto con CI 44871062296 son dos pasadas seguidas en CI, no tres: se acepta por decisión del operador."
   ],
   "actualizado": "2026-11-24"
 }

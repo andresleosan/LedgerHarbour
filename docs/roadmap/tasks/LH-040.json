@@ -1,7 +1,7 @@
 {
   "id": "LH-040",
   "titulo": "Leer mejor las fotos pequeñas de tickets",
-  "estado": "pendiente",
+  "estado": "parcial",
   "responsable": "operador",
   "criterio": [
     "Con una muestra de tickets reales autorizados, la fecha sale bien en más tickets que hoy y ningún campo que antes salía bien sale mal.",
@@ -16,12 +16,17 @@
     "src/modules/invoices/local-ocr-provider.ts",
     "src/modules/invoices/local-ocr-fields.ts"
   ],
-  "hecho": "",
-  "falta": "Conseguir la muestra, medir la línea de partida y ajustar el preprocesado con ella.",
-  "bloqueo": "Autorizar entre 5 y 10 fotos más de tickets o facturas reales y dejarlas en la carpeta privada de secretos.",
-  "siguiente": "Con la muestra, medir cuántas fechas y totales salen bien hoy y probar cada ajuste por separado.",
+  "hecho": "La foto se normaliza de contraste antes de leerla: más totales bien leídos en fotos pequeñas y ninguno perdido. Ampliar la imagen arregla una fecha pero pierde totales, así que no se aplica.",
+  "falta": "Mejorar la fecha: con un solo ticket real que la lee mal no se puede medir; CORD no anota fechas.",
+  "bloqueo": "Dejar entre 5 y 10 fotos de tickets reales con la fecha visible en la carpeta privada de secretos.",
+  "siguiente": "Con esas fotos, medir la fecha con y sin ampliar la imagen, y leer una fecha sin etiqueta solo si es la única del ticket.",
   "evidencia": [
-    "2026-11-21 · Sale de MEJORAS tras LH-027: con fotos de 720 px un dígito de la fecha sale mal; al 200 % sale bien, pero ajustada a 2400 px empeora. Con dos muestras no se puede ajustar sin adivinar."
+    "2026-11-21 · Sale de MEJORAS tras LH-027: con fotos de 720 px un dígito de la fecha sale mal; al 200 % sale bien, pero ajustada a 2400 px empeora. Con dos muestras no se puede ajustar sin adivinar.",
+    "2026-11-24 · Decisión del operador en la sesión: medir con CORD v2 (naver-clova-ix/cord-v2, partición test, 100 tickets, CC BY 4.0) más las dos fotos reales ya autorizadas. CORD se guarda solo en la carpeta privada, no en el repositorio.",
+    "2026-11-24 · Método: cada ticket de CORD reducido a 720×1280 en JPEG 85 como las fotos reales; misma orden de ImageMagick y Tesseract 5.3.0 que el proveedor, en ledgerharbour-ocr-tools:lh027 sin red y con memoria limitada. CORD no trae fechas: se puntúan importes y total.",
+    "2026-11-24 · Total extraído bien en CORD (100 tickets): hoy 16 bien y 4 mal; con -normalize 19 bien y 1 mal, 0 perdidos. Ampliar al 150 %: 13 bien, 4 perdidos. Binarizado adaptativo: más importes en el texto (48,5 % → 58,8 %) pero 10 totales perdidos y pierde el total de las dos fotos reales.",
+    "2026-11-24 · Fotos reales con el proveedor del repositorio en el contenedor aislado: mismos campos que en LH-027 (ninguno cambia ni se pierde), 0,7 s por foto y 62 MB de pico. La fecha mal leída de una foto sale bien solo al ampliar al 150 %, y además no lleva etiqueta.",
+    "2026-11-24 · Prueba: tests/unit/invoices/local-ocr-provider.test.ts falla sin -normalize y pasa con él."
   ],
-  "actualizado": "2026-11-21"
+  "actualizado": "2026-11-24"
 }

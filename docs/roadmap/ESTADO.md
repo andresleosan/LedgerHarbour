@@ -2,6 +2,8 @@
 
 Una línea por cierre, la más reciente arriba: fecha, tarea, qué cambió para quien usa la app y progreso antes → después.
 
+- 2026-11-24 · LH-040 sigue parcial · Las fotos de tickets se leen con más contraste: más totales bien leídos y ninguno perdido. La fecha de las fotos pequeñas espera tickets reales con fecha · 29 de 30 → 29 de 30.
+- 2026-11-24 · LH-041 · Publicada la navegación nueva (LH-039) en producción; CI pasa la prueba de pago · 28 de 30 → 29 de 30.
 - 2026-11-24 · LH-041 a la cola · La caída de la prueba de pago es del entorno de la VPS, no de la app; en CI pasa. Falta verla con la navegación nueva · 28 de 30 → 28 de 30.
 - 2026-11-24 · LH-039 · Navegación nueva: menú lateral en el ordenador y barra de pestañas abajo en el móvil, menú propio de ajustes, pantallas de carga y error, y un resumen que invita a subir la primera foto · 27 de 29 → 28 de 29.
 - 2026-11-21 · LH-029 · La app está en producción en ledgerharbour.pages.dev: acceso con Google o correo, foto leída en la VPS, libro del contable descargable, y cada cambio en main se publica solo · 26 de 29 → 27 de 29.
