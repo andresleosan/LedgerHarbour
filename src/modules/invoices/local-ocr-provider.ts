@@ -11,6 +11,8 @@ import { OcrProviderError, type OcrInput, type OcrProvider, type OcrResult } fro
 const runFile = promisify(execFile);
 const MAX_PAGES = 15;
 const MAX_EDGE = "2400";
+// LH-040: a small photo read again at up to 2240 px (175 % of a 1280 px phone photo) gets its date digits right far more often.
+const ENLARGED_EDGE = "2240";
 const TIME_LIMIT_MS = 90_000;
 const imageFormats = new Map([
   ["image/jpeg", "jpeg"],
@@ -40,7 +42,20 @@ async function run(command: string, args: string[], directory: string, deadline:
   return stdout;
 }
 
-async function preparePages(inputFile: string, directory: string, mimeType: string, deadline: number): Promise<string[]> {
+const convertLimits = [
+  "-limit", "thread", "1",
+  "-limit", "width", "12000",
+  "-limit", "height", "12000",
+  "-limit", "memory", "128MiB",
+  "-limit", "map", "256MiB",
+  "-limit", "disk", "128MiB",
+  "-limit", "list-length", String(MAX_PAGES + 1),
+];
+
+async function preparePages(
+  inputFile: string, directory: string, mimeType: string, deadline: number, enlarged = false,
+): Promise<string[]> {
+  const prefix = enlarged ? "large" : "page";
   if (mimeType === "application/pdf") {
     const info = await run("pdfinfo", [inputFile], directory, deadline);
     const pages = Number(/^Pages:\s+(\d+)$/m.exec(info)?.[1]);
@@ -51,21 +66,17 @@ async function preparePages(inputFile: string, directory: string, mimeType: stri
     if (!format) throw new OcrProviderError(false);
     const frame = format === "tiff" ? "" : "[0]";
     await run("convert", [
-      "-limit", "thread", "1",
-      "-limit", "width", "12000",
-      "-limit", "height", "12000",
-      "-limit", "memory", "128MiB",
-      "-limit", "map", "256MiB",
-      "-limit", "disk", "128MiB",
-      "-limit", "list-length", String(MAX_PAGES + 1),
+      ...convertLimits,
       `${format}:${inputFile}${frame}`,
       "-auto-orient", "-resize", `${MAX_EDGE}x${MAX_EDGE}>`,
+      // Enlarged from the photo itself: enlarging the contrast-stretched page misread digits in a real receipt.
+      ...(enlarged ? ["-resize", `${ENLARGED_EDGE}x${ENLARGED_EDGE}<`] : []),
       // LH-040: stretching contrast read more totals right on degraded receipt photos and lost none; enlarging lost some.
       "-background", "white", "-alpha", "remove", "-colorspace", "gray", "-normalize", "-depth", "8",
-      join(directory, "page-%02d.pgm"),
+      join(directory, `${prefix}-%02d.pgm`),
     ], directory, deadline);
   }
-  const pages = (await readdir(directory)).filter((name) => /^page-\d+\.pgm$/.test(name)).sort();
+  const pages = (await readdir(directory)).filter((name) => new RegExp(`^${prefix}-\\d+\\.pgm$`).test(name)).sort();
   if (pages.length < 1 || pages.length > MAX_PAGES) throw new OcrProviderError(false);
   return pages;
 }
@@ -84,11 +95,19 @@ export class LocalOcrProvider implements OcrProvider {
       const deadline = Date.now() + TIME_LIMIT_MS;
       await writeFile(inputFile, input.data, { mode: 0o600 });
       const pages = await preparePages(inputFile, directory, input.mimeType, deadline);
+      const read = (page: string) => run("tesseract", [join(directory!, page), "stdout", "-l", "eng", "--psm", "6"], directory!, deadline);
       const text: string[] = [];
-      for (const page of pages) {
-        text.push(await run("tesseract", [join(directory, page), "stdout", "-l", "eng", "--psm", "6"], directory, deadline));
+      for (const page of pages) text.push(await read(page));
+      const first = extractLocalOcrFields(text);
+      if (input.mimeType === "application/pdf" || first.fields.invoiceDate !== null) return first;
+      try {
+        const enlarged: string[] = [];
+        for (const page of await preparePages(inputFile, directory, input.mimeType, deadline, true)) enlarged.push(await read(page));
+        return extractLocalOcrFields(text, enlarged);
+      } catch {
+        // The enlarged reading only adds a date: if it fails or runs out of time, the first reading stands.
+        return first;
       }
-      return extractLocalOcrFields(text);
     } catch {
       // Tool output can contain document text or temporary paths.
       throw new OcrProviderError(false);

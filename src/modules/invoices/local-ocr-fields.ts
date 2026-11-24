@@ -32,8 +32,22 @@ function currencyCodes(value: string): string[] {
   );
 }
 
-export function extractLocalOcrFields(pages: readonly string[]): OcrResult {
-  const lines = pages.flatMap((page) => page.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+const toLines = (pages: readonly string[]) =>
+  pages.flatMap((page) => page.split(/\r?\n/).map((line) => line.trim()).filter(Boolean));
+
+function labeledDate(lines: readonly string[]): string | null {
+  // Only the first token after a date label is read, so OCR noise after the date does not hide it.
+  const invoiceDates = labeled(lines, /^(?:invoice date|date of issue|issued on)(?:\s*:\s*|\s+)(\S+)/i, date);
+  return unique(invoiceDates.length ? invoiceDates : labeled(lines, /^date(?:\s*:\s*|\s+)(\S+)/i, date));
+}
+
+/**
+ * `enlargedPages` is a second reading of a small photo, used only for the date: its labelled date, or else
+ * its one distinct date, since tills often print the date unlabelled at the foot (LH-040).
+ */
+export function extractLocalOcrFields(pages: readonly string[], enlargedPages: readonly string[] = []): OcrResult {
+  const lines = toLines(pages);
+  const enlarged = toLines(enlargedPages);
   const subtotal = unique(labeled(lines, /^(?:subtotal|sub total|net total)(?:\s*:\s*|\s+)(.+)$/i, money));
   const taxAmount = unique(labeled(lines, /^(?:(?:total\s+)?(?:vat|gst|tax)(?:\s+amount)?)(?:\s*:\s*|\s+)(.+)$/i, money));
   const labeledTotals = labeled(lines, /^(?:grand total|invoice total|total(?: due| amount)?|amount due|balance due)(?:\s*:\s*|\s+)(.+)$/i, money);
@@ -43,12 +57,11 @@ export function extractLocalOcrFields(pages: readonly string[]): OcrResult {
   const total = unique(totals, amountKey);
   const explicitCurrency = labeled(lines, /^currency(?:\s*:\s*|\s+)(.+)$/i, /^(?:GBP|EUR|USD|[£€$])$/i);
   const suppliers = labeled(lines, /^(?:supplier|vendor|issued by)(?:\s*:\s*|\s+)(.+)$/i);
-  // Only the first token after a date label is read, so OCR noise after the date does not hide it.
-  const invoiceDates = labeled(lines, /^(?:invoice date|date of issue|issued on)(?:\s*:\s*|\s+)(\S+)/i, date);
   const fields: OcrExtractedFields = {
     supplier: unique(suppliers.length ? suppliers : lines.slice(0, 5).filter((line) => companySuffix.test(line))),
     invoiceNumber: unique(labeled(lines, /^(?:tax )?invoice\s*(?:no\.?|number|ref(?:erence)?\.?|#)\s*:?\s*(\S+)$/i)),
-    invoiceDate: unique(invoiceDates.length ? invoiceDates : labeled(lines, /^date(?:\s*:\s*|\s+)(\S+)/i, date)),
+    invoiceDate: labeledDate(lines) ?? labeledDate(enlarged) ??
+      unique(enlarged.flatMap((line) => line.split(/\s+/)).filter((token) => date.test(token))),
     dueDate: unique(labeled(lines, /^(?:due date|payment due)(?:\s*:\s*|\s+)(\S+)/i, date)),
     subtotal,
     taxAmount,

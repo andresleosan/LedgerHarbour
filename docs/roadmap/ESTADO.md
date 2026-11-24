@@ -2,6 +2,7 @@
 
 Una línea por cierre, la más reciente arriba: fecha, tarea, qué cambió para quien usa la app y progreso antes → después.
 
+- 2026-11-24 · LH-040 · Las fotos pequeñas de tickets ya traen la fecha aunque el ticket no la etiquete: si no la encuentra, la app relee la foto ampliada solo para la fecha. En tickets de prueba, de 17 a 111 fechas bien de 120 · 29 de 30 → 30 de 30.
 - 2026-11-24 · LH-040 sigue parcial · Las fotos pequeñas de tickets se leen con más contraste: más importes bien leídos (18 arreglados y 2 estropeados de 200 tickets de prueba). La fecha de las fotos pequeñas espera tickets reales con fecha · 29 de 30 → 29 de 30.
 - 2026-11-24 · LH-041 · Publicada la navegación nueva (LH-039) en producción; CI pasa la prueba de pago · 28 de 30 → 29 de 30.
 - 2026-11-24 · LH-041 a la cola · La caída de la prueba de pago es del entorno de la VPS, no de la app; en CI pasa. Falta verla con la navegación nueva · 28 de 30 → 28 de 30.

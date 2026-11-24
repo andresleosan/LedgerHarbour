@@ -62,6 +62,29 @@ describe("local OCR invoice fields", () => {
     expect(parseInvoice(bare, "ocr")).toMatchObject({ total: null, currencyReference: null });
   });
 
+  it("takes only the date from an enlarged reading when the first has no labelled date", () => {
+    const first = ["Example Corner Shop\n04/08/2026 09:41 1060\nTotal £5.10"];
+    expect(extractLocalOcrFields(first).fields.invoiceDate).toBeNull();
+
+    const result = extractLocalOcrFields(first, ["Example Corner Shop\n04/03/2026 09:41 1060\nTotal £9.99"]);
+    expect(parseInvoice(result, "ocr")).toMatchObject({ invoiceDate: "2026-03-04", total: "5.10" });
+    expect(result.confidence.invoiceDate).toBe(0.79);
+  });
+
+  it("prefers a labelled date and leaves two different unlabelled dates for review", () => {
+    const labelled = extractLocalOcrFields(["Date: 04/03/2026\nTotal £5.10"], ["Date: 05/03/2026"]);
+    expect(labelled.fields.invoiceDate).toBe("04/03/2026");
+
+    const enlargedLabel = extractLocalOcrFields(["Total £5.10"], ["DATE: 06/03/2026 st0\n07/03/2026"]);
+    expect(enlargedLabel.fields.invoiceDate).toBe("06/03/2026");
+
+    const twoDates = extractLocalOcrFields(["Total £5.10"], ["04/03/2026 09:41\nReturn by 03/04/2026"]);
+    expect(twoDates.fields.invoiceDate).toBeNull();
+
+    const sameTwice = extractLocalOcrFields(["Total £5.10"], ["04/03/2026 09:41", "Paid 04/03/2026"]);
+    expect(sameTwice.fields.invoiceDate).toBe("04/03/2026");
+  });
+
   it("leaves a blank scan in human review", () => {
     expect(parseInvoice(extractLocalOcrFields([" ", "\n"]), "ocr")).toMatchObject({
       invoiceNumber: null,
