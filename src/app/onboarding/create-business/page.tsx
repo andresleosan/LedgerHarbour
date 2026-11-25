@@ -12,6 +12,7 @@ type ErrorPayload = { error?: { code?: string } };
 
 function messageForError(code: string | undefined, copy: typeof messages.en.onboarding): string {
   if (code === "INVALID_BUSINESS_NAME") return copy.invalidName;
+  if (code === "BUSINESS_REQUEST_DUPLICATE") return copy.duplicateBusinessName;
   if (code === "REPOSITORY_CONFLICT") return copy.conflictError;
   return copy.genericError;
 }

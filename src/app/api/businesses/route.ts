@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { getCurrentIdentity } from "../../../modules/auth/session";
 import {
+  asOnboardingError,
   createBusinessRequest,
   OnboardingError,
   ONBOARDING_ERROR_CODES,
@@ -13,11 +14,14 @@ import { getPersistenceContext } from "../../../modules/persistence/repository-f
 const createBusinessSchema = z.object({ name: z.string() });
 
 function errorResponse(error: unknown): NextResponse {
-  if (error instanceof OnboardingError) {
-    const status = error.code === ONBOARDING_ERROR_CODES.DUPLICATE_MEMBERSHIP ||
-      error.code === ONBOARDING_ERROR_CODES.PENDING_REQUEST_CONFLICT ||
-      error.code === ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT ? 409 : 400;
-    return NextResponse.json({ error: { code: error.code, message: error.message } }, { status });
+  const onboardingError = asOnboardingError(error);
+  if (onboardingError) {
+    const { code, message } = onboardingError;
+    const status = code === ONBOARDING_ERROR_CODES.BUSINESS_REQUEST_DUPLICATE ||
+      code === ONBOARDING_ERROR_CODES.DUPLICATE_MEMBERSHIP ||
+      code === ONBOARDING_ERROR_CODES.PENDING_REQUEST_CONFLICT ||
+      code === ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT ? 409 : 400;
+    return NextResponse.json({ error: { code, message } }, { status });
   }
   return NextResponse.json(
     { error: { code: "INVALID_REQUEST", message: "The request could not be completed." } },

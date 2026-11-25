@@ -28,6 +28,27 @@ describe("business approval lifecycle", () => {
     await expect(tenancy.findBusinessStatus(created.id)).resolves.toBe("pending");
   });
 
+  it("rejects a duplicate request from the same applicant after normalizing the name", async () => {
+    const tenancy = createInMemoryOnboardingRepository();
+    const requester = user("requester");
+    const original = await createBusinessRequest({ name: "Pending Harbour" }, requester, tenancy);
+
+    await expect(createBusinessRequest({ name: "  pEnDiNg HaRbOuR  " }, requester, tenancy))
+      .rejects.toMatchObject({ code: "BUSINESS_REQUEST_DUPLICATE" });
+    await expect(tenancy.listBusinesses()).resolves.toEqual([original]);
+  });
+
+  it("allows a different applicant to request the same business name", async () => {
+    const tenancy = createInMemoryOnboardingRepository();
+    const original = await createBusinessRequest({ name: "Shared Harbour" }, user("requester"), tenancy);
+    const otherRequester = user("other-requester");
+
+    const independent = await createBusinessRequest({ name: "  shared harbour  " }, otherRequester, tenancy);
+
+    expect(independent).toMatchObject({ createdBy: otherRequester, status: "pending" });
+    expect(independent.id).not.toBe(original.id);
+  });
+
   it("approves atomically, provisions the requester as owner_admin, and audits the transition", async () => {
     const tenancy = createInMemoryOnboardingRepository();
     const platform = createInMemoryPlatformRepository();

@@ -686,6 +686,7 @@
     "requestRejected": "Request rejected.",
     "noPending": "There are no pending requests.",
     "invalidName": "Enter a business name.",
+    "duplicateBusinessName": "You already requested a business with this name.",
     "invalidSearch": "Enter a business name to search.",
     "genericError": "We could not complete that action. Please try again.",
     "accessError": "You do not have permission to review these requests.",

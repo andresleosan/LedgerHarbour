@@ -7,6 +7,7 @@ import type { BusinessId, BusinessStatus, Membership, UserId } from "./types";
 
 export const ONBOARDING_ERROR_CODES = {
   INVALID_BUSINESS_NAME: "INVALID_BUSINESS_NAME",
+  BUSINESS_REQUEST_DUPLICATE: "BUSINESS_REQUEST_DUPLICATE",
   INVALID_SEARCH_QUERY: "INVALID_SEARCH_QUERY",
   INVALID_REQUEST_ROLE: "INVALID_REQUEST_ROLE",
   INVALID_BUSINESS_TRANSITION: "INVALID_BUSINESS_TRANSITION",
@@ -37,6 +38,7 @@ export function validateBusinessStatusTransition(current: BusinessStatus, next: 
 
 const publicMessages: Record<OnboardingErrorCode, string> = {
   INVALID_BUSINESS_NAME: "Business name is required.",
+  BUSINESS_REQUEST_DUPLICATE: "You already requested a business with this name.",
   INVALID_SEARCH_QUERY: "Enter a business name to search.",
   INVALID_REQUEST_ROLE: "This membership role is not available.",
   INVALID_BUSINESS_TRANSITION: "This business state transition is not available.",
@@ -56,6 +58,16 @@ export class OnboardingError extends Error {
   constructor(readonly code: OnboardingErrorCode) {
     super(publicMessages[code]);
   }
+}
+
+// The shared in-memory repository can throw errors from a different Next route bundle.
+export function asOnboardingError(error: unknown): OnboardingError | null {
+  if (error instanceof OnboardingError) return error;
+  const candidate = error as { name?: unknown; code?: unknown } | null;
+  if (candidate?.name === "OnboardingError" && typeof candidate.code === "string" && Object.hasOwn(publicMessages, candidate.code)) {
+    return new OnboardingError(candidate.code as OnboardingErrorCode);
+  }
+  return null;
 }
 
 export type BaseCurrencyKind = "standard";
@@ -319,6 +331,11 @@ class InMemoryOnboardingRepository implements MemoryOnboardingRepository {
 
   async createBusiness(input: BusinessCreateInput): Promise<Business> {
     assertPendingBusinessCreationInput(input);
+    const duplicate = [...this.businesses.values()].some(
+      (business) => business.createdBy === input.createdBy && business.normalizedName === input.normalizedName,
+    );
+    if (duplicate) throw new OnboardingError(ONBOARDING_ERROR_CODES.BUSINESS_REQUEST_DUPLICATE);
+
     const business = {
       ...input,
       status: "pending" as const,
