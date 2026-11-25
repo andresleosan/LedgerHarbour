@@ -9,8 +9,9 @@ async function signIn(page: import("@playwright/test").Page, email: string) {
 }
 
 test("submits a business request and requires platform approval before operation", async ({ browserWithDiagnostics: browser }) => {
+  const ownerEmail = "task3-requester@example.com";
   const requester = await browser.newPage();
-  await signIn(requester, "task3-requester@example.com");
+  await signIn(requester, ownerEmail);
   await requester.goto("/onboarding/create-business");
   await requester.getByLabel("Business name").fill("E2E Approval Harbour");
   await requester.getByRole("button", { name: "Submit request" }).click();
@@ -51,8 +52,14 @@ test("submits a business request and requires platform approval before operation
   expect(approval.status).toBe(200);
   expect(approval.body.business.status).toBe("active");
 
-  await requester.goto("/portfolio");
-  await expect(requester.getByRole("heading", { name: "E2E Approval Harbour" })).toBeVisible();
   await requester.close();
+
+  const returningOwner = await browser.newPage();
+  await signIn(returningOwner, ownerEmail);
+  // The test adapter stays on /login. Enter the same continuation route as Google sign-in.
+  await returningOwner.goto("/auth/continue");
+  await expect(returningOwner).toHaveURL(/\/portfolio(?:[?#]|$)/);
+  await expect(returningOwner.getByRole("heading", { name: "E2E Approval Harbour", exact: true })).toBeVisible();
+  await returningOwner.close();
   await admin.close();
 });

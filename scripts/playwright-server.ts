@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 
 const testEnvironment: Record<string, string> = {
   NODE_ENV: "test",
+  WATCHPACK_POLLING: "true",
   AUTH_MODE: "firebase",
   OCR_PROVIDER: "fake",
   PERSISTENCE_MODE: "memory",
@@ -25,8 +26,8 @@ export function createPlaywrightServerEnv(environment: NodeJS.ProcessEnv = proce
 export function spawnPlaywrightServer(environment: NodeJS.ProcessEnv = process.env): ChildProcess {
   const command = process.platform === "win32" ? (process.env.ComSpec ?? "cmd.exe") : "corepack";
   const args = process.platform === "win32"
-    ? ["/d", "/s", "/c", "corepack pnpm dev --port 3100"]
-    : ["pnpm", "dev", "--port", "3100"];
+    ? ["/d", "/s", "/c", "corepack pnpm dev --hostname 127.0.0.1 --port 3100"]
+    : ["pnpm", "dev", "--hostname", "127.0.0.1", "--port", "3100"];
   return spawn(command, args, {
     env: createPlaywrightServerEnv(environment),
     stdio: "inherit",
