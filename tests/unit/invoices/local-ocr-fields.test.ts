@@ -85,6 +85,17 @@ describe("local OCR invoice fields", () => {
     expect(sameTwice.fields.invoiceDate).toBe("04/03/2026");
   });
 
+  it("reads a two-digit year and counts one date printed in two forms once", () => {
+    const short = extractLocalOcrFields(["Total £5.10"], ["12.12.19 14:02"]);
+    expect(parseInvoice(short, "ocr").invoiceDate).toBe("2019-12-12");
+
+    const twoForms = extractLocalOcrFields(["Total £5.10"], ["12.12.19 14:02", "Paid 12/12/2019"]);
+    expect(parseInvoice(twoForms, "ocr").invoiceDate).toBe("2019-12-12");
+
+    const different = extractLocalOcrFields(["Total £5.10"], ["12.12.19 14:02", "Return by 12/01/2020"]);
+    expect(different.fields.invoiceDate).toBeNull();
+  });
+
   it("leaves a blank scan in human review", () => {
     expect(parseInvoice(extractLocalOcrFields([" ", "\n"]), "ocr")).toMatchObject({
       invoiceNumber: null,

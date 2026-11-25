@@ -1,0 +1,25 @@
+{
+  "id": "LH-042",
+  "titulo": "Subir las acciones de CI a versiones que no usen Node 20",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "actions/checkout y actions/setup-node van en una versión mayor actual que corre en Node 24.",
+    "El resto del flujo de CI no cambia."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    ".github/workflows/ci.yml"
+  ],
+  "hecho": "ci.yml usa actions/checkout@v7 y actions/setup-node@v7, que corren en Node 24. Nada más cambia.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "2026-11-25 · action.yml de checkout v7 y setup-node v7: using node24 (v6 también). Últimas: checkout v7.0.1 (20-jul-2026), setup-node v7.1.0 (8-oct-2026). Fuente: opción más reciente con meses de uso.",
+    "2026-11-25 · Verificación de lote: lint y tsc correctos; Vitest 1270 pasadas y 7 omitidas en 121 archivos; build correcto.",
+    "CI la comprueba al publicar."
+  ],
+  "actualizado": "2026-11-25"
+}

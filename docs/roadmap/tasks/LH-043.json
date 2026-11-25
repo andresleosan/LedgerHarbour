@@ -1,0 +1,29 @@
+{
+  "id": "LH-043",
+  "titulo": "Leer fechas de tickets con año de 2 cifras y con otro separador",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Una fecha impresa con año de 2 cifras (12.12.19) se lee como 2019-12-12.",
+    "La misma fecha escrita con distinto separador o año corto en dos sitios del ticket cuenta como una sola fecha.",
+    "Dos fechas distintas siguen quedando vacías para revisión."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/invoices/local-ocr-fields.ts",
+    "src/modules/invoices/invoice-parser.ts",
+    "tests/unit/invoices/local-ocr-fields.test.ts",
+    "tests/unit/invoices/invoice-parser.test.ts"
+  ],
+  "hecho": "La fecha impresa con año de 2 cifras se lee como 20YY. Una misma fecha escrita con otro separador, otro relleno o año corto cuenta como una sola; dos fechas distintas siguen vacías para revisión.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "2026-11-25 · Prueba primero: invoice-parser (12.12.19 → 2019-12-12, 6/8/26 → 2026-08-06) y local-ocr-fields (año corto, misma fecha en dos formas, dos fechas distintas) fallaban y ahora pasan.",
+    "Decisión: año de 2 cifras = 20YY, opción más simple; un ticket anterior a 2000 saldría un siglo tarde y lo corrige la revisión humana (todas las lecturas locales la exigen).",
+    "2026-11-25 · Verificación de lote: lint y tsc correctos; Vitest 1270 pasadas y 7 omitidas en 121 archivos; build correcto."
+  ],
+  "actualizado": "2026-11-25"
+}

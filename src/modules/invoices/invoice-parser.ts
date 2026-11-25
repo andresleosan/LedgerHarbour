@@ -45,7 +45,8 @@ const DECIMAL_PATTERN = /^\d+(?:\.\d+)?$/;
 // Money is stored in pence; more than two decimals would be rounded silently, so it is never accepted.
 const OVER_PRECISE = /\.\d{3,}$/;
 // ponytail: printed dates are read day first (DD/MM/YYYY) because the product serves UK/Jersey businesses.
-const PRINTED_DATE_PATTERN = /^(\d{1,2})([/.-])(\d{1,2})\2(\d{4})$/;
+// A two-digit year is read as 20YY (LH-043): a pre-2000 receipt lands a century late, and review catches it.
+const PRINTED_DATE_PATTERN = /^(\d{1,2})([/.-])(\d{1,2})\2(\d{2}|\d{4})$/;
 // A currency symbol or seeded ISO code is only accepted at the start or end of the whole value.
 const CURRENCY_AFFIX = /^(?:[£€$]|GBP|EUR|USD)\s*(?=\d)|(?<=\d)\s*(?:[£€$]|GBP|EUR|USD)$/gi;
 const SPACE_GROUPED = /^\d{1,3}(?:[ \u00a0\u202f]\d{3})+(?:[.,]\d+)?$/;
@@ -78,7 +79,7 @@ function printedDate(value: string): string | null {
   const match = PRINTED_DATE_PATTERN.exec(value);
   if (!match) return isoDate(value);
   const [, day, , month, year] = match;
-  return isoDate(`${year}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`);
+  return isoDate(`${year.padStart(4, "20")}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`);
 }
 
 function decimal(value: string): string | null {

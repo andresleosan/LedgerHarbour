@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const calls: { command: string; args: string[] }[] = [];
 let readings: Record<string, string> = {};
 let failEnlarging = false;
+let pageHeader = "";
 
 vi.mock("node:child_process", () => ({
   execFile: (
@@ -17,7 +18,7 @@ vi.mock("node:child_process", () => ({
     calls.push({ command, args });
     const enlarging = command === "convert" && args.includes("2240x2240<");
     if (enlarging && failEnlarging) return callback(new Error("convert failed"), { stdout: "" });
-    if (command === "convert") writeFileSync(join(options.cwd, enlarging ? "large-00.pgm" : "page-00.pgm"), "");
+    if (command === "convert") writeFileSync(join(options.cwd, enlarging ? "large-00.pgm" : "page-00.pgm"), enlarging ? "" : pageHeader);
     if (command === "pdfinfo") return callback(null, { stdout: "Pages: 1\n" });
     if (command === "pdftoppm") writeFileSync(join(options.cwd, "page-1.pgm"), "");
     const page = command === "tesseract" ? args[0].split("/").at(-1)! : "";
@@ -34,6 +35,7 @@ describe("local OCR provider", () => {
   beforeEach(() => {
     calls.length = 0;
     failEnlarging = false;
+    pageHeader = "";
     readings = {
       "page-00.pgm": "Total £120.60\n16/08/2026 10:14",
       "large-00.pgm": "Total £999.99\n17/08/2026 10:14",
@@ -59,6 +61,16 @@ describe("local OCR provider", () => {
     readings["page-00.pgm"] = "Invoice date: 16/08/2026\nTotal £120.60";
     expect((await extract()).fields.invoiceDate).toBe("16/08/2026");
     expect(calls.map((call) => call.command)).toEqual(["convert", "tesseract"]);
+  });
+
+  it("does not read again a photo that is already 2240 px or more on its longest edge", async () => {
+    pageHeader = "P5\n1600 2240\n255\n";
+    expect((await extract()).fields.invoiceDate).toBeNull();
+    expect(calls.map((call) => call.command)).toEqual(["convert", "tesseract"]);
+
+    calls.length = 0;
+    pageHeader = "P5\n1260 2239\n255\n";
+    expect((await extract()).fields.invoiceDate).toBe("17/08/2026");
   });
 
   it("keeps the first reading when the enlarged one fails, and never enlarges a PDF", async () => {

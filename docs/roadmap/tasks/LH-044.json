@@ -1,0 +1,27 @@
+{
+  "id": "LH-044",
+  "titulo": "Saltar la segunda lectura de la fecha cuando la foto ya mide 2240 px o más",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Si cada página de la foto ya tiene su lado mayor de 2240 px o más, no se relee ampliada.",
+    "Las fotos más pequeñas siguen teniendo la segunda lectura.",
+    "Si no se puede leer el tamaño de la página, se relee como hasta ahora."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/invoices/local-ocr-provider.ts",
+    "tests/unit/invoices/local-ocr-provider.test.ts"
+  ],
+  "hecho": "Si cada página ya mide 2240 px o más en su lado mayor (leído de la cabecera PGM), no se hace la segunda lectura; las fotos menores y las de cabecera ilegible se releen como antes.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "",
+  "evidencia": [
+    "2026-11-25 · Prueba primero en local-ocr-provider.test.ts: 1600x2240 no se relee; 1260x2239 sí. Fallaba y ahora pasa.",
+    "Motivo: con el lado mayor ≥ 2240 la ampliación (-resize 2240x2240<) no cambia la imagen y la segunda lectura daría el mismo texto.",
+    "2026-11-25 · Verificación de lote: lint y tsc correctos; Vitest 1270 pasadas y 7 omitidas en 121 archivos; build correcto."
+  ],
+  "actualizado": "2026-11-25"
+}

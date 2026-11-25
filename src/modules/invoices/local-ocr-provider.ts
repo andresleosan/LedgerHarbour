@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -101,6 +101,13 @@ export class LocalOcrProvider implements OcrProvider {
       const first = extractLocalOcrFields(text);
       if (input.mimeType === "application/pdf" || first.fields.invoiceDate !== null) return first;
       try {
+        // LH-044: a page already ENLARGED_EDGE or more on its longest edge would be read again unchanged.
+        // An unreadable header gives 0, so that page is still enlarged.
+        const edges = await Promise.all(pages.map(async (page) => {
+          const [, width, height] = /^P5\s+(\d+)\s+(\d+)/.exec((await readFile(join(directory!, page))).toString("latin1", 0, 32)) ?? [];
+          return Math.max(Number(width ?? 0), Number(height ?? 0));
+        }));
+        if (edges.every((edge) => edge >= Number(ENLARGED_EDGE))) return first;
         const enlarged: string[] = [];
         for (const page of await preparePages(inputFile, directory, input.mimeType, deadline, true)) enlarged.push(await read(page));
         return extractLocalOcrFields(text, enlarged);

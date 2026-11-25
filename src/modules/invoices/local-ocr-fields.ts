@@ -6,7 +6,10 @@ import {
 } from "./ocr-provider";
 
 const companySuffix = /\b(?:ltd\.?|limited|plc|llp|inc\.?)$/i;
-const date = /^(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/.-]\d{1,2}[/.-]\d{4})$/;
+const date = /^(?:\d{4}-\d{2}-\d{2}|\d{1,2}[/.-]\d{1,2}[/.-](?:\d{2}|\d{4}))$/;
+// One date printed as "12.12.19" and "12/12/2019" is the same date (LH-043); ISO dates are compared as printed.
+const dateKey = (value: string) => /^\d{4}-/.test(value) ? value
+  : value.split(/[/.-]/).map((part, index) => index === 2 ? part.padStart(4, "20") : part.padStart(2, "0")).join("/");
 const money = /^(?:(?:GBP|EUR|USD|[£€$])\s*)?\d[\d., \u00a0\u202f]*(?:\s*(?:GBP|EUR|USD|[£€$]))?$/i;
 
 // Receipts print one figure in several forms ("£5.10", "Gbp5.10"); money is compared without its currency marks.
@@ -38,7 +41,7 @@ const toLines = (pages: readonly string[]) =>
 function labeledDate(lines: readonly string[]): string | null {
   // Only the first token after a date label is read, so OCR noise after the date does not hide it.
   const invoiceDates = labeled(lines, /^(?:invoice date|date of issue|issued on)(?:\s*:\s*|\s+)(\S+)/i, date);
-  return unique(invoiceDates.length ? invoiceDates : labeled(lines, /^date(?:\s*:\s*|\s+)(\S+)/i, date));
+  return unique(invoiceDates.length ? invoiceDates : labeled(lines, /^date(?:\s*:\s*|\s+)(\S+)/i, date), dateKey);
 }
 
 /**
@@ -61,8 +64,8 @@ export function extractLocalOcrFields(pages: readonly string[], enlargedPages: r
     supplier: unique(suppliers.length ? suppliers : lines.slice(0, 5).filter((line) => companySuffix.test(line))),
     invoiceNumber: unique(labeled(lines, /^(?:tax )?invoice\s*(?:no\.?|number|ref(?:erence)?\.?|#)\s*:?\s*(\S+)$/i)),
     invoiceDate: labeledDate(lines) ?? labeledDate(enlarged) ??
-      unique(enlarged.flatMap((line) => line.split(/\s+/)).filter((token) => date.test(token))),
-    dueDate: unique(labeled(lines, /^(?:due date|payment due)(?:\s*:\s*|\s+)(\S+)/i, date)),
+      unique(enlarged.flatMap((line) => line.split(/\s+/)).filter((token) => date.test(token)), dateKey),
+    dueDate: unique(labeled(lines, /^(?:due date|payment due)(?:\s*:\s*|\s+)(\S+)/i, date), dateKey),
     subtotal,
     taxAmount,
     total,

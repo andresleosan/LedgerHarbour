@@ -111,6 +111,8 @@ describe("invoice parser reading OCR output", () => {
     ["16.08.2026", "2026-08-16"],
     ["6/8/2026", "2026-08-06"],
     ["2026-08-16", "2026-08-16"],
+    ["12.12.19", "2019-12-12"],
+    ["6/8/26", "2026-08-06"],
   ])("reads the printed date %s day first", (printed, iso) => {
     expect(ocr({ invoiceDate: printed }).invoiceDate).toBe(iso);
   });
