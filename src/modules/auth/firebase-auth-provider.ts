@@ -36,6 +36,11 @@ export interface FirebaseAuthProviderOptions {
   sessions?: FirebaseSessionStore;
 }
 
+export const errorCode = (error: unknown): string => {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? code : error instanceof Error ? error.name : "unknown";
+};
+
 export class FirebaseAuthProvider implements AuthProvider {
   private readonly auth: FirebaseAdminAuth;
   private readonly sessions: FirebaseSessionStore;
@@ -89,7 +94,9 @@ export class FirebaseAuthProvider implements AuthProvider {
     if (!session) return null;
     try {
       return identityFromToken(await this.auth.verifySessionCookie(session, true));
-    } catch {
+    } catch (error) {
+      // Only the error code is logged: Firebase messages can quote the cookie or the email.
+      console.warn("firebase session rejected", errorCode(error));
       await this.sessions.clear();
       return null;
     }

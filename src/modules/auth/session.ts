@@ -3,7 +3,7 @@ import { workUnitAsyncStorage } from "next/dist/server/app-render/work-unit-asyn
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import type { AuthIdentity } from "./auth-provider";
-import { FirebaseAuthProvider } from "./firebase-auth-provider";
+import { errorCode, FirebaseAuthProvider } from "./firebase-auth-provider";
 import { createDeterministicFirebaseAdminAuth, deterministicFirebaseToken } from "./firebase-test-adapter";
 import { FIREBASE_SESSION_MAX_AGE, firebaseSessionStore } from "./firebase-session";
 import { isDeterministicTestRuntime } from "./runtime-mode";
@@ -151,7 +151,8 @@ export async function getCurrentIdentity(): Promise<AuthIdentity | null> {
   if (process.env.AUTH_MODE === "firebase") {
     try {
       return await new FirebaseAuthProvider().getCurrentIdentity();
-    } catch {
+    } catch (error) {
+      console.warn("firebase session lookup failed", errorCode(error));
       return null;
     }
   }

@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   FirebaseAuthProvider,
@@ -84,5 +84,20 @@ describe("FirebaseAuthProvider", () => {
     await expect(provider.getCurrentIdentity()).resolves.toMatchObject({ providerUserId: "firebase-user-1" });
     await provider.signOut();
     await expect(provider.getCurrentIdentity()).resolves.toBeNull();
+  });
+
+  it("logs only the error code when a stored session is rejected", async () => {
+    const { auth, sessions } = setup();
+    await sessions.set("signed-session-cookie");
+    auth.verifySessionCookie = async () => {
+      throw Object.assign(new Error("decoding signed-session-cookie for user@example.com"), { code: "auth/session-cookie-revoked" });
+    };
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    await expect(new FirebaseAuthProvider({ auth, sessions }).getCurrentIdentity()).resolves.toBeNull();
+
+    expect(warn).toHaveBeenCalledWith("firebase session rejected", "auth/session-cookie-revoked");
+    expect(JSON.stringify(warn.mock.calls)).not.toMatch(/signed-session-cookie|example\.com/);
+    warn.mockRestore();
   });
 });
