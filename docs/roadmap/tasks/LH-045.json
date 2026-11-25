@@ -1,0 +1,31 @@
+{
+  "id": "LH-045",
+  "titulo": "Impedir solicitudes de negocio duplicadas por solicitante",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Una solicitud posterior del mismo solicitante con el mismo nombre devuelve HTTP 409 y muestra el motivo en el formulario.",
+    "El nombre se compara sin distinguir mayúsculas ni la cantidad de espacios. Otra cuenta puede solicitar el mismo nombre.",
+    "Dos envíos simultáneos del mismo solicitante dejan una sola solicitud."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/tenancy/business-service.ts",
+    "src/modules/tenancy/postgres-tenancy-repository.ts",
+    "src/app/api/businesses/route.ts",
+    "src/app/onboarding/create-business/page.tsx",
+    "tests/e2e/platform/business-approval.spec.ts"
+  ],
+  "hecho": "El alta compara el nombre normalizado con cualquier solicitud previa del mismo solicitante. PostgreSQL serializa la comprobación y la inserción por solicitante. El formulario ofrece un aviso en español e inglés.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "La publicación y la verificación con Google en producción quedan para el operador.",
+  "evidencia": [
+    "2026-11-25 · vitest run tests/unit/platform/business-approval.test.ts tests/integration/tenancy/business-approval.test.ts --no-file-parallelism reprodujo dos fallos antes del cambio. Después pasaron las 21 pruebas.",
+    "2026-11-25 · playwright test tests/e2e/platform/business-approval.spec.ts --project=chromium --reporter=line pasó 1 prueba. Comprobó las respuestas 201 y 409, el aviso en el formulario, una sola solicitud, la aprobación y el acceso posterior a /portfolio con autenticación sintética.",
+    "2026-11-25 · El simulador de OCR ahora usa basename para reconocer rutas en Windows. vitest run tests/unit/invoices/local-ocr-provider.test.ts --no-file-parallelism pasó 4 pruebas.",
+    "2026-11-25 · Node 26.12.1. Lint, tsc --noEmit, vitest run --no-file-parallelism (1279 pasadas y 7 omitidas) y build correctos."
+  ],
+  "actualizado": "2026-11-25"
+}

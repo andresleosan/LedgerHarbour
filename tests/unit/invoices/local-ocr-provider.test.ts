@@ -1,5 +1,5 @@
 import { writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, join } from "node:path";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -21,7 +21,7 @@ vi.mock("node:child_process", () => ({
     if (command === "convert") writeFileSync(join(options.cwd, enlarging ? "large-00.pgm" : "page-00.pgm"), enlarging ? "" : pageHeader);
     if (command === "pdfinfo") return callback(null, { stdout: "Pages: 1\n" });
     if (command === "pdftoppm") writeFileSync(join(options.cwd, "page-1.pgm"), "");
-    const page = command === "tesseract" ? args[0].split("/").at(-1)! : "";
+    const page = command === "tesseract" ? basename(args[0]) : "";
     callback(null, { stdout: readings[page] ?? "" });
   },
 }));

@@ -280,22 +280,32 @@ function createRepository(db: Database, transactionCount: { value: number }): On
     async createBusiness(input: BusinessCreateInput) {
       try {
         assertPendingBusinessCreationInput(input);
-        const [row] = await db.insert(businesses).values({
-          name: input.name,
-          normalizedSearchName: input.normalizedName,
-          baseCurrencyKind: input.baseCurrencyKind,
-          baseCurrencyCode: input.baseCurrencyCode,
-          baseCurrencyId: input.baseCurrencyId,
-          createdBy: input.createdBy,
-          status: "pending",
-          isActive: false,
-          activatedAt: null,
-          serviceExpiresAt: null,
-          suspendedAt: null,
-          suspensionReason: null,
-        }).returning();
-        if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
-        return mapBusiness(row, input.createdBy);
+        return await db.transaction(async (transaction) => {
+          // Serialize requests by applicant, including when no matching business exists yet.
+          await transaction.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`business_requests:${input.createdBy}`}, 0))`);
+          const [duplicate] = await transaction.select({ id: businesses.id }).from(businesses).where(and(
+            eq(businesses.createdBy, input.createdBy),
+            eq(businesses.normalizedSearchName, input.normalizedName),
+          )).limit(1);
+          if (duplicate) throw new OnboardingError(ONBOARDING_ERROR_CODES.BUSINESS_REQUEST_DUPLICATE);
+
+          const [row] = await transaction.insert(businesses).values({
+            name: input.name,
+            normalizedSearchName: input.normalizedName,
+            baseCurrencyKind: input.baseCurrencyKind,
+            baseCurrencyCode: input.baseCurrencyCode,
+            baseCurrencyId: input.baseCurrencyId,
+            createdBy: input.createdBy,
+            status: "pending",
+            isActive: false,
+            activatedAt: null,
+            serviceExpiresAt: null,
+            suspendedAt: null,
+            suspensionReason: null,
+          }).returning();
+          if (!row) throw new OnboardingError(ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT);
+          return mapBusiness(row, input.createdBy);
+        });
       } catch (error) {
         return preserveOrMap(error);
       }

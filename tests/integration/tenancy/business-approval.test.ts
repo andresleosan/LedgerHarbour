@@ -59,6 +59,35 @@ describe("PostgreSQL business approval lifecycle", () => {
     }
   }, 30_000);
 
+  it("stores only one pending business for concurrent requests by the same applicant", async () => {
+    const { db, close } = await createTestDatabase();
+
+    try {
+      const tenancy = createPostgresOnboardingRepository(db);
+      const onboarding = createOnboardingServices(tenancy);
+      const requester = {
+        provider: "firebase",
+        providerUserId: "postgres-duplicate-requester",
+        email: "requester@example.com",
+        displayName: "Requester",
+        emailVerified: true,
+      } as const;
+
+      const results = await Promise.allSettled([
+        onboarding.createBusinessRequest({ name: "Concurrent Harbour" }, requester),
+        onboarding.createBusinessRequest({ name: "  concurrent harbour  " }, requester),
+      ]);
+
+      expect(results).toEqual(expect.arrayContaining([
+        expect.objectContaining({ status: "fulfilled", value: expect.objectContaining({ status: "pending" }) }),
+        expect.objectContaining({ status: "rejected", reason: expect.objectContaining({ code: "BUSINESS_REQUEST_DUPLICATE" }) }),
+      ]));
+      await expect(tenancy.listBusinesses()).resolves.toHaveLength(1);
+    } finally {
+      await close();
+    }
+  }, 30_000);
+
   it("keeps the first PostgreSQL platform claim and rejects the second claim", async () => {
     const { db, close } = await createTestDatabase();
 

@@ -14,7 +14,8 @@ const createBusinessSchema = z.object({ name: z.string() });
 
 function errorResponse(error: unknown): NextResponse {
   if (error instanceof OnboardingError) {
-    const status = error.code === ONBOARDING_ERROR_CODES.DUPLICATE_MEMBERSHIP ||
+    const status = error.code === ONBOARDING_ERROR_CODES.BUSINESS_REQUEST_DUPLICATE ||
+      error.code === ONBOARDING_ERROR_CODES.DUPLICATE_MEMBERSHIP ||
       error.code === ONBOARDING_ERROR_CODES.PENDING_REQUEST_CONFLICT ||
       error.code === ONBOARDING_ERROR_CODES.REPOSITORY_CONFLICT ? 409 : 400;
     return NextResponse.json({ error: { code: error.code, message: error.message } }, { status });

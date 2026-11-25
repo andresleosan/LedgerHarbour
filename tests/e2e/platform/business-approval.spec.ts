@@ -1,3 +1,4 @@
+import { relayFetches } from "../documents/relay-fetch";
 import { expect, test } from "../fixtures";
 import { browserApiRequest } from "../helpers/browser-api";
 
@@ -12,6 +13,7 @@ test("submits a business request and requires platform approval before operation
   const ownerEmail = "task3-requester@example.com";
   const requester = await browser.newPage();
   await signIn(requester, ownerEmail);
+  const submissions = await relayFetches(requester, /^\/api\/businesses$/);
   await requester.goto("/onboarding/create-business");
   await requester.getByLabel("Business name").fill("E2E Approval Harbour");
   await requester.getByRole("button", { name: "Submit request" }).click();
@@ -19,6 +21,12 @@ test("submits a business request and requires platform approval before operation
   await expect(requestStatus).toContainText("awaiting platform approval");
   const businessId = (await requestStatus.textContent())?.match(/business-[\w-]+/)?.[0];
   expect(businessId).toBeTruthy();
+
+  await requester.getByLabel("Business name").fill(" e2e  approval harbour ");
+  await requester.getByRole("button", { name: "Submit request" }).click();
+  await expect(requester.getByRole("alert").filter({ hasText: "You already requested a business with this name." }))
+    .toBeVisible();
+  expect(submissions.map(({ status }) => status)).toEqual([201, 409]);
 
   const beforeApproval = await browserApiRequest(requester, `/api/businesses/${businessId}/documents`, {
     method: "POST",
@@ -36,10 +44,12 @@ test("submits a business request and requires platform approval before operation
   await signIn(admin, "platform-admin@example.com");
   const pending = await admin.evaluate(async () => {
     const response = await fetch("/api/platform/businesses");
-    return { status: response.status, body: await response.json() } as { status: number; body: { businesses?: Array<{ id: string; status: string }> } };
+    return { status: response.status, body: await response.json() } as { status: number; body: { businesses?: Array<{ id: string; name: string; status: string }> } };
   });
   expect(pending.status, JSON.stringify(pending.body)).toBe(200);
-  expect(pending.body.businesses).toContainEqual(expect.objectContaining({ id: businessId, status: "pending" }));
+  expect(pending.body.businesses?.filter((business) => business.name.toLowerCase() === "e2e approval harbour")).toEqual([
+    expect.objectContaining({ id: businessId, status: "pending" }),
+  ]);
 
   const approval = await admin.evaluate(async (id) => {
     const response = await fetch(`/api/platform/businesses/${id}/approve`, {
