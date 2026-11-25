@@ -60,6 +60,16 @@ export class OnboardingError extends Error {
   }
 }
 
+// The shared in-memory repository can throw errors from a different Next route bundle.
+export function asOnboardingError(error: unknown): OnboardingError | null {
+  if (error instanceof OnboardingError) return error;
+  const candidate = error as { name?: unknown; code?: unknown } | null;
+  if (candidate?.name === "OnboardingError" && typeof candidate.code === "string" && Object.hasOwn(publicMessages, candidate.code)) {
+    return new OnboardingError(candidate.code as OnboardingErrorCode);
+  }
+  return null;
+}
+
 export type BaseCurrencyKind = "standard";
 
 export interface Business {

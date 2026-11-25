@@ -25,7 +25,9 @@
     "2026-11-25 · vitest run tests/unit/platform/business-approval.test.ts tests/integration/tenancy/business-approval.test.ts --no-file-parallelism reprodujo dos fallos antes del cambio. Después pasaron las 21 pruebas.",
     "2026-11-25 · playwright test tests/e2e/platform/business-approval.spec.ts --project=chromium --reporter=line pasó 1 prueba. Comprobó las respuestas 201 y 409, el aviso en el formulario, una sola solicitud, la aprobación y el acceso posterior a /portfolio con autenticación sintética.",
     "2026-11-25 · El simulador de OCR ahora usa basename para reconocer rutas en Windows. vitest run tests/unit/invoices/local-ocr-provider.test.ts --no-file-parallelism pasó 4 pruebas.",
-    "2026-11-25 · Node 26.12.1. Lint, tsc --noEmit, vitest run --no-file-parallelism (1279 pasadas y 7 omitidas) y build correctos."
+    "2026-11-25 · Node 26.12.1. Lint, tsc --noEmit, vitest run --no-file-parallelism (1279 pasadas y 7 omitidas) y build correctos.",
+    "2026-11-25 · CI del PR 2 detectó un 400 genérico cuando el repositorio en memoria y la ruta usaban copias distintas del módulo. La prueba de integración reprodujo ese 400 y pasó al conservar el 409 y su mensaje público.",
+    "2026-11-25 · El panel y el alta pasaron 6 pruebas juntas en Chromium. Cada reintento usa una cuenta y un nombre sintéticos independientes. Lint, TypeScript y build correctos. Vitest registró 1280 pasadas y 7 omitidas."
   ],
   "actualizado": "2026-11-25"
 }

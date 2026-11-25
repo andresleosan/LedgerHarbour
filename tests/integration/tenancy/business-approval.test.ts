@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { createTestDatabase } from "../../../src/db/test-database";
 import { createOnboardingServices } from "../../../src/modules/tenancy/business-service";
@@ -155,3 +155,42 @@ describe("PostgreSQL business approval lifecycle", () => {
     }
   }, 30_000);
 });
+
+it("returns a duplicate conflict when the repository and route load different module copies", async () => {
+  const repositoryBundle = await import("../../../src/modules/tenancy/business-service");
+  vi.resetModules();
+  const routeBundle = await import("../../../src/modules/tenancy/business-service");
+  const { POST } = await import("../../../src/app/api/businesses/route");
+  const { setCurrentIdentity, clearCurrentIdentity } = await import("../../../src/modules/auth/session");
+  expect(routeBundle.OnboardingError).not.toBe(repositoryBundle.OnboardingError);
+  expect(routeBundle.defaultOnboardingRepository).toBe(repositoryBundle.defaultOnboardingRepository);
+
+  vi.stubEnv("AUTH_MODE", "firebase");
+  vi.stubEnv("PERSISTENCE_MODE", "memory");
+  const request = (name: string) => POST(new Request("http://localhost/api/businesses", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+    headers: { "content-type": "application/json" },
+  }));
+
+  try {
+    await setCurrentIdentity({
+      provider: "firebase",
+      providerUserId: "cross-bundle-requester",
+      email: "cross-bundle-requester@example.com",
+      displayName: "Cross-bundle Requester",
+      emailVerified: true,
+    });
+
+    expect((await request("Module Copy Harbour")).status).toBe(201);
+    const duplicate = await request(" module copy harbour ");
+
+    expect(duplicate.status).toBe(409);
+    await expect(duplicate.json()).resolves.toMatchObject({
+      error: { code: "BUSINESS_REQUEST_DUPLICATE", message: "You already requested a business with this name." },
+    });
+  } finally {
+    await clearCurrentIdentity();
+    vi.unstubAllEnvs();
+  }
+}, 30_000);
