@@ -11,13 +11,19 @@ import PlatformShell from "@/ui/platform/PlatformShell";
 
 export default async function PlatformLayout({ children }: { children: ReactNode }) {
   const identity = await getCurrentIdentity();
-  if (!identity) redirect("/login");
+  if (!identity) {
+    console.info("platform layout", "no session");
+    redirect("/login");
+  }
 
   const persistence = getPersistenceContext();
   try {
     await requirePlatformMember(identity, persistence.tenancyRepository, persistence.platformRepository);
   } catch (error) {
-    if (error instanceof PlatformError) redirect("/portfolio");
+    if (error instanceof PlatformError) {
+      console.info("platform layout", "not a platform member");
+      redirect("/portfolio");
+    }
     throw error;
   }
 

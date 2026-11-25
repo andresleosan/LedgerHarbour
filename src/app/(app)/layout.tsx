@@ -11,7 +11,10 @@ import AppShell from "@/ui/AppShell";
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const identity = await getCurrentIdentity();
-  if (!identity) redirect("/login");
+  if (!identity) {
+    console.info("app layout", "no session");
+    redirect("/login");
+  }
 
   const persistence = getPersistenceContext();
   const businesses = await listUserBusinesses(identity, {
