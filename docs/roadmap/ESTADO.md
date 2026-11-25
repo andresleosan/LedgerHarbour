@@ -2,6 +2,7 @@
 
 Una línea por cierre, la más reciente arriba: fecha, tarea, qué cambió para quien usa la app y progreso antes → después.
 
+- 2026-11-25 · LH-046 · Los PDF con texto seleccionable recuperan el número de factura si el OCR lo deja vacío · 34 de 34 → 35 de 35.
 - 2026-11-25 · LH-045 · El alta conserva el aviso de duplicado cuando el servidor carga el repositorio y la ruta por separado · 34 de 34.
 - 2026-11-25 · LH-045 · El alta avisa cuando un solicitante repite el nombre de un negocio y guarda solo una solicitud · 33 de 33 → 34 de 34.
 - 2026-11-25 · LH-042, LH-043, LH-044 · Los tickets con año de 2 cifras (12.12.19) ya traen la fecha, y la misma fecha escrita de dos formas ya no se queda vacía; las fotos grandes no se releen sin motivo; CI deja de usar Node 20 · 30 de 33 → 33 de 33.

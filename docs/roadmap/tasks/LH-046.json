@@ -1,0 +1,28 @@
+{
+  "id": "LH-046",
+  "titulo": "Recuperar el número de factura de la capa de texto del PDF",
+  "estado": "hecho",
+  "responsable": "desarrollo",
+  "criterio": [
+    "Si el OCR del PDF deja vacío el número, usar una referencia inequívoca de su capa de texto.",
+    "Conservar los demás campos y sus niveles de confianza. Mantener la lectura original si la capa falla o da referencias distintas.",
+    "Conservar los números ya leídos por OCR y el flujo de las imágenes."
+  ],
+  "depende": [],
+  "comprueba": [],
+  "recursos": [
+    "src/modules/invoices/local-ocr-provider.ts",
+    "tests/unit/invoices/local-ocr-provider.test.ts"
+  ],
+  "hecho": "El proveedor conserva la lectura rasterizada y recupera solo el número de factura ausente mediante pdftotext. Usa la validación de etiquetas y el límite de tiempo existentes.",
+  "falta": "",
+  "bloqueo": "",
+  "siguiente": "Comprobar el nuevo borrador de la factura sintética en producción tras publicarse main.",
+  "evidencia": [
+    "2026-11-25 · La prueba real en producción dejó vacío el número del PDF sintético. La referencia exacta QA-PDF-001 estaba en la capa de texto.",
+    "2026-11-25 · vitest run tests/unit/invoices/local-ocr-provider.test.ts --no-file-parallelism reprodujo el campo vacío y otros dos fallos antes del cambio. Después pasaron las 8 pruebas.",
+    "2026-11-25 · Node 26.12.1. Lint, tsc --noEmit y build correctos. Vitest secuencial dejó 1284 pruebas pasadas y 7 omitidas.",
+    "2026-11-25 · La copia de prueba tiene bytes distintos y conserva texto y salida PGM idénticos al original."
+  ],
+  "actualizado": "2026-11-25"
+}

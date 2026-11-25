@@ -99,7 +99,23 @@ export class LocalOcrProvider implements OcrProvider {
       const text: string[] = [];
       for (const page of pages) text.push(await read(page));
       const first = extractLocalOcrFields(text);
-      if (input.mimeType === "application/pdf" || first.fields.invoiceDate !== null) return first;
+      if (input.mimeType === "application/pdf") {
+        if (first.fields.invoiceNumber !== null) return first;
+        try {
+          const embedded = await run("pdftotext", ["-enc", "UTF-8", "-layout", inputFile, "-"], directory, deadline);
+          const fallback = extractLocalOcrFields([embedded]);
+          if (fallback.fields.invoiceNumber === null) return first;
+          return {
+            ...first,
+            fields: { ...first.fields, invoiceNumber: fallback.fields.invoiceNumber },
+            confidence: { ...first.confidence, invoiceNumber: fallback.confidence.invoiceNumber },
+          };
+        } catch {
+          // A missing or unreadable text layer must not discard the raster OCR result.
+          return first;
+        }
+      }
+      if (first.fields.invoiceDate !== null) return first;
       try {
         // LH-044: a page already ENLARGED_EDGE or more on its longest edge would be read again unchanged.
         // An unreadable header gives 0, so that page is still enlarged.

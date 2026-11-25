@@ -7,6 +7,7 @@ const calls: { command: string; args: string[] }[] = [];
 let readings: Record<string, string> = {};
 let failEnlarging = false;
 let pageHeader = "";
+let pdfText: string | Error = "";
 
 vi.mock("node:child_process", () => ({
   execFile: (
@@ -20,6 +21,9 @@ vi.mock("node:child_process", () => ({
     if (enlarging && failEnlarging) return callback(new Error("convert failed"), { stdout: "" });
     if (command === "convert") writeFileSync(join(options.cwd, enlarging ? "large-00.pgm" : "page-00.pgm"), enlarging ? "" : pageHeader);
     if (command === "pdfinfo") return callback(null, { stdout: "Pages: 1\n" });
+    if (command === "pdftotext") {
+      return pdfText instanceof Error ? callback(pdfText, { stdout: "" }) : callback(null, { stdout: pdfText });
+    }
     if (command === "pdftoppm") writeFileSync(join(options.cwd, "page-1.pgm"), "");
     const page = command === "tesseract" ? basename(args[0]) : "";
     callback(null, { stdout: readings[page] ?? "" });
@@ -36,6 +40,7 @@ describe("local OCR provider", () => {
     calls.length = 0;
     failEnlarging = false;
     pageHeader = "";
+    pdfText = "";
     readings = {
       "page-00.pgm": "Total £120.60\n16/08/2026 10:14",
       "large-00.pgm": "Total £999.99\n17/08/2026 10:14",
@@ -73,12 +78,52 @@ describe("local OCR provider", () => {
     expect((await extract()).fields.invoiceDate).toBe("17/08/2026");
   });
 
-  it("keeps the first reading when the enlarged one fails, and never enlarges a PDF", async () => {
+  it("keeps the first photo reading when enlargement fails", async () => {
     failEnlarging = true;
     expect((await extract()).fields).toMatchObject({ invoiceDate: null, total: "£120.60" });
+  });
 
-    calls.length = 0;
-    expect((await extract("application/pdf")).fields.invoiceDate).toBeNull();
+  it("recovers only a missing PDF invoice number from its text layer", async () => {
+    readings["page-1.pgm"] = "Supplier: Harbour Test Supplies Ltd\nInvoice Date: 2026-11-24\nTotal: GBP 120.00";
+    pdfText = "Invoice Number: QA-PDF-001\nInvoice Date: 2026-11-25\nSubtotal: GBP 999.00\nTotal GBP 999.00";
+
+    const result = await extract("application/pdf");
+
+    expect(result.fields).toMatchObject({
+      invoiceNumber: "QA-PDF-001",
+      supplier: "Harbour Test Supplies Ltd",
+      invoiceDate: "2026-11-24",
+      subtotal: null,
+      total: "GBP 120.00",
+      currencyReference: "GBP",
+    });
+    expect(result.confidence).toMatchObject({ invoiceNumber: 0.79, invoiceDate: 0.79, subtotal: 0, total: 0.79 });
+    expect(calls.map((call) => call.command)).toEqual(["pdfinfo", "pdftoppm", "tesseract", "pdftotext"]);
+    expect(calls.at(-1)?.args).toEqual(["-enc", "UTF-8", "-layout", expect.any(String), "-"]);
+  });
+
+  it("skips the text layer when Tesseract already found a PDF invoice number", async () => {
+    readings["page-1.pgm"] = "Invoice Number: OCR-123\nTotal £120.60";
+    pdfText = "Invoice Number: TEXT-456";
+
+    expect((await extract("application/pdf")).fields.invoiceNumber).toBe("OCR-123");
     expect(calls.map((call) => call.command)).toEqual(["pdfinfo", "pdftoppm", "tesseract"]);
+  });
+
+  it("does not pick an invoice number from conflicting PDF text-layer labels", async () => {
+    pdfText = "Invoice Number: QA-PDF-001\nInvoice Number: QA-PDF-002";
+
+    const result = await extract("application/pdf");
+
+    expect(result.fields).toMatchObject({ invoiceNumber: null, total: "£120.60" });
+    expect(result.confidence.invoiceNumber).toBe(0);
+    expect(calls.map((call) => call.command)).toEqual(["pdfinfo", "pdftoppm", "tesseract", "pdftotext"]);
+  });
+
+  it("keeps the rasterized PDF reading if extracting the text layer fails", async () => {
+    pdfText = new Error("pdftotext failed");
+
+    expect((await extract("application/pdf")).fields).toMatchObject({ invoiceNumber: null, invoiceDate: null, total: "£120.60" });
+    expect(calls.map((call) => call.command)).toEqual(["pdfinfo", "pdftoppm", "tesseract", "pdftotext"]);
   });
 });
