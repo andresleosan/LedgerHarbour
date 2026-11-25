@@ -6,6 +6,7 @@ import {
   type PlatformRepository,
 } from "../platform/platform-service";
 import type { OnboardingRepository } from "../tenancy/business-service";
+import { listUserBusinesses } from "../tenancy/portfolio-service";
 
 export interface PostLoginDestinationDependencies {
   tenancyRepository: OnboardingRepository;
@@ -15,7 +16,7 @@ export interface PostLoginDestinationDependencies {
 export async function resolvePostLoginDestination(
   identity: AuthIdentity,
   dependencies: PostLoginDestinationDependencies,
-): Promise<"/admin" | "/onboarding"> {
+): Promise<"/admin" | "/portfolio" | "/onboarding"> {
   try {
     await requirePlatformMember(
       identity,
@@ -25,7 +26,8 @@ export async function resolvePostLoginDestination(
     return "/admin";
   } catch (error) {
     if (error instanceof PlatformError && error.code === PLATFORM_ERROR_CODES.PLATFORM_ACCESS_DENIED) {
-      return "/onboarding";
+      const businesses = await listUserBusinesses(identity, { tenancyRepository: dependencies.tenancyRepository });
+      return businesses.length > 0 ? "/portfolio" : "/onboarding";
     }
     throw error;
   }

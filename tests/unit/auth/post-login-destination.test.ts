@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { resolvePostLoginDestination } from "../../../src/modules/auth/post-login-destination";
 import { createInMemoryPlatformRepository, PLATFORM_ERROR_CODES } from "../../../src/modules/platform/platform-service";
-import { createInMemoryOnboardingRepository } from "../../../src/modules/tenancy/business-service";
+import { createBusinessRequest, createInMemoryOnboardingRepository } from "../../../src/modules/tenancy/business-service";
+import { createPlatformService } from "../../../src/modules/platform/platform-service";
+import { testServiceExpiresAt } from "../../helpers/business-fixtures";
 import type { UserId } from "../../../src/modules/tenancy/types";
 
 const identity = (email: string, providerUserId = email) => ({
@@ -44,6 +46,29 @@ describe("post-login destination", () => {
       tenancyRepository,
       platformRepository,
     })).resolves.toBe("/onboarding");
+  });
+
+  it("routes the owner of an approved business to the portfolio", async () => {
+    const tenancyRepository = createInMemoryOnboardingRepository();
+    const platformRepository = createInMemoryPlatformRepository();
+    const actor = identity("owner@example.com");
+    const created = await createBusinessRequest({ name: "Approved Co" }, actor, tenancyRepository);
+    platformRepository.addMember({ id: "platform-approver", userId: "approver" as UserId, normalizedEmail: "approver@example.com" });
+    await createPlatformService({ tenancyRepository, platformRepository })
+      .approveBusiness(created.id, "approver" as UserId, { serviceExpiresAt: testServiceExpiresAt(), reason: "Approved" });
+
+    await expect(resolvePostLoginDestination(actor, { tenancyRepository, platformRepository }))
+      .resolves.toBe("/portfolio");
+  });
+
+  it("keeps the owner of a business still awaiting approval on onboarding", async () => {
+    const tenancyRepository = createInMemoryOnboardingRepository();
+    const platformRepository = createInMemoryPlatformRepository();
+    const actor = identity("waiting@example.com");
+    await createBusinessRequest({ name: "Waiting Co" }, actor, tenancyRepository);
+
+    await expect(resolvePostLoginDestination(actor, { tenancyRepository, platformRepository }))
+      .resolves.toBe("/onboarding");
   });
 
   it("does not hide a conflicting platform claim", async () => {

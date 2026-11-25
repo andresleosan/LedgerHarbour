@@ -7,7 +7,7 @@ import { getPersistenceContext } from "../../../../modules/persistence/repositor
 
 export const dynamic = "force-dynamic";
 
-export type PostLoginDestination = "/admin" | "/onboarding" | "/login";
+export type PostLoginDestination = "/admin" | "/portfolio" | "/onboarding" | "/login";
 export type PostLoginSearchParams = Record<string, string | string[] | undefined>;
 
 function buildPostLoginRedirect(
