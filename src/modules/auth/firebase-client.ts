@@ -29,6 +29,7 @@ function firebaseApp(config: FirebaseClientConfig): FirebaseApp {
 }
 
 const googleRedirectResults = new Map<string, Promise<UserCredential | null>>();
+const googleRedirectPendingKey = "ledgerharbour:google-redirect-pending";
 
 export interface FirebaseGoogleCredential {
   readonly user: {
@@ -58,6 +59,17 @@ function firebaseConfigKey(config: FirebaseClientConfig): string {
   return `${config.authDomain}:${config.projectId}:${config.appId}`;
 }
 
+function consumeGoogleRedirectAttempt(): boolean {
+  try {
+    const storage = window.sessionStorage;
+    const wasPending = storage.getItem(googleRedirectPendingKey) === "1";
+    if (wasPending) storage.removeItem(googleRedirectPendingKey);
+    return wasPending;
+  } catch {
+    return false;
+  }
+}
+
 export async function signInWithFirebaseEmail(config: FirebaseClientConfig, email: string, password: string, register: boolean): Promise<UserCredential> {
   if (isTestEnvironment()) return deterministicCredential(email) as UserCredential;
   const auth = getAuth(firebaseApp(config));
@@ -67,7 +79,17 @@ export async function signInWithFirebaseEmail(config: FirebaseClientConfig, emai
 export async function startFirebaseGoogleRedirect(config: FirebaseClientConfig): Promise<void> {
   if (isTestEnvironment()) return;
   const auth = getAuth(firebaseApp(config));
-  await signInWithRedirect(auth, new GoogleAuthProvider());
+  try {
+    window.sessionStorage.setItem(googleRedirectPendingKey, "1");
+  } catch {
+    // Keep Google sign-in available when tab storage is blocked.
+  }
+  try {
+    await signInWithRedirect(auth, new GoogleAuthProvider());
+  } catch (error) {
+    consumeGoogleRedirectAttempt();
+    throw error;
+  }
 }
 
 export async function getFirebaseGoogleRedirectResult(config: FirebaseClientConfig): Promise<UserCredential | null> {
@@ -77,7 +99,13 @@ export async function getFirebaseGoogleRedirectResult(config: FirebaseClientConf
   const existingResult = googleRedirectResults.get(key);
   if (existingResult) return existingResult;
 
-  const result = getRedirectResult(auth).finally(() => googleRedirectResults.delete(key));
+  const wasPending = consumeGoogleRedirectAttempt();
+  const result = getRedirectResult(auth)
+    .then((credential) => {
+      if (!credential && wasPending) throw new AuthError(AUTH_ERROR_CODES.PROVIDER_FAILURE);
+      return credential;
+    })
+    .finally(() => googleRedirectResults.delete(key));
   googleRedirectResults.set(key, result);
   return result;
 }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, onTestFinished, vi } from "vitest";
 
 const signInWithRedirect = vi.hoisted(() => vi.fn());
 const getRedirectResult = vi.hoisted(() => vi.fn());
@@ -39,6 +39,19 @@ const config = {
 
 const runtimeEnv = (values: Record<string, string>) => values as NodeJS.ProcessEnv;
 
+function mockTabStorage() {
+  const storage = new Map<string, string>();
+  vi.stubGlobal("window", {
+    sessionStorage: {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    },
+    location: { hostname: "localhost" },
+  });
+  onTestFinished(() => { vi.unstubAllGlobals(); });
+}
+
 describe("Firebase Google authentication", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -78,6 +91,33 @@ describe("Firebase Google authentication", () => {
 
     await getFirebaseGoogleRedirectResult(config);
     expect(getRedirectResult).toHaveBeenCalledTimes(2);
+  });
+
+  it("reports a missing Google result once after starting a redirect", async () => {
+    mockTabStorage();
+    signInWithRedirect.mockResolvedValue(undefined);
+    getRedirectResult.mockResolvedValue(null);
+
+    await expect(getFirebaseGoogleRedirectResult(config)).resolves.toBeNull();
+    await startFirebaseGoogleRedirect(config);
+    const results = await Promise.allSettled([
+      getFirebaseGoogleRedirectResult(config),
+      getFirebaseGoogleRedirectResult(config),
+    ]);
+    expect(results).toEqual([
+      { status: "rejected", reason: expect.objectContaining({ name: "AuthError" }) },
+      { status: "rejected", reason: expect.objectContaining({ name: "AuthError" }) },
+    ]);
+    await expect(getFirebaseGoogleRedirectResult(config)).resolves.toBeNull();
+  });
+
+  it("clears the attempt when starting the redirect fails", async () => {
+    mockTabStorage();
+    signInWithRedirect.mockRejectedValueOnce(new Error("Synthetic launch failure"));
+    getRedirectResult.mockResolvedValue(null);
+
+    await expect(startFirebaseGoogleRedirect(config)).rejects.toThrow("Synthetic launch failure");
+    await expect(getFirebaseGoogleRedirectResult(config)).resolves.toBeNull();
   });
 
   it("passes the redirected ID token through the application provider", async () => {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { AUTH_ERROR_CODES, AuthError, toAuthError } from "@/modules/auth/auth-errors";
 import {
@@ -51,12 +51,18 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
   const authCopy = isLogin ? loginCopy : registerCopy;
   const isFirebase = authMode === "firebase";
   const isDeterministicFirebaseTest = isFirebase && process.env.NEXT_PUBLIC_FIREBASE_TEST_ADAPTER === "true";
+  const { apiKey, authDomain, projectId, appId } = firebaseConfig ?? {};
+  const googleNavigation = useRef({ locale, searchParams, router });
+
+  useLayoutEffect(() => {
+    googleNavigation.current = { locale, searchParams, router };
+  }, [locale, searchParams, router]);
 
   useEffect(() => {
-    if (!isFirebase || !isLogin || !firebaseConfig) return;
+    if (authMode !== "firebase" || mode !== "login" || !apiKey || !authDomain || !projectId || !appId) return;
     let cancelled = false;
 
-    void getFirebaseGoogleRedirectResult(firebaseConfig)
+    void getFirebaseGoogleRedirectResult({ apiKey, authDomain, projectId, appId })
       .then(async (firebaseCredential) => {
         if (!firebaseCredential || cancelled) return;
         if (firebaseGoogleCompletionStarted.current) return;
@@ -69,6 +75,8 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
           return;
         }
         setFeedback({ type: "signedIn", email: identity.email });
+        // The Server Action can re-render this page before returning the identity.
+        const { locale, searchParams, router } = googleNavigation.current;
         navigateAfterSuccessfulLogin({
           flow: "googleRedirectCompletion",
           mode,
@@ -87,7 +95,7 @@ export default function AuthForm({ mode, providerActions, authMode = "firebase",
       });
 
     return () => { cancelled = true; };
-  }, [authMode, firebaseConfig, isDeterministicFirebaseTest, isFirebase, isLogin, locale, mode, provider, router, searchParams]);
+  }, [apiKey, appId, authDomain, authMode, isDeterministicFirebaseTest, mode, projectId, provider]);
 
   const clearFeedback = () => {
     setFeedback(null);
