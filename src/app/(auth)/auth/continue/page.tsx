@@ -34,6 +34,7 @@ async function PostLoginContinuationPage({ searchParams }: PostLoginContinuation
   const rawSearchParams = await searchParams;
 
   const identity = await getCurrentIdentity();
+  console.info("auth continue", identity ? "session" : "no session");
   if (!identity) redirect(buildPostLoginRedirect("/login", rawSearchParams));
 
   const persistence = getPersistenceContext();

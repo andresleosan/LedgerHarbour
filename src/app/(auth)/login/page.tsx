@@ -3,7 +3,7 @@ import { AuthError, AUTH_ERROR_CODES } from "@/modules/auth/auth-errors";
 import type { EmailSignInInput } from "@/modules/auth/auth-provider";
 import type { AuthIdentity, GoogleSignInInput } from "@/modules/auth/auth-provider";
 import { createAuthProvider } from "@/modules/auth/dev-auth-provider";
-import { FirebaseAuthProvider } from "@/modules/auth/firebase-auth-provider";
+import { errorCode, FirebaseAuthProvider } from "@/modules/auth/firebase-auth-provider";
 import type { AuthProvider } from "@/modules/auth/auth-provider";
 import { enforceAuthRateLimit } from "@/modules/security/auth-rate-limit";
 import { isDeterministicTestRuntime } from "@/modules/auth/runtime-mode";
@@ -25,8 +25,15 @@ async function signInWithEmail(input: EmailSignInInput): Promise<AuthIdentity> {
 
 async function signInWithGoogle(input?: GoogleSignInInput): Promise<AuthIdentity> {
   "use server";
-  await enforceAuthRateLimit("google");
-  return requireProvider().signInWithGoogle(input);
+  try {
+    await enforceAuthRateLimit("google");
+    const identity = await requireProvider().signInWithGoogle(input);
+    console.info("google sign-in ok");
+    return identity;
+  } catch (error) {
+    console.warn("google sign-in failed", errorCode(error));
+    throw error;
+  }
 }
 
 async function signOut(): Promise<void> {
