@@ -9,6 +9,8 @@ import { getPersistenceContext } from "@/modules/persistence/repository-factory"
 import { signOutAction } from "@/app/onboarding/actions";
 import AppShell from "@/ui/AppShell";
 
+export const dynamic = "force-dynamic";
+
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const identity = await getCurrentIdentity();
   if (!identity) {

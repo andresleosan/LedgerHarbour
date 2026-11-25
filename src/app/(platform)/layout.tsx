@@ -9,6 +9,8 @@ import { requirePlatformMember } from "@/modules/platform/platform-service";
 import { getPersistenceContext } from "@/modules/persistence/repository-factory";
 import PlatformShell from "@/ui/platform/PlatformShell";
 
+export const dynamic = "force-dynamic";
+
 export default async function PlatformLayout({ children }: { children: ReactNode }) {
   const identity = await getCurrentIdentity();
   if (!identity) {
